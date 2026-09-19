@@ -1,0 +1,1898 @@
+"use client";
+
+import React, { createContext, useContext, useState, useEffect } from "react";
+import {
+  Siswa,
+  Guru,
+  Kelas,
+  MataPelajaran,
+  JadwalPelajaran,
+  PresensiRecord,
+  NilaiSiswa,
+  TagihanSPP,
+  TagihanSiswa,
+  KategoriTagihan,
+  MetodePembayaranTagihan,
+  Pengumuman,
+  SchoolProfile,
+  StatusKehadiran,
+  TabunganSiswa,
+  TransaksiTabungan,
+  JenisTagihan,
+  BulanSPP,
+  PesertaTransportasi,
+  RecordSPPTransportTahunAjaran,
+  TransaksiSPPTransport,
+  LMSMateri,
+  LMSTugas,
+  LMSSubmission,
+  StatusSubmission,
+  LMSKuis,
+  LMSKuisAttempt,
+  LMSForumDiskusi,
+  LMSKomentarForum,
+  LMSVirtualMeeting,
+  LMSBankSoal,
+  LMSBankSoalItem,
+  LMSJadwalMateri,
+} from "@/types/school";
+import {
+  INITIAL_SCHOOL_PROFILE,
+  INITIAL_SISWA,
+  INITIAL_GURU,
+  INITIAL_KELAS,
+  INITIAL_MAPEL,
+  INITIAL_JADWAL,
+  INITIAL_PRESENSI,
+  INITIAL_NILAI,
+  INITIAL_SPP,
+  INITIAL_JENIS_TAGIHAN,
+  INITIAL_PENGUMUMAN,
+  INITIAL_TABUNGAN,
+  INITIAL_TRANSAKSI_TABUNGAN,
+  INITIAL_PESERTA_TRANSPORT,
+  INITIAL_SPP_TRANSPORT_RECORDS,
+  INITIAL_TRANSAKSI_SPP_TRANSPORT,
+  INITIAL_LMS_MATERI,
+  INITIAL_LMS_TUGAS,
+  INITIAL_LMS_SUBMISSIONS,
+  INITIAL_LMS_KUIS,
+  INITIAL_LMS_ATTEMPTS,
+  INITIAL_LMS_FORUM,
+  INITIAL_LMS_MEETINGS,
+  INITIAL_LMS_BANK_SOAL,
+  INITIAL_LMS_JADWAL_MATERI,
+  generateStudentYearRecord,
+} from "@/lib/mock-data";
+
+interface SchoolDataContextType {
+  profile: SchoolProfile;
+  updateProfile: (profile: SchoolProfile) => void;
+  siswaList: Siswa[];
+  addSiswa: (siswa: Omit<Siswa, "id">) => void;
+  importSiswaList: (siswaList: Omit<Siswa, "id">[]) => void;
+  updateSiswa: (id: string, siswa: Partial<Siswa>) => void;
+  deleteSiswa: (id: string) => void;
+  guruList: Guru[];
+  addGuru: (guru: Omit<Guru, "id">) => void;
+  updateGuru: (id: string, guru: Partial<Guru>) => void;
+  deleteGuru: (id: string) => void;
+  kelasList: Kelas[];
+  addKelas: (kelas: Omit<Kelas, "id" | "jumlahSiswa">) => void;
+  updateKelas: (id: string, kelas: Partial<Kelas>) => void;
+  deleteKelas: (id: string, targetKelasForStudents?: string) => void;
+  mapelList: MataPelajaran[];
+  jadwalList: JadwalPelajaran[];
+  addJadwal: (jadwal: Omit<JadwalPelajaran, "id">) => void;
+  bulkAddJadwal: (items: Omit<JadwalPelajaran, "id">[]) => void;
+  updateJadwal: (id: string, jadwal: Partial<JadwalPelajaran>) => void;
+  deleteJadwal: (id: string) => void;
+  bulkDeleteJadwal: (ids: string[]) => void;
+  resetJadwalToDefault: () => void;
+  presensiList: PresensiRecord[];
+  updatePresensi: (siswaId: string, status: StatusKehadiran, keterangan?: string, tanggal?: string) => void;
+  nilaiList: NilaiSiswa[];
+  saveNilai: (nilai: Omit<NilaiSiswa, "id"> & { id?: string }) => void;
+  bulkSaveNilai: (items: (Omit<NilaiSiswa, "id"> & { id?: string })[]) => void;
+  sppList: TagihanSPP[];
+  jenisTagihanList: JenisTagihan[];
+  addJenisTagihan: (data: Omit<JenisTagihan, "id">) => void;
+  updateJenisTagihan: (id: string, data: Partial<JenisTagihan>) => void;
+  deleteJenisTagihan: (id: string, fallbackNama?: string) => void;
+  addTagihan: (data: Omit<TagihanSiswa, "id">) => void;
+  bulkAddTagihan: (
+    kelas: string,
+    judul: string,
+    kategori: KategoriTagihan,
+    nominal: number,
+    jatuhTempo: string,
+    keterangan?: string
+  ) => void;
+  bayarSPP: (id: string, metode: MetodePembayaranTagihan) => void;
+  bayarTagihanDariTabungan: (
+    tagihanId: string,
+    petugas?: string
+  ) => { success: boolean; message?: string };
+  bulkBayarTagihanDariTabungan: (
+    kelas?: string
+  ) => { successCount: number; failCount: number };
+  pengumumanList: Pengumuman[];
+  addPengumuman: (pengumuman: Omit<Pengumuman, "id" | "tanggal">) => void;
+  deletePengumuman: (id: string) => void;
+  tabunganList: TabunganSiswa[];
+  transaksiTabunganList: TransaksiTabungan[];
+  setorTabungan: (siswaId: string, nominal: number, keterangan?: string, petugas?: string, tanggal?: string) => void;
+  tarikTabungan: (siswaId: string, nominal: number, keterangan?: string, petugas?: string, tanggal?: string) => { success: boolean; message?: string };
+  bulkSetorTabungan: (items: { siswaId: string; nominal: number; keterangan?: string }[], petugas?: string, tanggal?: string) => void;
+  pesertaTransportList: PesertaTransportasi[];
+  sppTransportRecords: RecordSPPTransportTahunAjaran[];
+  transaksiSPPTransportList: TransaksiSPPTransport[];
+  updatePesertaTransport: (siswaId: string, isAktif: boolean, biayaBulanan?: number, rute?: string) => void;
+  bayarSPPTransport: (params: {
+    siswaId: string;
+    tahunAjaran: string;
+    jenis: "SPP" | "Transportasi" | "Paket Keduanya";
+    bulan: BulanSPP[];
+    metodePembayaran: MetodePembayaranTagihan;
+    tanggalBayar?: string;
+    petugas?: string;
+    keterangan?: string;
+  }) => { success: boolean; message?: string; noKuitansi?: string };
+  bulkBayarSPPTransportDariTabungan: (params: {
+    kelas?: string;
+    tahunAjaran: string;
+    bulan: BulanSPP;
+    jenis: "SPP" | "Transportasi" | "Paket Keduanya";
+    petugas?: string;
+  }) => {
+    successCount: number;
+    skippedCount: number;
+    insufficientCount: number;
+    totalAmount: number;
+    insufficientNames: string[];
+  };
+  getStudentSPPTransportRecord: (siswaId: string, tahunAjaran: string) => RecordSPPTransportTahunAjaran;
+
+  // LMS Methods & States
+  lmsMateriList: LMSMateri[];
+  addMateri: (materi: Omit<LMSMateri, "id" | "createdAt" | "sudahDibacaSiswaIds">) => LMSMateri;
+  updateMateri: (id: string, materi: Partial<LMSMateri>) => void;
+  deleteMateri: (id: string) => void;
+  toggleBacaMateri: (materiId: string, siswaId: string) => void;
+
+  lmsTugasList: LMSTugas[];
+  addTugas: (tugas: Omit<LMSTugas, "id" | "createdAt">) => LMSTugas;
+  updateTugas: (id: string, tugas: Partial<LMSTugas>) => void;
+  deleteTugas: (id: string) => void;
+
+  lmsSubmissionList: LMSSubmission[];
+  submitTugas: (data: {
+    tugasId: string;
+    siswaId: string;
+    siswaNama: string;
+    siswaNisn: string;
+    kelas: string;
+    catatanSiswa: string;
+    fileJawabanUrl?: string;
+  }) => LMSSubmission;
+  nilaiSubmission: (submissionId: string, nilai: number, feedback?: string) => void;
+
+  lmsKuisList: LMSKuis[];
+  addKuis: (kuis: Omit<LMSKuis, "id" | "createdAt">) => LMSKuis;
+  deleteKuis: (id: string) => void;
+
+  lmsKuisAttemptList: LMSKuisAttempt[];
+  submitKuisAttempt: (attempt: Omit<LMSKuisAttempt, "id" | "selesaiPada">) => LMSKuisAttempt;
+
+  lmsForumList: LMSForumDiskusi[];
+  addForumTopik: (topik: Omit<LMSForumDiskusi, "id" | "tanggal" | "komentarList">) => LMSForumDiskusi;
+  addKomentarForum: (topikId: string, komentar: Omit<LMSKomentarForum, "id" | "tanggal">) => void;
+
+  lmsMeetingList: LMSVirtualMeeting[];
+  addMeeting: (meeting: Omit<LMSVirtualMeeting, "id">) => LMSVirtualMeeting;
+  deleteMeeting: (id: string) => void;
+
+  // LMS Bank Soal
+  lmsBankSoalList: LMSBankSoal[];
+  addBankSoal: (bank: Omit<LMSBankSoal, "id" | "createdAt">) => LMSBankSoal;
+  updateBankSoal: (id: string, bank: Partial<LMSBankSoal>) => void;
+  deleteBankSoal: (id: string) => void;
+  addSoalToBank: (bankId: string, soal: Omit<LMSBankSoalItem, "id">) => void;
+  updateSoalInBank: (bankId: string, soalId: string, soal: Partial<LMSBankSoalItem>) => void;
+  deleteSoalFromBank: (bankId: string, soalId: string) => void;
+  generateKuisFromBankSoal: (params: {
+    judul: string;
+    mapel: string;
+    kelas: string;
+    durasiMenit: number;
+    kkm: number;
+    deadline: string;
+    deskripsi: string;
+    soalItems: LMSBankSoalItem[];
+    guruNama: string;
+  }) => LMSKuis;
+
+  lmsJadwalMateriList: LMSJadwalMateri[];
+  addJadwalMateri: (data: Omit<LMSJadwalMateri, "id">) => LMSJadwalMateri;
+  updateJadwalMateri: (id: string, data: Partial<LMSJadwalMateri>) => void;
+  deleteJadwalMateri: (id: string) => void;
+  toggleRealisasiJadwal: (
+    id: string,
+    payload?: {
+      sudahDiajarkan?: boolean;
+      catatanPembelajaran?: string;
+      tanggalRealisasi?: string;
+      jamRealisasi?: string;
+      guruPengajar?: string;
+    }
+  ) => void;
+
+  resetToDefault: () => void;
+}
+
+
+
+const SchoolDataContext = createContext<SchoolDataContextType | undefined>(undefined);
+
+export function SchoolDataProvider({ children }: { children: React.ReactNode }) {
+  const [profile, setProfile] = useState<SchoolProfile>(INITIAL_SCHOOL_PROFILE);
+  const [siswaList, setSiswaList] = useState<Siswa[]>(INITIAL_SISWA);
+  const [guruList, setGuruList] = useState<Guru[]>(INITIAL_GURU);
+  const [kelasList, setKelasList] = useState<Kelas[]>(INITIAL_KELAS);
+  const [mapelList, setMapelList] = useState<MataPelajaran[]>(INITIAL_MAPEL);
+  const [jadwalList, setJadwalList] = useState<JadwalPelajaran[]>(INITIAL_JADWAL);
+  const [presensiList, setPresensiList] = useState<PresensiRecord[]>(INITIAL_PRESENSI);
+  const [nilaiList, setNilaiList] = useState<NilaiSiswa[]>(INITIAL_NILAI);
+  const [sppList, setSppList] = useState<TagihanSPP[]>(INITIAL_SPP);
+  const [jenisTagihanList, setJenisTagihanList] = useState<JenisTagihan[]>(INITIAL_JENIS_TAGIHAN);
+  const [pengumumanList, setPengumumanList] = useState<Pengumuman[]>(INITIAL_PENGUMUMAN);
+  const [tabunganList, setTabunganList] = useState<TabunganSiswa[]>(INITIAL_TABUNGAN);
+  const [transaksiTabunganList, setTransaksiTabunganList] = useState<TransaksiTabungan[]>(INITIAL_TRANSAKSI_TABUNGAN);
+  const [pesertaTransportList, setPesertaTransportList] = useState<PesertaTransportasi[]>(INITIAL_PESERTA_TRANSPORT);
+  const [sppTransportRecords, setSppTransportRecords] = useState<RecordSPPTransportTahunAjaran[]>(INITIAL_SPP_TRANSPORT_RECORDS);
+  const [transaksiSPPTransportList, setTransaksiSPPTransportList] = useState<TransaksiSPPTransport[]>(INITIAL_TRANSAKSI_SPP_TRANSPORT);
+
+  // LMS States
+  const [lmsMateriList, setLmsMateriList] = useState<LMSMateri[]>(INITIAL_LMS_MATERI);
+  const [lmsTugasList, setLmsTugasList] = useState<LMSTugas[]>(INITIAL_LMS_TUGAS);
+  const [lmsSubmissionList, setLmsSubmissionList] = useState<LMSSubmission[]>(INITIAL_LMS_SUBMISSIONS);
+  const [lmsKuisList, setLmsKuisList] = useState<LMSKuis[]>(INITIAL_LMS_KUIS);
+  const [lmsKuisAttemptList, setLmsKuisAttemptList] = useState<LMSKuisAttempt[]>(INITIAL_LMS_ATTEMPTS);
+  const [lmsForumList, setLmsForumList] = useState<LMSForumDiskusi[]>(INITIAL_LMS_FORUM);
+  const [lmsMeetingList, setLmsMeetingList] = useState<LMSVirtualMeeting[]>(INITIAL_LMS_MEETINGS);
+  const [lmsBankSoalList, setLmsBankSoalList] = useState<LMSBankSoal[]>(INITIAL_LMS_BANK_SOAL);
+  const [lmsJadwalMateriList, setLmsJadwalMateriList] = useState<LMSJadwalMateri[]>(INITIAL_LMS_JADWAL_MATERI);
+
+  // Load from LocalStorage on client mount
+  useEffect(() => {
+    try {
+      const load = <T,>(key: string, fallback: T): T => {
+        const item = localStorage.getItem(`sim_data_${key}`);
+        return item ? JSON.parse(item) : fallback;
+      };
+
+      setProfile(load("profile", INITIAL_SCHOOL_PROFILE));
+      const loadedSiswa = load("siswa", INITIAL_SISWA);
+      setSiswaList(loadedSiswa && loadedSiswa.length > 0 ? loadedSiswa : INITIAL_SISWA);
+      const loadedGuru = load("guru", INITIAL_GURU);
+      const baseGuruList = loadedGuru && loadedGuru.length > 0 ? loadedGuru : INITIAL_GURU;
+      const sanitizedGuru = baseGuruList.map((g: any) => ({
+        ...g,
+        id: g.id || `gur-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        nama: g.nama || "Tenaga Pendidik",
+        nip: g.nip || "198001012005011001",
+        gelar: g.gelar || "",
+        jenisKelamin: g.jenisKelamin === "P" ? "P" : "L",
+        mataPelajaran: Array.isArray(g.mataPelajaran)
+          ? g.mataPelajaran
+          : typeof g.mataPelajaran === "string" && g.mataPelajaran.trim()
+          ? g.mataPelajaran.split(",").map((s: string) => s.trim())
+          : ["Umum"],
+        kelasWali: g.kelasWali || "",
+        pendidikanTerakhir: g.pendidikanTerakhir || "S1 Pendidikan",
+        statusKepegawaian: g.statusKepegawaian || "PNS",
+        email: g.email || `${(g.nama || "guru").toLowerCase().replace(/[^a-z0-9]/g, "")}@sekolah.id`,
+        noHp: g.noHp || "0812-3456-7890",
+        avatar: g.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(g.nama || "Guru")}`,
+      }));
+      setGuruList(sanitizedGuru);
+      const loadedKelas = load("kelas", INITIAL_KELAS);
+      const baseKelasList = loadedKelas && loadedKelas.length > 0 ? loadedKelas : INITIAL_KELAS;
+      const mergedKelas = [...baseKelasList];
+      INITIAL_KELAS.forEach((ik) => {
+        if (!mergedKelas.some((k) => k.id === ik.id || k.nama.toLowerCase() === ik.nama.toLowerCase())) {
+          mergedKelas.push(ik);
+        }
+      });
+      setKelasList(mergedKelas);
+      setMapelList(load("mapel", INITIAL_MAPEL));
+      setJadwalList(load("jadwal", INITIAL_JADWAL));
+      setPresensiList(load("presensi", INITIAL_PRESENSI));
+      setNilaiList(load("nilai", INITIAL_NILAI));
+      setSppList(load("spp", INITIAL_SPP));
+      setJenisTagihanList(load("jenis_tagihan", INITIAL_JENIS_TAGIHAN));
+      setPengumumanList(load("pengumuman", INITIAL_PENGUMUMAN));
+      setTabunganList(load("tabungan", INITIAL_TABUNGAN));
+      setTransaksiTabunganList(load("transaksi_tabungan", INITIAL_TRANSAKSI_TABUNGAN));
+      setPesertaTransportList(load("peserta_transport", INITIAL_PESERTA_TRANSPORT));
+      setSppTransportRecords(load("spp_transport_records", INITIAL_SPP_TRANSPORT_RECORDS));
+      setTransaksiSPPTransportList(load("transaksi_spp_transport", INITIAL_TRANSAKSI_SPP_TRANSPORT));
+
+      // Load LMS Data with automatic merging of new default items
+      const loadedMateri = load("lms_materi", INITIAL_LMS_MATERI);
+      const mergedMateri = Array.isArray(loadedMateri) ? [...loadedMateri] : [...INITIAL_LMS_MATERI];
+      INITIAL_LMS_MATERI.forEach((im) => {
+        if (!mergedMateri.some((m) => m.id === im.id)) {
+          mergedMateri.push(im);
+        }
+      });
+      setLmsMateriList(mergedMateri);
+
+      const loadedTugas = load("lms_tugas", INITIAL_LMS_TUGAS);
+      const mergedTugas = Array.isArray(loadedTugas) ? [...loadedTugas] : [...INITIAL_LMS_TUGAS];
+      INITIAL_LMS_TUGAS.forEach((it) => {
+        if (!mergedTugas.some((t) => t.id === it.id)) {
+          mergedTugas.push(it);
+        }
+      });
+      setLmsTugasList(mergedTugas);
+
+      setLmsSubmissionList(load("lms_submissions", INITIAL_LMS_SUBMISSIONS));
+
+      const loadedKuis = load("lms_kuis", INITIAL_LMS_KUIS);
+      const mergedKuis = Array.isArray(loadedKuis) ? [...loadedKuis] : [...INITIAL_LMS_KUIS];
+      INITIAL_LMS_KUIS.forEach((ik) => {
+        if (!mergedKuis.some((k) => k.id === ik.id)) {
+          mergedKuis.push(ik);
+        }
+      });
+      setLmsKuisList(mergedKuis);
+
+      setLmsKuisAttemptList(load("lms_attempts", INITIAL_LMS_ATTEMPTS));
+      setLmsForumList(load("lms_forum", INITIAL_LMS_FORUM));
+      const loadedBank = load("lms_bank_soal", INITIAL_LMS_BANK_SOAL);
+      if (Array.isArray(loadedBank) && loadedBank.length > 0 && Array.isArray((loadedBank[0] as any)?.soalList)) {
+        const mergedBank = [...loadedBank];
+        INITIAL_LMS_BANK_SOAL.forEach((ib) => {
+          if (!mergedBank.some((b) => b.id === ib.id)) {
+            mergedBank.push(ib);
+          }
+        });
+        setLmsBankSoalList(mergedBank);
+      } else {
+        setLmsBankSoalList(INITIAL_LMS_BANK_SOAL);
+        saveState("lms_bank_soal", INITIAL_LMS_BANK_SOAL);
+      }
+
+      const loadedJadwalMateri = load("lms_jadwal_materi", INITIAL_LMS_JADWAL_MATERI);
+      const mergedJadwalMateri = Array.isArray(loadedJadwalMateri) ? [...loadedJadwalMateri] : [...INITIAL_LMS_JADWAL_MATERI];
+      INITIAL_LMS_JADWAL_MATERI.forEach((ij) => {
+        if (!mergedJadwalMateri.some((j) => j.id === ij.id)) {
+          mergedJadwalMateri.push(ij);
+        }
+      });
+      setLmsJadwalMateriList(mergedJadwalMateri);
+    } catch (e) {
+      console.warn("Could not read from local storage", e);
+    }
+  }, []);
+
+  // Sync to LocalStorage
+  const saveState = (key: string, value: unknown) => {
+    try {
+      localStorage.setItem(`sim_data_${key}`, JSON.stringify(value));
+    } catch (e) {
+      console.warn(`Failed to persist ${key}`, e);
+    }
+  };
+
+  const updateProfile = (newProfile: SchoolProfile) => {
+    setProfile(newProfile);
+    saveState("profile", newProfile);
+  };
+
+  // Siswa Actions
+  const addSiswa = (siswaData: Omit<Siswa, "id">) => {
+    const newSiswa: Siswa = {
+      ...siswaData,
+      id: `sis-${Date.now()}`,
+      avatar:
+        siswaData.avatar ||
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(siswaData.nama)}`,
+    };
+    const updated = [newSiswa, ...siswaList];
+    setSiswaList(updated);
+    saveState("siswa", updated);
+  };
+
+  const importSiswaList = (newStudents: Omit<Siswa, "id">[]) => {
+    const now = Date.now();
+    const created: Siswa[] = newStudents.map((s, idx) => ({
+      ...s,
+      id: `sis-${now}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+      avatar:
+        s.avatar ||
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.nama)}`,
+    }));
+    setSiswaList((prev) => {
+      const updated = [...created, ...prev];
+      saveState("siswa", updated);
+      return updated;
+    });
+  };
+
+  const updateSiswa = (id: string, updatedData: Partial<Siswa>) => {
+    const updated = siswaList.map((s) => (s.id === id ? { ...s, ...updatedData } : s));
+    setSiswaList(updated);
+    saveState("siswa", updated);
+  };
+
+  const deleteSiswa = (id: string) => {
+    const updated = siswaList.filter((s) => s.id !== id);
+    setSiswaList(updated);
+    saveState("siswa", updated);
+  };
+
+  // Guru Actions
+  const addGuru = (guruData: Omit<Guru, "id">) => {
+    const newGuru: Guru = {
+      ...guruData,
+      id: `gur-${Date.now()}`,
+      avatar:
+        guruData.avatar ||
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(guruData.nama)}`,
+    };
+    const updated = [newGuru, ...guruList];
+    setGuruList(updated);
+    saveState("guru", updated);
+  };
+
+  const updateGuru = (id: string, updatedData: Partial<Guru>) => {
+    const updated = guruList.map((g) => (g.id === id ? { ...g, ...updatedData } : g));
+    setGuruList(updated);
+    saveState("guru", updated);
+  };
+
+  const deleteGuru = (id: string) => {
+    const updated = guruList.filter((g) => g.id !== id);
+    setGuruList(updated);
+    saveState("guru", updated);
+  };
+
+  // Kelas Actions
+  const addKelas = (kelasData: Omit<Kelas, "id" | "jumlahSiswa">) => {
+    const newKelas: Kelas = {
+      ...kelasData,
+      id: `cls-${Date.now()}`,
+      jumlahSiswa: 0,
+    };
+    const updated = [...kelasList, newKelas];
+    setKelasList(updated);
+    saveState("kelas", updated);
+
+    // If waliKelasId was assigned, sync guru's kelasWali
+    if (newKelas.waliKelasId) {
+      const updatedGuru = guruList.map((g) =>
+        g.id === newKelas.waliKelasId ? { ...g, kelasWali: newKelas.nama } : g
+      );
+      setGuruList(updatedGuru);
+      saveState("guru", updatedGuru);
+    }
+  };
+
+  const updateKelas = (id: string, updatedData: Partial<Kelas>) => {
+    const oldKelas = kelasList.find((k) => k.id === id);
+    if (!oldKelas) return;
+
+    const oldNama = oldKelas.nama;
+    const newNama = updatedData.nama || oldNama;
+    const oldWaliId = oldKelas.waliKelasId;
+    const newWaliId = updatedData.waliKelasId;
+
+    const updated = kelasList.map((k) => (k.id === id ? { ...k, ...updatedData } : k));
+    setKelasList(updated);
+    saveState("kelas", updated);
+
+    // If class name changed, cascade update to Siswa, Jadwal, Presensi, Nilai
+    if (oldNama !== newNama) {
+      const updatedSiswa = siswaList.map((s) =>
+        s.kelas === oldNama ? { ...s, kelas: newNama } : s
+      );
+      setSiswaList(updatedSiswa);
+      saveState("siswa", updatedSiswa);
+
+      const updatedJadwal = jadwalList.map((j) =>
+        j.kelas === oldNama ? { ...j, kelas: newNama } : j
+      );
+      setJadwalList(updatedJadwal);
+      saveState("jadwal", updatedJadwal);
+
+      const updatedPresensi = presensiList.map((p) =>
+        p.kelas === oldNama ? { ...p, kelas: newNama } : p
+      );
+      setPresensiList(updatedPresensi);
+      saveState("presensi", updatedPresensi);
+
+      const updatedNilai = nilaiList.map((n) =>
+        n.kelas === oldNama ? { ...n, kelas: newNama } : n
+      );
+      setNilaiList(updatedNilai);
+      saveState("nilai", updatedNilai);
+    }
+
+    // Update Guru wali assignment if changed
+    if (newWaliId !== undefined && newWaliId !== oldWaliId) {
+      const updatedGuru = guruList.map((g) => {
+        if (g.id === newWaliId) {
+          return { ...g, kelasWali: newNama };
+        }
+        if (g.id === oldWaliId && g.kelasWali === oldNama) {
+          const { kelasWali, ...rest } = g;
+          return rest as Guru;
+        }
+        return g;
+      });
+      setGuruList(updatedGuru);
+      saveState("guru", updatedGuru);
+    }
+  };
+
+  const deleteKelas = (id: string, targetKelasForStudents?: string) => {
+    const kelasToDelete = kelasList.find((k) => k.id === id);
+    if (!kelasToDelete) return;
+
+    const targetNama = targetKelasForStudents || "Belum Ditentukan";
+
+    // Remove from kelasList
+    const updatedKelasList = kelasList.filter((k) => k.id !== id);
+    setKelasList(updatedKelasList);
+    saveState("kelas", updatedKelasList);
+
+    // Reassign students belonging to this class
+    const updatedSiswa = siswaList.map((s) =>
+      s.kelas === kelasToDelete.nama ? { ...s, kelas: targetNama } : s
+    );
+    setSiswaList(updatedSiswa);
+    saveState("siswa", updatedSiswa);
+
+    // Reassign schedule belonging to this class
+    const updatedJadwal = jadwalList.filter((j) => j.kelas !== kelasToDelete.nama);
+    setJadwalList(updatedJadwal);
+    saveState("jadwal", updatedJadwal);
+
+    // Clear waliKelas from the previously assigned guru
+    if (kelasToDelete.waliKelasId) {
+      const updatedGuru = guruList.map((g) =>
+        g.id === kelasToDelete.waliKelasId && g.kelasWali === kelasToDelete.nama
+          ? (() => {
+              const { kelasWali, ...rest } = g;
+              return rest as Guru;
+            })()
+          : g
+      );
+      setGuruList(updatedGuru);
+      saveState("guru", updatedGuru);
+    }
+  };
+
+  // Jadwal Actions
+  const addJadwal = (jadwalData: Omit<JadwalPelajaran, "id">) => {
+    const newJadwal: JadwalPelajaran = {
+      ...jadwalData,
+      id: `jdw-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    };
+    const updated = [...jadwalList, newJadwal];
+    setJadwalList(updated);
+    saveState("jadwal", updated);
+  };
+
+  const bulkAddJadwal = (items: Omit<JadwalPelajaran, "id">[]) => {
+    const newItems: JadwalPelajaran[] = items.map((item, idx) => ({
+      ...item,
+      id: `jdw-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+    }));
+    const updated = [...jadwalList, ...newItems];
+    setJadwalList(updated);
+    saveState("jadwal", updated);
+  };
+
+  const updateJadwal = (id: string, updatedData: Partial<JadwalPelajaran>) => {
+    const updated = jadwalList.map((j) => (j.id === id ? { ...j, ...updatedData } : j));
+    setJadwalList(updated);
+    saveState("jadwal", updated);
+  };
+
+  const deleteJadwal = (id: string) => {
+    const updated = jadwalList.filter((j) => j.id !== id);
+    setJadwalList(updated);
+    saveState("jadwal", updated);
+  };
+
+  const bulkDeleteJadwal = (ids: string[]) => {
+    const idSet = new Set(ids);
+    const updated = jadwalList.filter((j) => !idSet.has(j.id));
+    setJadwalList(updated);
+    saveState("jadwal", updated);
+  };
+
+  const resetJadwalToDefault = () => {
+    setJadwalList(INITIAL_JADWAL);
+    saveState("jadwal", INITIAL_JADWAL);
+  };
+
+  // Presensi Actions
+  const updatePresensi = (
+    siswaId: string,
+    status: StatusKehadiran,
+    keterangan?: string,
+    tanggal?: string
+  ) => {
+    const targetDate = tanggal || new Date().toISOString().split("T")[0];
+    const existingIndex = presensiList.findIndex(
+      (p) => p.siswaId === siswaId && p.tanggal === targetDate
+    );
+
+    let updated: PresensiRecord[];
+    const siswa = siswaList.find((s) => s.id === siswaId);
+    if (!siswa) return;
+
+    if (existingIndex >= 0) {
+      updated = [...presensiList];
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        status,
+        keterangan: keterangan !== undefined ? keterangan : updated[existingIndex].keterangan,
+      };
+    } else {
+      const newPresensi: PresensiRecord = {
+        id: `prs-${Date.now()}-${siswaId}`,
+        siswaId,
+        siswaNama: siswa.nama,
+        kelas: siswa.kelas,
+        tanggal: targetDate,
+        status,
+        keterangan,
+      };
+      updated = [newPresensi, ...presensiList];
+    }
+    setPresensiList(updated);
+    saveState("presensi", updated);
+  };
+
+  // Nilai Actions
+  const saveNilai = (data: Omit<NilaiSiswa, "id"> & { id?: string }) => {
+    let updated: NilaiSiswa[];
+    if (data.id) {
+      updated = nilaiList.map((n) => (n.id === data.id ? ({ ...n, ...data } as NilaiSiswa) : n));
+    } else {
+      const newNilai: NilaiSiswa = {
+        ...data,
+        id: `nil-${Date.now()}`,
+      };
+      updated = [newNilai, ...nilaiList];
+    }
+    setNilaiList(updated);
+    saveState("nilai", updated);
+  };
+
+  const bulkSaveNilai = (items: (Omit<NilaiSiswa, "id"> & { id?: string })[]) => {
+    let updated = [...nilaiList];
+    items.forEach((item, index) => {
+      const existingIndex = item.id
+        ? updated.findIndex((n) => n.id === item.id)
+        : updated.findIndex(
+            (n) =>
+              n.siswaId === item.siswaId &&
+              n.mapel.toLowerCase() === item.mapel.toLowerCase()
+          );
+
+      if (existingIndex >= 0) {
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          ...item,
+        } as NilaiSiswa;
+      } else {
+        const newNilai: NilaiSiswa = {
+          ...item,
+          id: item.id || `nil-${Date.now()}-${index}`,
+        };
+        updated = [newNilai, ...updated];
+      }
+    });
+    setNilaiList(updated);
+    saveState("nilai", updated);
+  };
+
+  // Jenis Tagihan (Billing Categories) Actions
+  const addJenisTagihan = (data: Omit<JenisTagihan, "id">) => {
+    const newJenis: JenisTagihan = {
+      ...data,
+      id: `jt-${Date.now()}`,
+    };
+    const updated = [...jenisTagihanList, newJenis];
+    setJenisTagihanList(updated);
+    saveState("jenis_tagihan", updated);
+  };
+
+  const updateJenisTagihan = (id: string, data: Partial<JenisTagihan>) => {
+    const oldItem = jenisTagihanList.find((j) => j.id === id);
+    if (!oldItem) return;
+
+    const oldNama = oldItem.nama;
+    const newNama = data.nama || oldNama;
+
+    const updated = jenisTagihanList.map((j) => (j.id === id ? { ...j, ...data } : j));
+    setJenisTagihanList(updated);
+    saveState("jenis_tagihan", updated);
+
+    // If name changed, cascade update existing bills in sppList
+    if (oldNama !== newNama) {
+      const updatedBills = sppList.map((b) =>
+        b.kategori === oldNama ? { ...b, kategori: newNama } : b
+      );
+      setSppList(updatedBills);
+      saveState("spp", updatedBills);
+    }
+  };
+
+  const deleteJenisTagihan = (id: string, fallbackNama: string = "Lainnya") => {
+    const itemToDelete = jenisTagihanList.find((j) => j.id === id);
+    if (!itemToDelete) return;
+
+    const updated = jenisTagihanList.filter((j) => j.id !== id);
+    setJenisTagihanList(updated);
+    saveState("jenis_tagihan", updated);
+
+    // Cascade update existing bills with deleted category to fallbackNama
+    const updatedBills = sppList.map((b) =>
+      b.kategori === itemToDelete.nama ? { ...b, kategori: fallbackNama } : b
+    );
+    setSppList(updatedBills);
+    saveState("spp", updatedBills);
+  };
+
+  // Tagihan & SPP Actions
+  const addTagihan = (data: Omit<TagihanSiswa, "id">) => {
+    const newTagihan: TagihanSiswa = {
+      ...data,
+      id: `tag-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+    };
+    const updated = [newTagihan, ...sppList];
+    setSppList(updated);
+    saveState("spp", updated);
+  };
+
+  const bulkAddTagihan = (
+    kelas: string,
+    judul: string,
+    kategori: KategoriTagihan,
+    nominal: number,
+    jatuhTempo: string,
+    keterangan?: string
+  ) => {
+    const studentsInClass = siswaList.filter((s) => s.kelas === kelas);
+    if (studentsInClass.length === 0) return;
+
+    const newBills: TagihanSiswa[] = studentsInClass.map((s, idx) => ({
+      id: `tag-${Date.now()}-${idx}`,
+      siswaId: s.id,
+      siswaNama: s.nama,
+      nisn: s.nisn,
+      kelas: s.kelas,
+      judul,
+      kategori,
+      nominal,
+      jatuhTempo,
+      status: "Belum Lunas",
+      keterangan,
+    }));
+
+    const updated = [...newBills, ...sppList];
+    setSppList(updated);
+    saveState("spp", updated);
+  };
+
+  const bayarSPP = (id: string, metode: MetodePembayaranTagihan) => {
+    const now = new Date();
+    const invoiceNum = `KW-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, "0")}-${Math.floor(100 + Math.random() * 900)}`;
+    const todayStr = now.toISOString().split("T")[0];
+
+    const updated = sppList.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            status: "Lunas" as const,
+            tanggalBayar: todayStr,
+            metodePembayaran: metode,
+            noKuitansi: invoiceNum,
+          }
+        : item
+    );
+    setSppList(updated);
+    saveState("spp", updated);
+  };
+
+  const bayarTagihanDariTabungan = (
+    tagihanId: string,
+    petugas?: string
+  ): { success: boolean; message?: string } => {
+    const tagihan = sppList.find((item) => item.id === tagihanId);
+    if (!tagihan) {
+      return { success: false, message: "Data tagihan tidak ditemukan." };
+    }
+    if (tagihan.status === "Lunas") {
+      return { success: false, message: "Tagihan ini sudah lunas sebelumnya." };
+    }
+
+    const tabungan = tabunganList.find((t) => t.siswaId === tagihan.siswaId);
+    const saldoSaatIni = tabungan ? tabungan.saldo : 0;
+
+    if (saldoSaatIni < tagihan.nominal) {
+      return {
+        success: false,
+        message: `Saldo tabungan ${tagihan.siswaNama} (Rp ${saldoSaatIni.toLocaleString("id-ID")}) tidak cukup untuk melunasi tagihan sebesar Rp ${tagihan.nominal.toLocaleString("id-ID")}. Kurang Rp ${(tagihan.nominal - saldoSaatIni).toLocaleString("id-ID")}.`,
+      };
+    }
+
+    // Tarik saldo dari tabungan
+    const tarikResult = tarikTabungan(
+      tagihan.siswaId,
+      tagihan.nominal,
+      `Pelunasan Tagihan: ${tagihan.judul}`,
+      petugas || "Autodebet Tabungan Siswa"
+    );
+
+    if (!tarikResult.success) {
+      return tarikResult;
+    }
+
+    // Tandai tagihan sebagai lunas
+    const now = new Date();
+    const invoiceNum = `KW-TB-${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, "0")}-${Math.floor(100 + Math.random() * 900)}`;
+    const todayStr = now.toISOString().split("T")[0];
+
+    const updatedSpp = sppList.map((item) =>
+      item.id === tagihanId
+        ? {
+            ...item,
+            status: "Lunas" as const,
+            tanggalBayar: todayStr,
+            metodePembayaran: "Potong Tabungan Siswa" as MetodePembayaranTagihan,
+            noKuitansi: invoiceNum,
+          }
+        : item
+    );
+
+    setSppList(updatedSpp);
+    saveState("spp", updatedSpp);
+
+    return { success: true };
+  };
+
+  const bulkBayarTagihanDariTabungan = (
+    kelasFilter?: string
+  ): { successCount: number; failCount: number } => {
+    let successCount = 0;
+    let failCount = 0;
+
+    const unpaidBills = sppList.filter(
+      (b) =>
+        b.status !== "Lunas" &&
+        (!kelasFilter || kelasFilter === "Semua" || b.kelas === kelasFilter)
+    );
+
+    unpaidBills.forEach((b) => {
+      const tab = tabunganList.find((t) => t.siswaId === b.siswaId);
+      if (tab && tab.saldo >= b.nominal) {
+        const res = bayarTagihanDariTabungan(b.id, "Autodebet Massal");
+        if (res.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } else {
+        failCount++;
+      }
+    });
+
+    return { successCount, failCount };
+  };
+
+  // Pengumuman Actions
+  const addPengumuman = (data: Omit<Pengumuman, "id" | "tanggal">) => {
+    const today = new Date().toISOString().split("T")[0];
+    const newPengumuman: Pengumuman = {
+      ...data,
+      id: `ann-${Date.now()}`,
+      tanggal: today,
+    };
+    const updated = [newPengumuman, ...pengumumanList];
+    setPengumumanList(updated);
+    saveState("pengumuman", updated);
+  };
+
+  const deletePengumuman = (id: string) => {
+    const updated = pengumumanList.filter((p) => p.id !== id);
+    setPengumumanList(updated);
+    saveState("pengumuman", updated);
+  };
+
+  // Tabungan Actions
+  const setorTabungan = (
+    siswaId: string,
+    nominal: number,
+    keterangan?: string,
+    petugas?: string,
+    tanggal?: string
+  ) => {
+    if (nominal <= 0) return;
+    const today = tanggal || new Date().toISOString().split("T")[0];
+    const siswa = siswaList.find((s) => s.id === siswaId);
+    if (!siswa) return;
+
+    let updatedTabungan: TabunganSiswa[];
+    const targetTabungan = tabunganList.find((t) => t.siswaId === siswaId);
+    let tabId = `tab-${Date.now()}`;
+    let newSaldo = nominal;
+
+    if (targetTabungan) {
+      tabId = targetTabungan.id;
+      newSaldo = targetTabungan.saldo + nominal;
+      updatedTabungan = tabunganList.map((t) =>
+        t.siswaId === siswaId ? { ...t, saldo: newSaldo, terakhirUpdate: today } : t
+      );
+    } else {
+      const newTab: TabunganSiswa = {
+        id: tabId,
+        siswaId: siswa.id,
+        siswaNama: siswa.nama,
+        nisn: siswa.nisn,
+        kelas: siswa.kelas,
+        saldo: nominal,
+        terakhirUpdate: today,
+      };
+      updatedTabungan = [newTab, ...tabunganList];
+    }
+
+    const newTrx: TransaksiTabungan = {
+      id: `trx-${Date.now()}`,
+      tabunganId: tabId,
+      siswaId: siswa.id,
+      siswaNama: siswa.nama,
+      nisn: siswa.nisn,
+      kelas: siswa.kelas,
+      tipe: "Setor",
+      nominal,
+      saldoAkhir: newSaldo,
+      tanggal: today,
+      keterangan: keterangan || "Setoran tabungan tunai",
+      petugas: petugas || "Petugas Tata Usaha",
+      noReferensi: `TB-${today.replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`,
+    };
+
+    const updatedTrx = [newTrx, ...transaksiTabunganList];
+    setTabunganList(updatedTabungan);
+    setTransaksiTabunganList(updatedTrx);
+    saveState("tabungan", updatedTabungan);
+    saveState("transaksi_tabungan", updatedTrx);
+  };
+
+  const tarikTabungan = (
+    siswaId: string,
+    nominal: number,
+    keterangan?: string,
+    petugas?: string,
+    tanggal?: string
+  ) => {
+    if (nominal <= 0)
+      return { success: false, message: "Nominal penarikan harus lebih dari Rp 0" };
+    const targetTabungan = tabunganList.find((t) => t.siswaId === siswaId);
+    if (!targetTabungan || targetTabungan.saldo < nominal) {
+      return {
+        success: false,
+        message: "Saldo tabungan siswa tidak mencukupi untuk penarikan ini!",
+      };
+    }
+
+    const today = tanggal || new Date().toISOString().split("T")[0];
+    const newSaldo = targetTabungan.saldo - nominal;
+
+    const updatedTabungan = tabunganList.map((t) =>
+      t.siswaId === siswaId ? { ...t, saldo: newSaldo, terakhirUpdate: today } : t
+    );
+
+    const newTrx: TransaksiTabungan = {
+      id: `trx-${Date.now()}`,
+      tabunganId: targetTabungan.id,
+      siswaId: targetTabungan.siswaId,
+      siswaNama: targetTabungan.siswaNama,
+      nisn: targetTabungan.nisn,
+      kelas: targetTabungan.kelas,
+      tipe: "Tarik",
+      nominal,
+      saldoAkhir: newSaldo,
+      tanggal: today,
+      keterangan: keterangan || "Penarikan tabungan siswa",
+      petugas: petugas || "Petugas Tata Usaha",
+      noReferensi: `TR-${today.replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`,
+    };
+
+    const updatedTrx = [newTrx, ...transaksiTabunganList];
+    setTabunganList(updatedTabungan);
+    setTransaksiTabunganList(updatedTrx);
+    saveState("tabungan", updatedTabungan);
+    saveState("transaksi_tabungan", updatedTrx);
+
+    return { success: true };
+  };
+
+  const bulkSetorTabungan = (
+    items: { siswaId: string; nominal: number; keterangan?: string }[],
+    petugas?: string,
+    tanggal?: string
+  ) => {
+    const today = tanggal || new Date().toISOString().split("T")[0];
+    const validItems = items.filter((item) => item.nominal > 0);
+    if (validItems.length === 0) return;
+
+    let currentTabungan = [...tabunganList];
+    const newTransactions: TransaksiTabungan[] = [];
+
+    validItems.forEach((item, idx) => {
+      const siswa = siswaList.find((s) => s.id === item.siswaId);
+      if (!siswa) return;
+
+      const existingIndex = currentTabungan.findIndex((t) => t.siswaId === item.siswaId);
+      let newSaldo = item.nominal;
+      let tabId = `tab-${Date.now()}-${idx}`;
+
+      if (existingIndex >= 0) {
+        newSaldo = currentTabungan[existingIndex].saldo + item.nominal;
+        tabId = currentTabungan[existingIndex].id;
+        currentTabungan[existingIndex] = {
+          ...currentTabungan[existingIndex],
+          saldo: newSaldo,
+          terakhirUpdate: today,
+        };
+      } else {
+        const newTab: TabunganSiswa = {
+          id: tabId,
+          siswaId: siswa.id,
+          siswaNama: siswa.nama,
+          nisn: siswa.nisn,
+          kelas: siswa.kelas,
+          saldo: item.nominal,
+          terakhirUpdate: today,
+        };
+        currentTabungan = [newTab, ...currentTabungan];
+      }
+
+      newTransactions.push({
+        id: `trx-${Date.now()}-${idx}`,
+        tabunganId: tabId,
+        siswaId: siswa.id,
+        siswaNama: siswa.nama,
+        nisn: siswa.nisn,
+        kelas: siswa.kelas,
+        tipe: "Setor",
+        nominal: item.nominal,
+        saldoAkhir: newSaldo,
+        tanggal: today,
+        keterangan: item.keterangan || "Setoran tabungan kelas (Bulk)",
+        petugas: petugas || "Dewan Guru / Petugas",
+        noReferensi: `BK-${today.replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}-${idx + 1}`,
+      });
+    });
+
+    const updatedTrx = [...newTransactions, ...transaksiTabunganList];
+    setTabunganList(currentTabungan);
+    setTransaksiTabunganList(updatedTrx);
+    saveState("tabungan", currentTabungan);
+    saveState("transaksi_tabungan", updatedTrx);
+  };
+
+  // SPP & Transportasi Actions
+  const getStudentSPPTransportRecord = (siswaId: string, tahunAjaran: string): RecordSPPTransportTahunAjaran => {
+    const existing = sppTransportRecords.find(
+      (r) => r.siswaId === siswaId && r.tahunAjaran === tahunAjaran
+    );
+    if (existing) return existing;
+
+    const targetSiswa = siswaList.find((s) => s.id === siswaId);
+    if (!targetSiswa) {
+      throw new Error("Siswa tidak ditemukan");
+    }
+    const transportCfg = pesertaTransportList.find((t) => t.siswaId === siswaId);
+    const isTransport = transportCfg ? transportCfg.isAktif : false;
+    const biayaTransport = transportCfg ? transportCfg.biayaBulanan : 100000;
+    const newRecord = generateStudentYearRecord(targetSiswa, tahunAjaran, isTransport, biayaTransport, 0);
+
+    const updated = [newRecord, ...sppTransportRecords];
+    setSppTransportRecords(updated);
+    saveState("spp_transport_records", updated);
+    return newRecord;
+  };
+
+  const updatePesertaTransport = (
+    siswaId: string,
+    isAktif: boolean,
+    biayaBulanan: number = 100000,
+    rute: string = "-"
+  ) => {
+    const existingIndex = pesertaTransportList.findIndex((t) => t.siswaId === siswaId);
+    let updatedList: PesertaTransportasi[];
+    if (existingIndex >= 0) {
+      updatedList = pesertaTransportList.map((t) =>
+        t.siswaId === siswaId ? { ...t, isAktif, biayaBulanan, rute } : t
+      );
+    } else {
+      updatedList = [...pesertaTransportList, { siswaId, isAktif, biayaBulanan, rute }];
+    }
+    setPesertaTransportList(updatedList);
+    saveState("peserta_transport", updatedList);
+
+    // Update ongoing SPPTransportRecords that haven't been paid for transport
+    const updatedRecords = sppTransportRecords.map((rec) => {
+      if (rec.siswaId !== siswaId) return rec;
+      const updatedBulan = { ...rec.bulan };
+      (Object.keys(updatedBulan) as BulanSPP[]).forEach((b) => {
+        const item = updatedBulan[b];
+        if (item.transportStatus !== "Lunas") {
+          updatedBulan[b] = {
+            ...item,
+            isTransport: isAktif,
+            transportNominal: isAktif ? biayaBulanan : 0,
+            transportStatus: isAktif ? "Belum Bayar" : "Tidak Menggunakan",
+          };
+        } else {
+          updatedBulan[b] = {
+            ...item,
+            isTransport: isAktif,
+          };
+        }
+      });
+      return { ...rec, bulan: updatedBulan };
+    });
+    setSppTransportRecords(updatedRecords);
+    saveState("spp_transport_records", updatedRecords);
+  };
+
+  const bayarSPPTransport = (params: {
+    siswaId: string;
+    tahunAjaran: string;
+    jenis: "SPP" | "Transportasi" | "Paket Keduanya";
+    bulan: BulanSPP[];
+    metodePembayaran: MetodePembayaranTagihan;
+    tanggalBayar?: string;
+    petugas?: string;
+    keterangan?: string;
+  }): { success: boolean; message?: string; noKuitansi?: string } => {
+    const targetSiswa = siswaList.find((s) => s.id === params.siswaId);
+    if (!targetSiswa) return { success: false, message: "Siswa tidak ditemukan" };
+
+    const record = getStudentSPPTransportRecord(params.siswaId, params.tahunAjaran);
+    const today = params.tanggalBayar || new Date().toISOString().split("T")[0];
+    const noKwt = `KW-${params.jenis === "SPP" ? "SPP" : params.jenis === "Transportasi" ? "TRN" : "BYR"}-${params.tahunAjaran.replace("/", "")}-${Date.now().toString().slice(-6)}`;
+
+    // Hitung total nominal yang perlu dibayar
+    let totalNominal = 0;
+    const bulanCopy = { ...record.bulan };
+
+    params.bulan.forEach((b) => {
+      const current = bulanCopy[b];
+      if (!current) return;
+      if (params.jenis === "SPP" || params.jenis === "Paket Keduanya") {
+        if (current.sppStatus !== "Lunas") {
+          totalNominal += current.sppNominal; // Rp 100.000 / bulan
+        }
+      }
+      if (params.jenis === "Transportasi" || params.jenis === "Paket Keduanya") {
+        if (current.isTransport && current.transportStatus !== "Lunas") {
+          totalNominal += current.transportNominal;
+        }
+      }
+    });
+
+    if (totalNominal <= 0) {
+      return { success: false, message: "Bulan yang dipilih sudah lunas seluruhnya." };
+    }
+
+    // Jika metode pembayaran potong tabungan siswa
+    if (params.metodePembayaran === "Potong Tabungan Siswa") {
+      const studentTab = tabunganList.find((t) => t.siswaId === params.siswaId);
+      const studentSaldo = studentTab ? studentTab.saldo : 0;
+      if (studentSaldo < totalNominal) {
+        return {
+          success: false,
+          message: `Saldo tabungan siswa tidak mencukupi (Saldo: Rp ${studentSaldo.toLocaleString("id-ID")}, Total Tagihan: Rp ${totalNominal.toLocaleString("id-ID")})`,
+        };
+      }
+      tarikTabungan(
+        params.siswaId,
+        totalNominal,
+        `Pembayaran ${params.jenis} ${params.bulan.join(", ")} (${params.tahunAjaran})`,
+        params.petugas || "Sistem Autodebet SPP",
+        today
+      );
+    }
+
+    // Perbarui record bulan
+    params.bulan.forEach((b) => {
+      const cur = bulanCopy[b];
+      if (!cur) return;
+      const newCur = { ...cur };
+
+      if (params.jenis === "SPP" || params.jenis === "Paket Keduanya") {
+        newCur.sppStatus = "Lunas";
+        newCur.sppTanggalBayar = today;
+        newCur.sppMetode = params.metodePembayaran;
+        newCur.sppNoKuitansi = noKwt;
+      }
+
+      if (params.jenis === "Transportasi" || params.jenis === "Paket Keduanya") {
+        if (cur.isTransport) {
+          newCur.transportStatus = "Lunas";
+          newCur.transportTanggalBayar = today;
+          newCur.transportMetode = params.metodePembayaran;
+          newCur.transportNoKuitansi = noKwt;
+        }
+      }
+
+      bulanCopy[b] = newCur;
+    });
+
+    const updatedRecord: RecordSPPTransportTahunAjaran = {
+      ...record,
+      bulan: bulanCopy,
+    };
+
+    const newRecords = sppTransportRecords.map((r) =>
+      r.siswaId === params.siswaId && r.tahunAjaran === params.tahunAjaran ? updatedRecord : r
+    );
+    const exists = newRecords.some(
+      (r) => r.siswaId === params.siswaId && r.tahunAjaran === params.tahunAjaran
+    );
+    const finalRecords = exists ? newRecords : [updatedRecord, ...newRecords];
+
+    setSppTransportRecords(finalRecords);
+    saveState("spp_transport_records", finalRecords);
+
+    // Tambah log mutasi kuitansi
+    const newTrx: TransaksiSPPTransport = {
+      id: `trx-spp-${Date.now()}`,
+      noKuitansi: noKwt,
+      siswaId: targetSiswa.id,
+      siswaNama: targetSiswa.nama,
+      nisn: targetSiswa.nisn,
+      kelas: targetSiswa.kelas,
+      tahunAjaran: params.tahunAjaran,
+      jenis: params.jenis,
+      bulan: params.bulan,
+      totalNominal,
+      metodePembayaran: params.metodePembayaran,
+      tanggalBayar: today,
+      petugas: params.petugas || "Petugas Keuangan",
+      keterangan: params.keterangan || `Pembayaran ${params.jenis} ${params.bulan.join(", ")}`,
+    };
+
+    const updatedTrx = [newTrx, ...transaksiSPPTransportList];
+    setTransaksiSPPTransportList(updatedTrx);
+    saveState("transaksi_spp_transport", updatedTrx);
+
+    return {
+      success: true,
+      message: `Pembayaran ${params.jenis} untuk ${params.bulan.length} bulan berhasil disimpan!`,
+      noKuitansi: noKwt,
+    };
+  };
+
+  const bulkBayarSPPTransportDariTabungan = (params: {
+    kelas?: string;
+    tahunAjaran: string;
+    bulan: BulanSPP;
+    jenis: "SPP" | "Transportasi" | "Paket Keduanya";
+    petugas?: string;
+  }): {
+    successCount: number;
+    skippedCount: number;
+    insufficientCount: number;
+    totalAmount: number;
+    insufficientNames: string[];
+  } => {
+    let successCount = 0;
+    let skippedCount = 0;
+    let insufficientCount = 0;
+    let totalAmount = 0;
+    const insufficientNames: string[] = [];
+
+    const targetStudents = siswaList.filter(
+      (s) =>
+        !params.kelas ||
+        params.kelas === "Semua" ||
+        s.kelas.toLowerCase() === params.kelas.toLowerCase()
+    );
+
+    targetStudents.forEach((s) => {
+      const rec = getStudentSPPTransportRecord(s.id, params.tahunAjaran);
+      const detail = rec.bulan[params.bulan];
+      const transCfg = pesertaTransportList.find((t) => t.siswaId === s.id);
+      const isTrans = transCfg ? transCfg.isAktif : false;
+
+      const needsSPP =
+        (params.jenis === "SPP" || params.jenis === "Paket Keduanya") &&
+        detail.sppStatus !== "Lunas";
+      const needsTrans =
+        (params.jenis === "Transportasi" || params.jenis === "Paket Keduanya") &&
+        isTrans &&
+        detail.transportStatus !== "Lunas";
+
+      if (!needsSPP && !needsTrans) {
+        skippedCount++;
+        return;
+      }
+
+      let required = 0;
+      if (needsSPP) required += detail.sppNominal;
+      if (needsTrans) required += detail.transportNominal;
+
+      const studentTab = tabunganList.find((t) => t.siswaId === s.id);
+      const studentSaldo = studentTab ? studentTab.saldo : 0;
+
+      if (studentSaldo < required) {
+        insufficientCount++;
+        insufficientNames.push(
+          `${s.nama} (${s.kelas}) - Saldo: Rp ${studentSaldo.toLocaleString("id-ID")}`
+        );
+        return;
+      }
+
+      const res = bayarSPPTransport({
+        siswaId: s.id,
+        tahunAjaran: params.tahunAjaran,
+        jenis: needsSPP && needsTrans ? "Paket Keduanya" : needsSPP ? "SPP" : "Transportasi",
+        bulan: [params.bulan],
+        metodePembayaran: "Potong Tabungan Siswa",
+        petugas: params.petugas || "Autodebet Kas Rombel",
+        keterangan: `Autodebet ${params.jenis} bulan ${params.bulan} dari tabungan`,
+      });
+
+      if (res.success) {
+        successCount++;
+        totalAmount += required;
+      }
+    });
+
+    return {
+      successCount,
+      skippedCount,
+      insufficientCount,
+      totalAmount,
+      insufficientNames,
+    };
+  };
+
+  // LMS Action Handlers
+  const addMateri = (materiData: Omit<LMSMateri, "id" | "createdAt" | "sudahDibacaSiswaIds">): LMSMateri => {
+    const newMateri: LMSMateri = {
+      ...materiData,
+      id: `mat-${Date.now()}`,
+      createdAt: new Date().toISOString().split("T")[0],
+      sudahDibacaSiswaIds: [],
+    };
+    const updated = [newMateri, ...lmsMateriList];
+    setLmsMateriList(updated);
+    saveState("lms_materi", updated);
+    return newMateri;
+  };
+
+  const updateMateri = (id: string, data: Partial<LMSMateri>) => {
+    const updated = lmsMateriList.map((m) => (m.id === id ? { ...m, ...data } : m));
+    setLmsMateriList(updated);
+    saveState("lms_materi", updated);
+  };
+
+  const deleteMateri = (id: string) => {
+    const updated = lmsMateriList.filter((m) => m.id !== id);
+    setLmsMateriList(updated);
+    saveState("lms_materi", updated);
+  };
+
+  const toggleBacaMateri = (materiId: string, siswaId: string) => {
+    const updated = lmsMateriList.map((m) => {
+      if (m.id !== materiId) return m;
+      const already = m.sudahDibacaSiswaIds.includes(siswaId);
+      const newIds = already
+        ? m.sudahDibacaSiswaIds.filter((sid) => sid !== siswaId)
+        : [...m.sudahDibacaSiswaIds, siswaId];
+      return { ...m, sudahDibacaSiswaIds: newIds };
+    });
+    setLmsMateriList(updated);
+    saveState("lms_materi", updated);
+  };
+
+  const addTugas = (tugasData: Omit<LMSTugas, "id" | "createdAt">): LMSTugas => {
+    const newTugas: LMSTugas = {
+      ...tugasData,
+      id: `tgs-${Date.now()}`,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    const updated = [newTugas, ...lmsTugasList];
+    setLmsTugasList(updated);
+    saveState("lms_tugas", updated);
+    return newTugas;
+  };
+
+  const updateTugas = (id: string, data: Partial<LMSTugas>) => {
+    const updated = lmsTugasList.map((t) => (t.id === id ? { ...t, ...data } : t));
+    setLmsTugasList(updated);
+    saveState("lms_tugas", updated);
+  };
+
+  const deleteTugas = (id: string) => {
+    const updated = lmsTugasList.filter((t) => t.id !== id);
+    setLmsTugasList(updated);
+    saveState("lms_tugas", updated);
+  };
+
+  const submitTugas = (data: {
+    tugasId: string;
+    siswaId: string;
+    siswaNama: string;
+    siswaNisn: string;
+    kelas: string;
+    catatanSiswa: string;
+    fileJawabanUrl?: string;
+  }): LMSSubmission => {
+    const now = new Date();
+    const targetTugas = lmsTugasList.find((t) => t.id === data.tugasId);
+    let status: StatusSubmission = "Diserahkan";
+    if (targetTugas?.deadline) {
+      const deadlineDate = new Date(targetTugas.deadline);
+      if (now > deadlineDate) {
+        status = "Terlambat";
+      }
+    }
+    const existingIndex = lmsSubmissionList.findIndex(
+      (s) => s.tugasId === data.tugasId && s.siswaId === data.siswaId
+    );
+    let updated: LMSSubmission[];
+    let resSubmission: LMSSubmission;
+    const formattedDate = `${now.toISOString().split("T")[0]} ${now.toTimeString().slice(0, 5)}`;
+    if (existingIndex >= 0) {
+      resSubmission = {
+        ...lmsSubmissionList[existingIndex],
+        ...data,
+        tanggalKumpul: formattedDate,
+        status,
+      };
+      updated = [...lmsSubmissionList];
+      updated[existingIndex] = resSubmission;
+    } else {
+      resSubmission = {
+        id: `sub-${Date.now()}`,
+        ...data,
+        tanggalKumpul: formattedDate,
+        status,
+      };
+      updated = [resSubmission, ...lmsSubmissionList];
+    }
+    setLmsSubmissionList(updated);
+    saveState("lms_submissions", updated);
+    return resSubmission;
+  };
+
+  const nilaiSubmission = (submissionId: string, nilai: number, feedback?: string) => {
+    const formattedDate = new Date().toISOString().split("T")[0];
+    const updated = lmsSubmissionList.map((s) => {
+      if (s.id !== submissionId) return s;
+      return {
+        ...s,
+        nilai,
+        feedbackGuru: feedback || s.feedbackGuru,
+        status: "Dinilai" as StatusSubmission,
+        dinilaiPada: formattedDate,
+      };
+    });
+    setLmsSubmissionList(updated);
+    saveState("lms_submissions", updated);
+  };
+
+  const addKuis = (kuisData: Omit<LMSKuis, "id" | "createdAt">): LMSKuis => {
+    const newKuis: LMSKuis = {
+      ...kuisData,
+      id: `quiz-${Date.now()}`,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    const updated = [newKuis, ...lmsKuisList];
+    setLmsKuisList(updated);
+    saveState("lms_kuis", updated);
+    return newKuis;
+  };
+
+  const deleteKuis = (id: string) => {
+    const updated = lmsKuisList.filter((q) => q.id !== id);
+    setLmsKuisList(updated);
+    saveState("lms_kuis", updated);
+  };
+
+  const submitKuisAttempt = (attemptData: Omit<LMSKuisAttempt, "id" | "selesaiPada">): LMSKuisAttempt => {
+    const formattedDate = `${new Date().toISOString().split("T")[0]} ${new Date().toTimeString().slice(0, 5)}`;
+    const newAttempt: LMSKuisAttempt = {
+      ...attemptData,
+      id: `att-${Date.now()}`,
+      selesaiPada: formattedDate,
+    };
+    const updated = [newAttempt, ...lmsKuisAttemptList];
+    setLmsKuisAttemptList(updated);
+    saveState("lms_attempts", updated);
+    return newAttempt;
+  };
+
+  const addForumTopik = (topikData: Omit<LMSForumDiskusi, "id" | "tanggal" | "komentarList">): LMSForumDiskusi => {
+    const formattedDate = `${new Date().toISOString().split("T")[0]} ${new Date().toTimeString().slice(0, 5)}`;
+    const newTopik: LMSForumDiskusi = {
+      ...topikData,
+      id: `frm-${Date.now()}`,
+      tanggal: formattedDate,
+      komentarList: [],
+    };
+    const updated = [newTopik, ...lmsForumList];
+    setLmsForumList(updated);
+    saveState("lms_forum", updated);
+    return newTopik;
+  };
+
+  const addKomentarForum = (topikId: string, komentarData: Omit<LMSKomentarForum, "id" | "tanggal">) => {
+    const formattedDate = `${new Date().toISOString().split("T")[0]} ${new Date().toTimeString().slice(0, 5)}`;
+    const newKomentar: LMSKomentarForum = {
+      ...komentarData,
+      id: `kom-${Date.now()}`,
+      tanggal: formattedDate,
+    };
+    const updated = lmsForumList.map((f) => {
+      if (f.id !== topikId) return f;
+      return {
+        ...f,
+        komentarList: [...f.komentarList, newKomentar],
+      };
+    });
+    setLmsForumList(updated);
+    saveState("lms_forum", updated);
+  };
+
+  const addMeeting = (meetingData: Omit<LMSVirtualMeeting, "id">): LMSVirtualMeeting => {
+    const newMeeting: LMSVirtualMeeting = {
+      ...meetingData,
+      id: `meet-${Date.now()}`,
+    };
+    const updated = [newMeeting, ...lmsMeetingList];
+    setLmsMeetingList(updated);
+    saveState("lms_meetings", updated);
+    return newMeeting;
+  };
+
+  const deleteMeeting = (id: string) => {
+    const updated = lmsMeetingList.filter((m) => m.id !== id);
+    setLmsMeetingList(updated);
+    saveState("lms_meetings", updated);
+  };
+
+  // Bank Soal Handlers
+  const addBankSoal = (bankData: Omit<LMSBankSoal, "id" | "createdAt">): LMSBankSoal => {
+    const newBank: LMSBankSoal = {
+      ...bankData,
+      id: `pkt-bs-${Date.now()}`,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    const updated = [newBank, ...lmsBankSoalList];
+    setLmsBankSoalList(updated);
+    saveState("lms_bank_soal", updated);
+    return newBank;
+  };
+
+  const updateBankSoal = (id: string, updatedData: Partial<LMSBankSoal>) => {
+    const updated = lmsBankSoalList.map((b) =>
+      b.id === id ? { ...b, ...updatedData, updatedAt: new Date().toISOString().split("T")[0] } : b
+    );
+    setLmsBankSoalList(updated);
+    saveState("lms_bank_soal", updated);
+  };
+
+  const deleteBankSoal = (id: string) => {
+    const updated = lmsBankSoalList.filter((b) => b.id !== id);
+    setLmsBankSoalList(updated);
+    saveState("lms_bank_soal", updated);
+  };
+
+  const addSoalToBank = (bankId: string, soalData: Omit<LMSBankSoalItem, "id">) => {
+    const newSoal: LMSBankSoalItem = {
+      ...soalData,
+      id: `bs-item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    };
+    const updated = lmsBankSoalList.map((b) => {
+      if (b.id === bankId) {
+        return {
+          ...b,
+          soalList: [...b.soalList, newSoal],
+          updatedAt: new Date().toISOString().split("T")[0],
+        };
+      }
+      return b;
+    });
+    setLmsBankSoalList(updated);
+    saveState("lms_bank_soal", updated);
+  };
+
+  const updateSoalInBank = (bankId: string, soalId: string, updatedSoal: Partial<LMSBankSoalItem>) => {
+    const updated = lmsBankSoalList.map((b) => {
+      if (b.id === bankId) {
+        return {
+          ...b,
+          soalList: b.soalList.map((s) => (s.id === soalId ? { ...s, ...updatedSoal } : s)),
+          updatedAt: new Date().toISOString().split("T")[0],
+        };
+      }
+      return b;
+    });
+    setLmsBankSoalList(updated);
+    saveState("lms_bank_soal", updated);
+  };
+
+  const deleteSoalFromBank = (bankId: string, soalId: string) => {
+    const updated = lmsBankSoalList.map((b) => {
+      if (b.id === bankId) {
+        return {
+          ...b,
+          soalList: b.soalList.filter((s) => s.id !== soalId),
+          updatedAt: new Date().toISOString().split("T")[0],
+        };
+      }
+      return b;
+    });
+    setLmsBankSoalList(updated);
+    saveState("lms_bank_soal", updated);
+  };
+
+  const generateKuisFromBankSoal = (params: {
+    judul: string;
+    mapel: string;
+    kelas: string;
+    durasiMenit: number;
+    kkm: number;
+    deadline: string;
+    deskripsi: string;
+    soalItems: LMSBankSoalItem[];
+    guruNama: string;
+  }): LMSKuis => {
+    const convertedSoalList = params.soalItems.map((b, idx) => ({
+      id: `soal-gen-${Date.now()}-${idx + 1}`,
+      pertanyaan: b.pertanyaan,
+      pilihan: b.pilihan,
+      kunciJawaban: b.kunciJawaban,
+      pembahasan: b.pembahasan,
+      poin: b.poinDefault || 20,
+    }));
+
+    const newKuis: LMSKuis = {
+      id: `quiz-${Date.now()}`,
+      judul: params.judul,
+      mapel: params.mapel,
+      kelas: params.kelas,
+      guruNama: params.guruNama,
+      durasiMenit: params.durasiMenit,
+      kkm: params.kkm,
+      deadline: params.deadline,
+      deskripsi: params.deskripsi,
+      soalList: convertedSoalList,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+
+    const updated = [newKuis, ...lmsKuisList];
+    setLmsKuisList(updated);
+    saveState("lms_kuis", updated);
+    return newKuis;
+  };
+
+  // LMS Jadwal Pelaksanaan Materi Actions
+  const addJadwalMateri = (data: Omit<LMSJadwalMateri, "id">): LMSJadwalMateri => {
+    const newItem: LMSJadwalMateri = {
+      ...data,
+      id: `jdw-mat-${Date.now()}`,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    const updated = [newItem, ...lmsJadwalMateriList];
+    setLmsJadwalMateriList(updated);
+    saveState("lms_jadwal_materi", updated);
+    return newItem;
+  };
+
+  const updateJadwalMateri = (id: string, data: Partial<LMSJadwalMateri>) => {
+    const updated = lmsJadwalMateriList.map((item) => (item.id === id ? { ...item, ...data } : item));
+    setLmsJadwalMateriList(updated);
+    saveState("lms_jadwal_materi", updated);
+  };
+
+  const deleteJadwalMateri = (id: string) => {
+    const updated = lmsJadwalMateriList.filter((item) => item.id !== id);
+    setLmsJadwalMateriList(updated);
+    saveState("lms_jadwal_materi", updated);
+  };
+
+  const toggleRealisasiJadwal = (
+    id: string,
+    payload?: {
+      sudahDiajarkan?: boolean;
+      catatanPembelajaran?: string;
+      tanggalRealisasi?: string;
+      jamRealisasi?: string;
+      guruPengajar?: string;
+    }
+  ) => {
+    const updated = lmsJadwalMateriList.map((item) => {
+      if (item.id !== id) return item;
+      const nextStatus = payload?.sudahDiajarkan !== undefined ? payload.sudahDiajarkan : !item.sudahDiajarkan;
+      return {
+        ...item,
+        sudahDiajarkan: nextStatus,
+        tanggalRealisasi: nextStatus
+          ? payload?.tanggalRealisasi || item.tanggalRealisasi || new Date().toISOString().split("T")[0]
+          : undefined,
+        jamRealisasi: nextStatus
+          ? payload?.jamRealisasi || item.jamRealisasi || "08.00 - 09.30 WIB"
+          : undefined,
+        guruPengajar: nextStatus
+          ? payload?.guruPengajar || item.guruPengajar || "Ust. Pengampu"
+          : undefined,
+        catatanPembelajaran: payload?.catatanPembelajaran !== undefined
+          ? payload.catatanPembelajaran
+          : item.catatanPembelajaran,
+      };
+    });
+    setLmsJadwalMateriList(updated);
+    saveState("lms_jadwal_materi", updated);
+  };
+
+  const resetToDefault = () => {
+    setProfile(INITIAL_SCHOOL_PROFILE);
+    setSiswaList(INITIAL_SISWA);
+    setGuruList(INITIAL_GURU);
+    setKelasList(INITIAL_KELAS);
+    setMapelList(INITIAL_MAPEL);
+    setJadwalList(INITIAL_JADWAL);
+    setPresensiList(INITIAL_PRESENSI);
+    setNilaiList(INITIAL_NILAI);
+    setSppList(INITIAL_SPP);
+    setJenisTagihanList(INITIAL_JENIS_TAGIHAN);
+    setPengumumanList(INITIAL_PENGUMUMAN);
+    setTabunganList(INITIAL_TABUNGAN);
+    setTransaksiTabunganList(INITIAL_TRANSAKSI_TABUNGAN);
+    setPesertaTransportList(INITIAL_PESERTA_TRANSPORT);
+    setSppTransportRecords(INITIAL_SPP_TRANSPORT_RECORDS);
+    setTransaksiSPPTransportList(INITIAL_TRANSAKSI_SPP_TRANSPORT);
+
+    // Reset LMS Data
+    setLmsMateriList(INITIAL_LMS_MATERI);
+    setLmsTugasList(INITIAL_LMS_TUGAS);
+    setLmsSubmissionList(INITIAL_LMS_SUBMISSIONS);
+    setLmsKuisList(INITIAL_LMS_KUIS);
+    setLmsKuisAttemptList(INITIAL_LMS_ATTEMPTS);
+    setLmsForumList(INITIAL_LMS_FORUM);
+    setLmsMeetingList(INITIAL_LMS_MEETINGS);
+    setLmsBankSoalList(INITIAL_LMS_BANK_SOAL);
+    setLmsJadwalMateriList(INITIAL_LMS_JADWAL_MATERI);
+
+    localStorage.clear();
+  };
+
+  return (
+    <SchoolDataContext.Provider
+      value={{
+        profile,
+        updateProfile,
+        siswaList,
+        addSiswa,
+        importSiswaList,
+        updateSiswa,
+        deleteSiswa,
+        guruList,
+        addGuru,
+        updateGuru,
+        deleteGuru,
+        kelasList,
+        addKelas,
+        updateKelas,
+        deleteKelas,
+        mapelList,
+        jadwalList,
+        addJadwal,
+        bulkAddJadwal,
+        updateJadwal,
+        deleteJadwal,
+        bulkDeleteJadwal,
+        resetJadwalToDefault,
+        presensiList,
+        updatePresensi,
+        nilaiList,
+        saveNilai,
+        bulkSaveNilai,
+        sppList,
+        jenisTagihanList,
+        addJenisTagihan,
+        updateJenisTagihan,
+        deleteJenisTagihan,
+        addTagihan,
+        bulkAddTagihan,
+        bayarSPP,
+        bayarTagihanDariTabungan,
+        bulkBayarTagihanDariTabungan,
+        pengumumanList,
+        addPengumuman,
+        deletePengumuman,
+        tabunganList,
+        transaksiTabunganList,
+        setorTabungan,
+        tarikTabungan,
+        bulkSetorTabungan,
+        pesertaTransportList,
+        sppTransportRecords,
+        transaksiSPPTransportList,
+        updatePesertaTransport,
+        bayarSPPTransport,
+        bulkBayarSPPTransportDariTabungan,
+        getStudentSPPTransportRecord,
+
+        // LMS States & Actions
+        lmsMateriList,
+        addMateri,
+        updateMateri,
+        deleteMateri,
+        toggleBacaMateri,
+        lmsTugasList,
+        addTugas,
+        updateTugas,
+        deleteTugas,
+        lmsSubmissionList,
+        submitTugas,
+        nilaiSubmission,
+        lmsKuisList,
+        addKuis,
+        deleteKuis,
+        lmsKuisAttemptList,
+        submitKuisAttempt,
+        lmsForumList,
+        addForumTopik,
+        addKomentarForum,
+        lmsMeetingList,
+        addMeeting,
+        deleteMeeting,
+        lmsBankSoalList,
+        addBankSoal,
+        updateBankSoal,
+        deleteBankSoal,
+        addSoalToBank,
+        updateSoalInBank,
+        deleteSoalFromBank,
+        generateKuisFromBankSoal,
+        lmsJadwalMateriList,
+        addJadwalMateri,
+        updateJadwalMateri,
+        deleteJadwalMateri,
+        toggleRealisasiJadwal,
+
+        resetToDefault,
+      }}
+
+
+    >
+      {children}
+    </SchoolDataContext.Provider>
+  );
+}
+
+export function useSchoolData() {
+  const context = useContext(SchoolDataContext);
+  if (!context) {
+    throw new Error("useSchoolData must be used within a SchoolDataProvider");
+  }
+  return context;
+}
