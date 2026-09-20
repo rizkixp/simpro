@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { UserRole } from "@/types/school";
 import { Menu, Bell, Shield, UserCheck, BookOpen, HeartHandshake, Wallet, Sparkles, Cloud, RefreshCw } from "lucide-react";
+import InstallPwaButton from "@/components/common/InstallPwaButton";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -144,6 +145,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             );
           })}
         </div>
+
+        {/* PWA Direct Install Button */}
+        <InstallPwaButton />
 
         {/* Notifications Icon */}
         <div className="relative">
