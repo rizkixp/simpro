@@ -36,6 +36,7 @@ import {
   LMSBankSoalItem,
   LMSJadwalMateri,
 } from "@/types/school";
+import { SupabaseSchoolService, SupabaseHealthStatus } from "@/lib/supabase/services/schoolService";
 import {
   INITIAL_SCHOOL_PROFILE,
   INITIAL_SISWA,
@@ -228,6 +229,15 @@ interface SchoolDataContextType {
   ) => void;
 
   resetToDefault: () => void;
+
+  // Supabase Cloud State & Sync
+  isSupabaseConnected: boolean;
+  isSyncing: boolean;
+  lastSyncTime: Date | null;
+  supabaseError: string | null;
+  syncWithSupabase: () => Promise<void>;
+  seedDatabaseToCloud: () => Promise<boolean>;
+  testSupabaseHealth: () => Promise<SupabaseHealthStatus>;
 }
 
 
@@ -262,6 +272,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const [lmsMeetingList, setLmsMeetingList] = useState<LMSVirtualMeeting[]>(INITIAL_LMS_MEETINGS);
   const [lmsBankSoalList, setLmsBankSoalList] = useState<LMSBankSoal[]>(INITIAL_LMS_BANK_SOAL);
   const [lmsJadwalMateriList, setLmsJadwalMateriList] = useState<LMSJadwalMateri[]>(INITIAL_LMS_JADWAL_MATERI);
+
+  // Supabase Cloud Integration States
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
   // Load from LocalStorage on client mount
   useEffect(() => {
@@ -375,7 +391,239 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     } catch (e) {
       console.warn("Could not read from local storage", e);
     }
+
+    // Connect to Supabase Cloud on initial mount
+    if (SupabaseSchoolService.isConfigured()) {
+      syncWithSupabase();
+    }
   }, []);
+
+
+  // Helper for background Supabase persistence without blocking UI
+  const persistSupabase = (action: () => Promise<boolean | any>) => {
+    if (SupabaseSchoolService.isConfigured()) {
+      action().catch((err) => {
+        console.warn("[Supabase] Background persistence warning:", err);
+      });
+    }
+  };
+
+  // Health check
+  const testSupabaseHealth = async (): Promise<SupabaseHealthStatus> => {
+    return await SupabaseSchoolService.testConnection();
+  };
+
+  // Seed current in-memory data to Supabase
+  const seedDatabaseToCloud = async (): Promise<boolean> => {
+    if (!SupabaseSchoolService.isConfigured()) {
+      setSupabaseError("Supabase belum dikonfigurasi di .env.local");
+      return false;
+    }
+    setIsSyncing(true);
+    try {
+      const res = await SupabaseSchoolService.seedInitialDataToSupabase({
+        profile: profile || INITIAL_SCHOOL_PROFILE,
+        siswa: siswaList.length > 0 ? siswaList : INITIAL_SISWA,
+        guru: guruList.length > 0 ? guruList : INITIAL_GURU,
+        kelas: kelasList.length > 0 ? kelasList : INITIAL_KELAS,
+        mapel: mapelList.length > 0 ? mapelList : INITIAL_MAPEL,
+        jadwal: jadwalList.length > 0 ? jadwalList : INITIAL_JADWAL,
+        presensi: presensiList.length > 0 ? presensiList : INITIAL_PRESENSI,
+        nilai: nilaiList.length > 0 ? nilaiList : INITIAL_NILAI,
+        jenisTagihan: jenisTagihanList.length > 0 ? jenisTagihanList : INITIAL_JENIS_TAGIHAN,
+        tagihan: sppList.map((s) => ({
+          id: s.id,
+          siswaId: s.siswaId,
+          siswaNama: s.siswaNama,
+          nisn: s.nisn,
+          kelas: s.kelas,
+          judul: `SPP ${s.bulan} ${s.tahun}`,
+          kategori: "SPP" as const,
+          nominal: s.nominal,
+          jatuhTempo: s.jatuhTempo,
+          status: s.status,
+          tanggalBayar: s.tanggalBayar,
+          metodePembayaran: s.metodePembayaran,
+          noKuitansi: s.noKuitansi,
+          keterangan: s.keterangan,
+          bulan: s.bulan,
+          tahun: s.tahun,
+        })),
+        tabungan: tabunganList.length > 0 ? tabunganList : INITIAL_TABUNGAN,
+        transaksiTabungan: transaksiTabunganList.length > 0 ? transaksiTabunganList : INITIAL_TRANSAKSI_TABUNGAN,
+        pesertaTransport: pesertaTransportList.length > 0 ? pesertaTransportList : INITIAL_PESERTA_TRANSPORT,
+        sppTransportRecords: sppTransportRecords.length > 0 ? sppTransportRecords : INITIAL_SPP_TRANSPORT_RECORDS,
+        transaksiSPPTransport: transaksiSPPTransportList.length > 0 ? transaksiSPPTransportList : INITIAL_TRANSAKSI_SPP_TRANSPORT,
+        pengumuman: pengumumanList.length > 0 ? pengumumanList : INITIAL_PENGUMUMAN,
+        lmsMateri: lmsMateriList.length > 0 ? lmsMateriList : INITIAL_LMS_MATERI,
+        lmsTugas: lmsTugasList.length > 0 ? lmsTugasList : INITIAL_LMS_TUGAS,
+        lmsSubmissions: lmsSubmissionList.length > 0 ? lmsSubmissionList : INITIAL_LMS_SUBMISSIONS,
+        lmsKuis: lmsKuisList.length > 0 ? lmsKuisList : INITIAL_LMS_KUIS,
+        lmsAttempts: lmsKuisAttemptList.length > 0 ? lmsKuisAttemptList : INITIAL_LMS_ATTEMPTS,
+        lmsForum: lmsForumList.length > 0 ? lmsForumList : INITIAL_LMS_FORUM,
+        lmsMeetings: lmsMeetingList.length > 0 ? lmsMeetingList : INITIAL_LMS_MEETINGS,
+        lmsBankSoal: lmsBankSoalList.length > 0 ? lmsBankSoalList : INITIAL_LMS_BANK_SOAL,
+        lmsJadwalMateri: lmsJadwalMateriList.length > 0 ? lmsJadwalMateriList : INITIAL_LMS_JADWAL_MATERI,
+      });
+
+      if (res.success) {
+        setIsSupabaseConnected(true);
+        setLastSyncTime(new Date());
+        setSupabaseError(null);
+      } else {
+        setSupabaseError(res.message);
+      }
+      return res.success;
+    } catch (err: any) {
+      console.error("[Supabase] Gagal seed database:", err);
+      setSupabaseError(err.message || "Gagal seed database ke cloud Supabase");
+      return false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Full bi-directional sync with Supabase Cloud
+  const syncWithSupabase = async (): Promise<void> => {
+    if (!SupabaseSchoolService.isConfigured()) {
+      setIsSupabaseConnected(false);
+      return;
+    }
+
+    setIsSyncing(true);
+    setSupabaseError(null);
+
+    try {
+      const data = await SupabaseSchoolService.fetchAllSchoolData();
+      if (!data) {
+        setIsSupabaseConnected(false);
+        setSupabaseError("Tidak dapat menghubungkan ke Supabase cloud.");
+        setIsSyncing(false);
+        return;
+      }
+
+      const hasCloudData = Boolean(
+        (data.siswa && data.siswa.length > 0) ||
+        (data.guru && data.guru.length > 0) ||
+        (data.kelas && data.kelas.length > 0) ||
+        data.profile
+      );
+
+      if (!hasCloudData) {
+        // First-time connected to fresh Supabase: auto seed so it's ready!
+        console.log("[Supabase] Database cloud masih kosong. Menjalankan auto-seeding awal...");
+        await seedDatabaseToCloud();
+        return;
+      }
+
+      // Hydrate all states with data from Supabase
+      if (data.profile) {
+        setProfile(data.profile);
+        saveState("profile", data.profile);
+      }
+      if (data.siswa && data.siswa.length > 0) {
+        setSiswaList(data.siswa);
+        saveState("siswa", data.siswa);
+      }
+      if (data.guru && data.guru.length > 0) {
+        setGuruList(data.guru);
+        saveState("guru", data.guru);
+      }
+      if (data.kelas && data.kelas.length > 0) {
+        setKelasList(data.kelas);
+        saveState("kelas", data.kelas);
+      }
+      if (data.mapel && data.mapel.length > 0) {
+        setMapelList(data.mapel);
+        saveState("mapel", data.mapel);
+      }
+      if (data.jadwal && data.jadwal.length > 0) {
+        setJadwalList(data.jadwal);
+        saveState("jadwal", data.jadwal);
+      }
+      if (data.presensi && data.presensi.length > 0) {
+        setPresensiList(data.presensi);
+        saveState("presensi", data.presensi);
+      }
+      if (data.nilai && data.nilai.length > 0) {
+        setNilaiList(data.nilai);
+        saveState("nilai", data.nilai);
+      }
+      if (data.jenisTagihan && data.jenisTagihan.length > 0) {
+        setJenisTagihanList(data.jenisTagihan);
+        saveState("jenis_tagihan", data.jenisTagihan);
+      }
+      if (data.tabungan && data.tabungan.length > 0) {
+        setTabunganList(data.tabungan);
+        saveState("tabungan", data.tabungan);
+      }
+      if (data.transaksiTabungan && data.transaksiTabungan.length > 0) {
+        setTransaksiTabunganList(data.transaksiTabungan);
+        saveState("transaksi_tabungan", data.transaksiTabungan);
+      }
+      if (data.pesertaTransport && data.pesertaTransport.length > 0) {
+        setPesertaTransportList(data.pesertaTransport);
+        saveState("peserta_transport", data.pesertaTransport);
+      }
+      if (data.sppTransportRecords && data.sppTransportRecords.length > 0) {
+        setSppTransportRecords(data.sppTransportRecords);
+        saveState("spp_transport_records", data.sppTransportRecords);
+      }
+      if (data.transaksiSPPTransport && data.transaksiSPPTransport.length > 0) {
+        setTransaksiSPPTransportList(data.transaksiSPPTransport);
+        saveState("transaksi_spp_transport", data.transaksiSPPTransport);
+      }
+      if (data.pengumuman && data.pengumuman.length > 0) {
+        setPengumumanList(data.pengumuman);
+        saveState("pengumuman", data.pengumuman);
+      }
+      if (data.lmsMateri && data.lmsMateri.length > 0) {
+        setLmsMateriList(data.lmsMateri);
+        saveState("lms_materi", data.lmsMateri);
+      }
+      if (data.lmsTugas && data.lmsTugas.length > 0) {
+        setLmsTugasList(data.lmsTugas);
+        saveState("lms_tugas", data.lmsTugas);
+      }
+      if (data.lmsSubmissions && data.lmsSubmissions.length > 0) {
+        setLmsSubmissionList(data.lmsSubmissions);
+        saveState("lms_submissions", data.lmsSubmissions);
+      }
+      if (data.lmsKuis && data.lmsKuis.length > 0) {
+        setLmsKuisList(data.lmsKuis);
+        saveState("lms_kuis", data.lmsKuis);
+      }
+      if (data.lmsAttempts && data.lmsAttempts.length > 0) {
+        setLmsKuisAttemptList(data.lmsAttempts);
+        saveState("lms_attempts", data.lmsAttempts);
+      }
+      if (data.lmsForum && data.lmsForum.length > 0) {
+        setLmsForumList(data.lmsForum);
+        saveState("lms_forum", data.lmsForum);
+      }
+      if (data.lmsMeetings && data.lmsMeetings.length > 0) {
+        setLmsMeetingList(data.lmsMeetings);
+        saveState("lms_meetings", data.lmsMeetings);
+      }
+      if (data.lmsBankSoal && data.lmsBankSoal.length > 0) {
+        setLmsBankSoalList(data.lmsBankSoal);
+        saveState("lms_bank_soal", data.lmsBankSoal);
+      }
+      if (data.lmsJadwalMateri && data.lmsJadwalMateri.length > 0) {
+        setLmsJadwalMateriList(data.lmsJadwalMateri);
+        saveState("lms_jadwal_materi", data.lmsJadwalMateri);
+      }
+
+      setIsSupabaseConnected(true);
+      setLastSyncTime(new Date());
+    } catch (err: any) {
+      console.error("[Supabase] Gagal mengambil data sekolah dari Supabase:", err);
+      setIsSupabaseConnected(false);
+      setSupabaseError(err.message || "Gagal sinkronisasi data cloud");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Sync to LocalStorage
   const saveState = (key: string, value: unknown) => {
@@ -389,6 +637,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const updateProfile = (newProfile: SchoolProfile) => {
     setProfile(newProfile);
     saveState("profile", newProfile);
+    persistSupabase(() => SupabaseSchoolService.updateProfile(newProfile));
   };
 
   // Siswa Actions
@@ -403,6 +652,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [newSiswa, ...siswaList];
     setSiswaList(updated);
     saveState("siswa", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertSiswa(newSiswa));
   };
 
   const importSiswaList = (newStudents: Omit<Siswa, "id">[]) => {
@@ -417,6 +667,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     setSiswaList((prev) => {
       const updated = [...created, ...prev];
       saveState("siswa", updated);
+      persistSupabase(() => SupabaseSchoolService.bulkUpsertSiswa(created));
       return updated;
     });
   };
@@ -425,12 +676,17 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = siswaList.map((s) => (s.id === id ? { ...s, ...updatedData } : s));
     setSiswaList(updated);
     saveState("siswa", updated);
+    const target = updated.find((s) => s.id === id);
+    if (target) {
+      persistSupabase(() => SupabaseSchoolService.upsertSiswa(target));
+    }
   };
 
   const deleteSiswa = (id: string) => {
     const updated = siswaList.filter((s) => s.id !== id);
     setSiswaList(updated);
     saveState("siswa", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteSiswa(id));
   };
 
   // Guru Actions
@@ -445,18 +701,24 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [newGuru, ...guruList];
     setGuruList(updated);
     saveState("guru", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertGuru(newGuru));
   };
 
   const updateGuru = (id: string, updatedData: Partial<Guru>) => {
     const updated = guruList.map((g) => (g.id === id ? { ...g, ...updatedData } : g));
     setGuruList(updated);
     saveState("guru", updated);
+    const target = updated.find((g) => g.id === id);
+    if (target) {
+      persistSupabase(() => SupabaseSchoolService.upsertGuru(target));
+    }
   };
 
   const deleteGuru = (id: string) => {
     const updated = guruList.filter((g) => g.id !== id);
     setGuruList(updated);
     saveState("guru", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteGuru(id));
   };
 
   // Kelas Actions
@@ -469,6 +731,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [...kelasList, newKelas];
     setKelasList(updated);
     saveState("kelas", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertKelas(newKelas));
 
     // If waliKelasId was assigned, sync guru's kelasWali
     if (newKelas.waliKelasId) {
@@ -492,6 +755,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = kelasList.map((k) => (k.id === id ? { ...k, ...updatedData } : k));
     setKelasList(updated);
     saveState("kelas", updated);
+    const targetKelas = updated.find((k) => k.id === id);
+    if (targetKelas) {
+      persistSupabase(() => SupabaseSchoolService.upsertKelas(targetKelas));
+    }
 
     // If class name changed, cascade update to Siswa, Jadwal, Presensi, Nilai
     if (oldNama !== newNama) {
@@ -547,6 +814,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updatedKelasList = kelasList.filter((k) => k.id !== id);
     setKelasList(updatedKelasList);
     saveState("kelas", updatedKelasList);
+    persistSupabase(() => SupabaseSchoolService.deleteKelas(id));
 
     // Reassign students belonging to this class
     const updatedSiswa = siswaList.map((s) =>
@@ -584,6 +852,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [...jadwalList, newJadwal];
     setJadwalList(updated);
     saveState("jadwal", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertJadwal(newJadwal));
   };
 
   const bulkAddJadwal = (items: Omit<JadwalPelajaran, "id">[]) => {
@@ -594,18 +863,24 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [...jadwalList, ...newItems];
     setJadwalList(updated);
     saveState("jadwal", updated);
+    persistSupabase(() => SupabaseSchoolService.bulkUpsertJadwal(newItems));
   };
 
   const updateJadwal = (id: string, updatedData: Partial<JadwalPelajaran>) => {
     const updated = jadwalList.map((j) => (j.id === id ? { ...j, ...updatedData } : j));
     setJadwalList(updated);
     saveState("jadwal", updated);
+    const target = updated.find((j) => j.id === id);
+    if (target) {
+      persistSupabase(() => SupabaseSchoolService.upsertJadwal(target));
+    }
   };
 
   const deleteJadwal = (id: string) => {
     const updated = jadwalList.filter((j) => j.id !== id);
     setJadwalList(updated);
     saveState("jadwal", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteJadwal(id));
   };
 
   const bulkDeleteJadwal = (ids: string[]) => {
@@ -613,6 +888,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = jadwalList.filter((j) => !idSet.has(j.id));
     setJadwalList(updated);
     saveState("jadwal", updated);
+    persistSupabase(() => SupabaseSchoolService.bulkDeleteJadwal(ids));
   };
 
   const resetJadwalToDefault = () => {
@@ -1880,6 +2156,15 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         toggleRealisasiJadwal,
 
         resetToDefault,
+
+        // Supabase Cloud State & Sync
+        isSupabaseConnected,
+        isSyncing,
+        lastSyncTime,
+        supabaseError,
+        syncWithSupabase,
+        seedDatabaseToCloud,
+        testSupabaseHealth,
       }}
 
 

@@ -3,8 +3,9 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { UserRole } from "@/types/school";
-import { Menu, Bell, Shield, UserCheck, BookOpen, HeartHandshake, Wallet, Sparkles } from "lucide-react";
+import { Menu, Bell, Shield, UserCheck, BookOpen, HeartHandshake, Wallet, Sparkles, Cloud, RefreshCw } from "lucide-react";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -13,6 +14,7 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const router = useRouter();
   const { user, switchRole, switchUser, userList } = useAuth();
+  const { isSupabaseConnected, isSyncing } = useSchoolData();
 
   const roleConfigs: { role: UserRole; label: string; icon: React.ReactNode; color: string }[] = [
     { role: "admin", label: "Admin", icon: <Shield className="h-3.5 w-3.5" />, color: "bg-[#064e3b] text-white" },
@@ -48,6 +50,41 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           <Sparkles className="w-3.5 h-3.5 text-amber-500" />
           <span>Tahun 1447 H • SDI Cendekia</span>
         </div>
+
+        {/* Supabase Cloud Connection Badge */}
+        <button
+          onClick={() => router.push("/dashboard/pengaturan")}
+          title={
+            isSupabaseConnected
+              ? "Terhubung ke Supabase Cloud. Klik untuk membuka pengaturan database."
+              : "Mode Offline / LocalStorage. Klik untuk konfigurasi cloud."
+          }
+          className={`hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+            isSyncing
+              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+              : isSupabaseConnected
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+              : "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+          }`}
+        >
+          {isSyncing ? (
+            <>
+              <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+              <span>Sinkronisasi...</span>
+            </>
+          ) : isSupabaseConnected ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Supabase Cloud</span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>Local Offline</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Right section: Instant Role Simulator & Profile */}

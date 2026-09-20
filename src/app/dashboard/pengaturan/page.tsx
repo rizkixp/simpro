@@ -3,16 +3,85 @@
 import React, { useState } from "react";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { Settings, Save, RotateCcw, CheckCircle2, School, ShieldCheck } from "lucide-react";
+import {
+  Settings,
+  Save,
+  RotateCcw,
+  CheckCircle2,
+  School,
+  ShieldCheck,
+  Cloud,
+  Database,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
+  ArrowDownToLine,
+  UploadCloud,
+  Server,
+  Activity,
+} from "lucide-react";
 
 export default function PengaturanPage() {
   const { user } = useAuth();
-  const { profile, updateProfile, resetToDefault } = useSchoolData();
+  const {
+    profile,
+    updateProfile,
+    resetToDefault,
+    isSupabaseConnected,
+    isSyncing,
+    lastSyncTime,
+    supabaseError,
+    syncWithSupabase,
+    seedDatabaseToCloud,
+    testSupabaseHealth,
+  } = useSchoolData();
 
   const [formData, setFormData] = useState({ ...profile });
   const [isSaved, setIsSaved] = useState(false);
+  const [testingHealth, setTestingHealth] = useState(false);
+  const [healthResult, setHealthResult] = useState<any>(null);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const canEdit = user?.role === "admin";
+
+  const handleTestConnection = async () => {
+    setTestingHealth(true);
+    try {
+      const res = await testSupabaseHealth();
+      setHealthResult(res);
+    } catch (e: any) {
+      setHealthResult({ isConnected: false, latencyMs: 0, error: e.message });
+    } finally {
+      setTestingHealth(false);
+    }
+  };
+
+  const handleManualSync = async () => {
+    setSyncStatusMsg(null);
+    try {
+      await syncWithSupabase();
+      setSyncStatusMsg({ text: "Berhasil menarik data terbaru dari Supabase Cloud!", type: "success" });
+    } catch (e: any) {
+      setSyncStatusMsg({ text: e.message || "Gagal menarik data dari cloud", type: "error" });
+    }
+    setTimeout(() => setSyncStatusMsg(null), 4000);
+  };
+
+  const handleSeedCloud = async () => {
+    if (!confirm("Apakah Anda yakin ingin menyinkronkan / mengunggah seluruh data sekolah saat ini ke Cloud Supabase?")) return;
+    setSyncStatusMsg(null);
+    try {
+      const ok = await seedDatabaseToCloud();
+      if (ok) {
+        setSyncStatusMsg({ text: "Seluruh data sekolah berhasil diunggah ke Supabase Cloud!", type: "success" });
+      } else {
+        setSyncStatusMsg({ text: "Gagal mengunggah data ke Supabase", type: "error" });
+      }
+    } catch (e: any) {
+      setSyncStatusMsg({ text: e.message || "Gagal mengunggah data", type: "error" });
+    }
+    setTimeout(() => setSyncStatusMsg(null), 4000);
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +123,178 @@ export default function PengaturanPage() {
           <span>Profil dan konfigurasi sekolah berhasil diperbarui secara permanen!</span>
         </div>
       )}
+
+      {syncStatusMsg && (
+        <div
+          className={`p-4 rounded-2xl text-xs font-semibold flex items-center gap-2.5 border ${
+            syncStatusMsg.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800"
+          }`}
+        >
+          {syncStatusMsg.type === "success" ? (
+            <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+          )}
+          <span>{syncStatusMsg.text}</span>
+        </div>
+      )}
+
+      {/* Supabase Cloud Database Card */}
+      <div className="bg-gradient-to-br from-white via-white to-emerald-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/20 rounded-3xl border border-emerald-200/80 dark:border-emerald-800/60 shadow-sm p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-emerald-100 dark:border-emerald-900/40">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-emerald-700 text-white rounded-2xl shadow-sm">
+              <Cloud className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Database Cloud Terpusat (Supabase PostgreSQL)
+                </h3>
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                    isSyncing
+                      ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+                      : isSupabaseConnected
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                      : "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                  }`}
+                >
+                  {isSyncing ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Menyinkronkan...</span>
+                    </>
+                  ) : isSupabaseConnected ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Cloud Online & Terhubung</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span>Mode Offline</span>
+                    </>
+                  )}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Seluruh data akademik, keuangan, LMS, dan akun pengguna tersimpan secara persisten di cloud agar dapat diakses bersama secara online.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Server & Connection Information Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400 block">
+              Endpoint Project Supabase
+            </span>
+            <div className="font-mono text-emerald-800 dark:text-emerald-300 font-semibold truncate text-[11px]">
+              {process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bzokswukvykpadmvvwsb.supabase.co"}
+            </div>
+            <span className="text-[10px] text-slate-400">PostgreSQL Cloud Database</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400 block">
+              Terakhir Disinkronkan
+            </span>
+            <div className="text-slate-800 dark:text-white font-semibold text-xs">
+              {lastSyncTime ? lastSyncTime.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " WIB" : "Baru saja diinisialisasi"}
+            </div>
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400">
+              {isSupabaseConnected ? "Sinkronisasi otomatis aktif" : "Menunggu koneksi..."}
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-400 block">
+              Struktur Database
+            </span>
+            <div className="text-slate-800 dark:text-white font-semibold text-xs flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-emerald-600" />
+              <span>26 Tabel Lengkap</span>
+            </div>
+            <span className="text-[10px] text-slate-400">Row Level Security (RLS) Aktif</span>
+          </div>
+        </div>
+
+        {/* Diagnostic Results Box */}
+        {healthResult && (
+          <div className={`p-4 rounded-2xl border text-xs space-y-2 ${
+            healthResult.isConnected
+              ? "bg-emerald-50/70 border-emerald-200 text-emerald-900 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-200"
+              : "bg-rose-50/70 border-rose-200 text-rose-900 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-200"
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-1.5">
+                <Activity className="w-4 h-4" />
+                <span>Hasil Diagnostik Koneksi Cloud:</span>
+              </span>
+              <span className="font-mono text-[11px] font-semibold bg-white/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-inherit">
+                Latensi: {healthResult.latencyMs} ms
+              </span>
+            </div>
+            {healthResult.isConnected ? (
+              <div className="text-[11px] flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-600 dark:text-slate-300">
+                <span>Koneksi sukses!</span>
+                {healthResult.tableCounts && (
+                  <>
+                    <span>Siswa: <b>{healthResult.tableCounts.siswa}</b></span>
+                    <span>Guru: <b>{healthResult.tableCounts.guru}</b></span>
+                    <span>Kelas: <b>{healthResult.tableCounts.kelas}</b></span>
+                  </>
+                )}
+              </div>
+            ) : (
+              <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                Gagal: {healthResult.error || "Tidak dapat menghubungi server Supabase."}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Action Controls for Cloud Database */}
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={handleTestConnection}
+            disabled={testingHealth}
+            className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-semibold text-xs transition-all flex items-center gap-2 shadow-xs"
+          >
+            {testingHealth ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Activity className="h-3.5 w-3.5 text-emerald-600" />
+            )}
+            <span>{testingHealth ? "Menguji..." : "Uji Koneksi Cloud"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-semibold text-xs transition-all flex items-center gap-2"
+          >
+            <ArrowDownToLine className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
+            <span>Tarik Data dari Cloud</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSeedCloud}
+            disabled={isSyncing}
+            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs transition-all flex items-center gap-2 shadow-sm shadow-emerald-700/20"
+          >
+            <UploadCloud className="h-3.5 w-3.5" />
+            <span>Sinkronisasi / Unggah Data ke Cloud</span>
+          </button>
+        </div>
+      </div>
 
       {/* Main Settings Form */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8">
