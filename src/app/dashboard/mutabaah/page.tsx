@@ -42,6 +42,9 @@ import {
   Download,
   FileText,
   Image as ImageIcon,
+  MessageCircle,
+  Share2,
+  Copy,
 } from "lucide-react";
 
 export default function MutabaahPage() {
@@ -99,6 +102,91 @@ export default function MutabaahPage() {
     siswa: Siswa;
     record?: MutabaahRecord;
   } | null>(null);
+
+  // WhatsApp Share State for Mutabaah
+  const [isWaMutabaahOpen, setIsWaMutabaahOpen] = useState<boolean>(false);
+  const [waMutabaahSiswa, setWaMutabaahSiswa] = useState<Siswa | null>(null);
+  const [isCopiedWaMutabaah, setIsCopiedWaMutabaah] = useState<boolean>(false);
+
+  // Format clean international phone number for WhatsApp (e.g. 0812... -> 62812...)
+  const formatWhatsAppPhone = (phone?: string): string => {
+    if (!phone) return "";
+    let clean = phone.replace(/\D/g, "");
+    if (clean.startsWith("0")) {
+      clean = "62" + clean.substring(1);
+    } else if (!clean.startsWith("62")) {
+      clean = "62" + clean;
+    }
+    return clean;
+  };
+
+  // Helper check shalat Ya / Tidak
+  const isShalatTuntas = (status?: string): boolean => {
+    return status === "jamaah" || status === "munfarid";
+  };
+
+  // Generate Islamic Mutabaah Ibadah Daily Message
+  const generateMutabaahWhatsAppText = (siswa: Siswa, tanggal: string) => {
+    const rec = mutabaahList.find((m) => m.siswaId === siswa.id && m.tanggal === tanggal);
+    const dateFormatted = new Date(tanggal + "T00:00:00").toLocaleDateString("id-ID", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    let msg = `*LAPORAN MUTABA'AH IBADAH & AKHLAK HARIAN*\n`;
+    msg += `*${(profile.namaSekolah || "SDI SMART SCHOOL").toUpperCase()}*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `_Assalamu'alaikum Warahmatullahi Wabarakatuh_\n\n`;
+    msg += `Yth. Bapak/Ibu Wali dari Ananda:\n`;
+    msg += `👤 *Nama:* ${siswa.nama}\n`;
+    msg += `🆔 *NISN:* ${siswa.nisn || "-"}\n`;
+    msg += `🏫 *Kelas:* ${siswa.kelas}\n`;
+    msg += `📅 *Hari, Tanggal:* ${dateFormatted}\n\n`;
+
+    if (!rec) {
+      msg += `⚠️ _Catatan: Rekaman mutaba'ah ananda untuk hari ini belum tercatat dalam sistem._\n\n`;
+      msg += `Mohon kesediaan Ayah/Bunda untuk mengingatkan ananda senantiasa menjaga shalat 5 waktu dan amalan sunnah yaumiyah.\n\n`;
+    } else {
+      msg += `Alhamdulillah, berikut catatan amalan harian ananda:\n`;
+      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      msg += `*1. Shalat Fardhu 5 Waktu:*\n`;
+      msg += `  • Subuh: ${isShalatTuntas(rec.shalatWajib.subuh) ? "✅ Ya" : "❌ Tidak"}\n`;
+      msg += `  • Dzuhur: ${isShalatTuntas(rec.shalatWajib.dzuhur) ? "✅ Ya" : "❌ Tidak"}\n`;
+      msg += `  • Ashar: ${isShalatTuntas(rec.shalatWajib.ashar) ? "✅ Ya" : "❌ Tidak"}\n`;
+      msg += `  • Maghrib: ${isShalatTuntas(rec.shalatWajib.maghrib) ? "✅ Ya" : "❌ Tidak"}\n`;
+      msg += `  • Isya: ${isShalatTuntas(rec.shalatWajib.isya) ? "✅ Ya" : "❌ Tidak"}\n\n`;
+
+      msg += `*2. Amalan Sunnah Harian:*\n`;
+      msg += `  • Shalat Dhuha: ${rec.ibadahSunnah.shalatDhuha ? "✅ Ya" : "❌ Tidak"}\n`;
+      msg += `  • Sunnah Rawatib: ${rec.ibadahSunnah.rawatib ? "✅ Ya" : "❌ Tidak"}\n`;
+      msg += `  • Tilawah Al-Qur'an: ${
+        rec.ibadahSunnah.tilawahQuran
+          ? `✅ Ya (${rec.ibadahSunnah.jumlahHalamanTilawah || 1} Halaman)`
+          : "❌ Tidak"
+      }\n\n`;
+
+      msg += `*3. Akhlak & Birrul Walidain:*\n`;
+      msg += `  • Membantu Orang Tua: ${rec.akhlakKarakter.birrulWalidain ? "✅ Ya" : "❌ Tidak"}\n`;
+      msg += `  • Belajar Mandiri di Rumah: ${rec.akhlakKarakter.belajarMandiri ? "✅ Ya" : "❌ Tidak"}\n\n`;
+
+      msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+      msg += `🌟 *Skor Kebaikan:* ${rec.skorKebaikan} / 100\n`;
+      msg += `🏆 *Status Verifikasi:* ${rec.statusVerifikasi}\n`;
+      if (rec.catatanGuru && rec.catatanGuru !== "-") {
+        msg += `📝 *Catatan Pembina:* "${rec.catatanGuru}"\n`;
+      }
+      msg += `\n`;
+    }
+
+    msg += `Jazakumullah khairan katsiran kepada Ayah/Bunda atas pendampingan dan bimbingan ananda di rumah.\n\n`;
+    msg += `_Wassalamu'alaikum Warahmatullahi Wabarakatuh_\n\n`;
+    msg += `*Tim Pembina Mutaba'ah & Wali Kelas*\n`;
+    msg += `${profile.namaSekolah}\n`;
+
+    return msg;
+  };
 
   const showNotification = (msg: string) => {
     setToastMsg(msg);
@@ -1698,6 +1786,18 @@ export default function MutabaahPage() {
                               >
                                 <Edit3 className="w-3 h-3" />
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWaMutabaahSiswa(siswa);
+                                  setIsCopiedWaMutabaah(false);
+                                  setIsWaMutabaahOpen(true);
+                                }}
+                                className="p-1 rounded-lg bg-green-50 hover:bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                                title="Kirim Laporan Mutaba'ah via WhatsApp ke Wali Santri"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -2100,6 +2200,20 @@ export default function MutabaahPage() {
                                   <Eye className="w-3.5 h-3.5" />
                                 </button>
                               )}
+
+                              {/* WhatsApp Share Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWaMutabaahSiswa(siswa);
+                                  setIsCopiedWaMutabaah(false);
+                                  setIsWaMutabaahOpen(true);
+                                }}
+                                className="p-1.5 rounded-xl bg-green-50 hover:bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
+                                title="Kirim Laporan Mutaba'ah ke WhatsApp Wali Santri"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -3344,13 +3458,139 @@ export default function MutabaahPage() {
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setWaMutabaahSiswa(detailSiswaData.siswa);
+                  setIsCopiedWaMutabaah(false);
+                  setIsWaMutabaahOpen(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-green-600/20 transition-all cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Kirim WA Wali Santri</span>
+              </button>
+
               <button
                 onClick={() => setDetailSiswaData(null)}
-                className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold text-xs cursor-pointer"
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: PRATINJAU & PENGIRIMAN WHATSAPP MUTABA'AH WALI SANTRI             */}
+      {/* ========================================================================= */}
+      {isWaMutabaahOpen && waMutabaahSiswa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto no-print">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 relative my-6">
+            <button
+              onClick={() => setIsWaMutabaahOpen(false)}
+              className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-5">
+              <div className="h-11 w-11 rounded-2xl bg-green-500/10 text-green-600 flex items-center justify-center shadow-sm">
+                <MessageCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Kirim Laporan Mutaba'ah via WhatsApp</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300">
+                    Official Gateway
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Kirimkan mutaba'ah ibadah yaumiyah dan akhlak ananda langsung ke nomor WhatsApp orang tua.
+                </p>
+              </div>
+            </div>
+
+            {/* Student & Contact Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 text-xs">
+              <div>
+                <p className="text-slate-400 text-[11px]">Nama Santri:</p>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">{waMutabaahSiswa.nama}</p>
+                <p className="text-slate-500">
+                  Kelas <strong>{waMutabaahSiswa.kelas}</strong> &bull; NISN: <span className="font-mono">{waMutabaahSiswa.nisn || "-"}</span>
+                </p>
+              </div>
+
+              <div>
+                <p className="text-slate-400 text-[11px]">Wali Santri & Kontak:</p>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">
+                  {waMutabaahSiswa.namaWali || "Bapak/Ibu Orang Tua"}
+                </p>
+                <p className="text-emerald-600 dark:text-emerald-400 font-mono font-bold flex items-center gap-1">
+                  <span>📞 {waMutabaahSiswa.noHpWali || "Nomor Belum Terdaftar"}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* WhatsApp Text Preview (WhatsApp Bubble Aesthetic) */}
+            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-[#f0f9f3] dark:bg-slate-800/90 p-4 mb-5 max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 shadow-inner">
+              <pre className="whitespace-pre-wrap font-sans">
+                {generateMutabaahWhatsAppText(waMutabaahSiswa, selectedDate)}
+              </pre>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  const text = generateMutabaahWhatsAppText(waMutabaahSiswa, selectedDate);
+                  navigator.clipboard.writeText(text);
+                  setIsCopiedWaMutabaah(true);
+                  setTimeout(() => setIsCopiedWaMutabaah(false), 2500);
+                }}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                {isCopiedWaMutabaah ? (
+                  <>
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="text-green-600 font-bold">Tersalin ke Clipboard!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Salin Format Pesan</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setIsWaMutabaahOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 cursor-pointer"
+                >
+                  Tutup
+                </button>
+
+                <a
+                  href={`https://api.whatsapp.com/send?phone=${formatWhatsAppPhone(
+                    waMutabaahSiswa.noHpWali
+                  )}&text=${encodeURIComponent(
+                    generateMutabaahWhatsAppText(waMutabaahSiswa, selectedDate)
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-green-600/30 transition-all cursor-pointer"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Buka Chat WhatsApp</span>
+                  <Share2 className="h-3.5 w-3.5" />
+                </a>
+              </div>
             </div>
           </div>
         </div>

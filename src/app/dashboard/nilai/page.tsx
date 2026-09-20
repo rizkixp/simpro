@@ -36,6 +36,10 @@ import {
   Download,
   Users,
   ChevronLeft,
+  MessageCircle,
+  Share2,
+  Copy,
+  Check,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -93,6 +97,11 @@ export default function NilaiManagementPage() {
   const [batchRaporType, setBatchRaporType] = useState<JenisRapor>("tengah");
   const [batchRaporViewMode, setBatchRaporViewMode] = useState<"bundel" | "leger">("bundel");
   const [batchSelectedKelas, setBatchSelectedKelas] = useState<string>("Semua");
+
+  // WhatsApp Share State
+  const [isWaModalOpen, setIsWaModalOpen] = useState(false);
+  const [waTargetSiswa, setWaTargetSiswa] = useState<Siswa | null>(null);
+  const [isCopiedWa, setIsCopiedWa] = useState(false);
 
   // Single Form State for Grade Input / Editing
   const [formData, setFormData] = useState({
@@ -421,6 +430,81 @@ export default function NilaiManagementPage() {
         document.title = prevTitle;
       }
     }, 1500);
+  };
+
+  // Format clean international phone number for WhatsApp (e.g. 0812... -> 62812...)
+  const formatWhatsAppPhone = (phone?: string): string => {
+    if (!phone) return "";
+    let clean = phone.replace(/\D/g, "");
+    if (clean.startsWith("0")) {
+      clean = "62" + clean.substring(1);
+    } else if (!clean.startsWith("62")) {
+      clean = "62" + clean;
+    }
+    return clean;
+  };
+
+  // Generate official Islamic formatted WhatsApp message for student report
+  const generateRaporWhatsAppText = (siswa: Siswa, type: JenisRapor) => {
+    const records = nilaiList.filter((n) => n.siswaId === siswa.id);
+    const isTengah = type === "tengah";
+    const typeLabel = isTengah ? "Tengah Semester (PTS)" : "Akhir Semester (PAS)";
+    const avgScore =
+      records.length > 0
+        ? Math.round(
+            records.reduce(
+              (acc, curr) =>
+                acc + (isTengah ? getStudentMid(curr).nilaiMid : getStudentAkhir(curr).nilaiAkhir),
+              0
+            ) / records.length
+          )
+        : 0;
+    const generalPredicate =
+      avgScore >= 88 ? "A (Sangat Baik)" : avgScore >= 75 ? "B (Baik)" : "C (Cukup)";
+
+    let msg = `*LAPORAN HASIL BELAJAR PESERTA DIDIK*\n`;
+    msg += `*${(profile.namaSekolah || "SDI SMART SCHOOL").toUpperCase()}*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `_Assalamu'alaikum Warahmatullahi Wabarakatuh_\n\n`;
+    msg += `Yth. Bapak/Ibu Wali dari Ananda:\n`;
+    msg += `👤 *Nama:* ${siswa.nama}\n`;
+    msg += `🆔 *NISN:* ${siswa.nisn}\n`;
+    msg += `🏫 *Kelas:* ${siswa.kelas}\n`;
+    msg += `📅 *Periode:* Rapor ${typeLabel} (TA ${profile.tahunAjaranAktif})\n\n`;
+    msg += `Alhamdulillah, berikut ringkasan capaian kompetensi belajar ananda:\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+
+    if (records.length === 0) {
+      msg += `_(Data nilai mata pelajaran belum diinputkan)_\n`;
+    } else {
+      records.forEach((r, i) => {
+        const score = isTengah ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
+        const pred = isTengah ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
+        const note = isTengah ? getStudentMid(r).catatanMid : getStudentAkhir(r).catatan;
+        msg += `${i + 1}. *${r.mapel}*: ${score} (${pred})\n`;
+        if (note && note !== "-") {
+          msg += `   _Catatan:_ "${note}"\n`;
+        }
+      });
+    }
+
+    msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📊 *Rata-rata Nilai:* ${avgScore} / 100\n`;
+    msg += `🌟 *Predikat Umum:* ${generalPredicate}\n\n`;
+
+    msg += `Terima kasih atas kerjasama dan bimbingan Ayah/Bunda di rumah. Semoga ananda senantiasa bersemangat menuntut ilmu dan berakhlak mulia.\n\n`;
+    msg += `_Wassalamu'alaikum Warahmatullahi Wabarakatuh_\n\n`;
+    msg += `*Wali Kelas & Manajemen Sekolah*\n`;
+    msg += `${profile.namaSekolah}\n`;
+    msg += `Telp: ${profile.telepon || "-"}`;
+
+    return msg;
+  };
+
+  const handleOpenWhatsAppModal = (siswa: Siswa) => {
+    setWaTargetSiswa(siswa);
+    setIsCopiedWa(false);
+    setIsWaModalOpen(true);
   };
 
   // Nilai records for selected rapor siswa
@@ -914,13 +998,25 @@ export default function NilaiManagementPage() {
                             </>
                           )}
                           {siswaObj && (
-                            <button
-                              onClick={() => handleOpenRapor(siswaObj, "tengah")}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              <span>Rapor PTS</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleOpenRapor(siswaObj, "tengah")}
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>Rapor PTS</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setRaporPrintType("tengah");
+                                  handleOpenWhatsAppModal(siswaObj);
+                                }}
+                                title="Kirim Rapor PTS via WhatsApp ke Wali"
+                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center"
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" />
+                              </button>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -985,13 +1081,25 @@ export default function NilaiManagementPage() {
                             </>
                           )}
                           {siswaObj && (
-                            <button
-                              onClick={() => handleOpenRapor(siswaObj, "akhir")}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              <span>Rapor PAS</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleOpenRapor(siswaObj, "akhir")}
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>Rapor PAS</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setRaporPrintType("akhir");
+                                  handleOpenWhatsAppModal(siswaObj);
+                                }}
+                                title="Kirim Rapor PAS via WhatsApp ke Wali"
+                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center"
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" />
+                              </button>
+                            </>
                           )}
                         </td>
                       </tr>
@@ -1046,13 +1154,25 @@ export default function NilaiManagementPage() {
                           </>
                         )}
                         {siswaObj && (
-                          <button
-                            onClick={() => handleOpenRapor(siswaObj, "akhir")}
-                            className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            <span>Cetak</span>
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleOpenRapor(siswaObj, "akhir")}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              <span>Cetak</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRaporPrintType("akhir");
+                                handleOpenWhatsAppModal(siswaObj);
+                              }}
+                              title="Kirim Rapor via WhatsApp ke Wali"
+                              className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -1716,6 +1836,16 @@ export default function NilaiManagementPage() {
                 >
                   <Download className="h-4 w-4" />
                   <span>Simpan / Ekspor PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenWhatsAppModal(raporSiswa)}
+                  className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-green-600/20 transition-all cursor-pointer"
+                  title="Kirim ringkasan laporan hasil belajar langsung ke WhatsApp orang tua"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Kirim WA Wali</span>
                 </button>
 
                 <button
@@ -2526,6 +2656,150 @@ export default function NilaiManagementPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 5: PRATINJAU & PENGIRIMAN WHATSAPP WALI SANTRI     */}
+      {/* ========================================================= */}
+      {isWaModalOpen && waTargetSiswa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto no-print">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 relative my-6">
+            <button
+              onClick={() => setIsWaModalOpen(false)}
+              className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-5">
+              <div className="h-11 w-11 rounded-2xl bg-green-500/10 text-green-600 flex items-center justify-center shadow-sm">
+                <MessageCircle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Kirim Laporan Rapor via WhatsApp</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300">
+                    Official Gateway
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Kirimkan ringkasan hasil belajar ananda langsung ke nomor WhatsApp wali santri secara santun dan terstruktur.
+                </p>
+              </div>
+            </div>
+
+            {/* Student & Guardian Info Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 text-xs">
+              <div>
+                <p className="text-slate-400 text-[11px]">Siswa Penerima:</p>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">{waTargetSiswa.nama}</p>
+                <p className="text-slate-500">
+                  Kelas <strong>{waTargetSiswa.kelas}</strong> &bull; NISN: <span className="font-mono">{waTargetSiswa.nisn}</span>
+                </p>
+              </div>
+
+              <div>
+                <p className="text-slate-400 text-[11px]">Wali Santri & Kontak:</p>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">
+                  {waTargetSiswa.namaWali || "Bapak/Ibu Orang Tua"}
+                </p>
+                <p className="text-emerald-600 dark:text-emerald-400 font-mono font-bold flex items-center gap-1">
+                  <span>📞 {waTargetSiswa.noHpWali || "Nomor Belum Terdaftar"}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Option Switcher (PTS vs PAS) */}
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Pilih Format Laporan Rapor:
+              </span>
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setRaporPrintType("tengah")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    raporPrintType === "tengah"
+                      ? "bg-amber-500 text-white shadow-sm"
+                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                  }`}
+                >
+                  Rapor PTS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRaporPrintType("akhir")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    raporPrintType === "akhir"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                  }`}
+                >
+                  Rapor PAS
+                </button>
+              </div>
+            </div>
+
+            {/* WhatsApp Text Preview (WhatsApp Bubble Aesthetic) */}
+            <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-[#f0f9f3] dark:bg-slate-800/90 p-4 mb-5 max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 shadow-inner">
+              <pre className="whitespace-pre-wrap font-sans">
+                {generateRaporWhatsAppText(waTargetSiswa, raporPrintType)}
+              </pre>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  const text = generateRaporWhatsAppText(waTargetSiswa, raporPrintType);
+                  navigator.clipboard.writeText(text);
+                  setIsCopiedWa(true);
+                  setTimeout(() => setIsCopiedWa(false), 2500);
+                }}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                {isCopiedWa ? (
+                  <>
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="text-green-600 font-bold">Tersalin ke Clipboard!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Salin Format Pesan</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setIsWaModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 cursor-pointer"
+                >
+                  Tutup
+                </button>
+
+                <a
+                  href={`https://api.whatsapp.com/send?phone=${formatWhatsAppPhone(
+                    waTargetSiswa.noHpWali
+                  )}&text=${encodeURIComponent(
+                    generateRaporWhatsAppText(waTargetSiswa, raporPrintType)
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-green-600/30 transition-all cursor-pointer"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Buka Chat WhatsApp</span>
+                  <Share2 className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -29,12 +29,17 @@ import {
   Sparkles,
   Info,
   Shield,
+  Printer,
+  CreditCard,
+  QrCode,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export default function SiswaManagementPage() {
   const { user } = useAuth();
   const teacherScope = useTeacherScope();
-  const { siswaList, addSiswa, importSiswaList, updateSiswa, deleteSiswa, kelasList } = useSchoolData();
+  const { siswaList, addSiswa, importSiswaList, updateSiswa, deleteSiswa, kelasList, profile } = useSchoolData();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedKelas, setSelectedKelas] = useState("Semua");
@@ -42,6 +47,13 @@ export default function SiswaManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addMode, setAddMode] = useState<"manual" | "import">("manual");
+
+  // Smart ID Card (Kartu Pelajar Digital) State
+  const [isIdCardModalOpen, setIsIdCardModalOpen] = useState(false);
+  const [idCardTargetSiswa, setIdCardTargetSiswa] = useState<Siswa | null>(null);
+  const [idCardSide, setIdCardSide] = useState<"both" | "front" | "back">("both");
+  const [isBatchCardModalOpen, setIsBatchCardModalOpen] = useState(false);
+  const [batchCardKelas, setBatchCardKelas] = useState<string>("Semua");
 
   // Import State
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -480,6 +492,31 @@ export default function SiswaManagementPage() {
   const validCount = parsedStudents.filter((s) => s.isValid && (!skipDuplicates || !s.isDuplicateNisn)).length;
   const duplicateCount = parsedStudents.filter((s) => s.isDuplicateNisn).length;
 
+  // Smart ID Card Handlers
+  const handlePrintCard = (title: string) => {
+    const prevTitle = typeof document !== "undefined" ? document.title : "";
+    if (typeof document !== "undefined") {
+      document.title = title.replace(/[/\\?%*:|"<>]/g, "_");
+    }
+    window.print();
+    setTimeout(() => {
+      if (typeof document !== "undefined") {
+        document.title = prevTitle;
+      }
+    }, 1500);
+  };
+
+  const handleOpenIdCard = (siswa: Siswa) => {
+    setIdCardTargetSiswa(siswa);
+    setIdCardSide("both");
+    setIsIdCardModalOpen(true);
+  };
+
+  const handleOpenBatchCard = () => {
+    setBatchCardKelas(selectedKelas !== "Semua" ? selectedKelas : "Semua");
+    setIsBatchCardModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header section */}
@@ -501,6 +538,15 @@ export default function SiswaManagementPage() {
           >
             <Download className="h-4 w-4" />
             <span>Ekspor CSV</span>
+          </button>
+
+          <button
+            onClick={handleOpenBatchCard}
+            className="px-3.5 py-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-all flex items-center gap-2 shadow-xs"
+            title="Cetak Kartu Tanda Pelajar Siswa Satu Kelas / Seluruh Siswa di Lembar A4"
+          >
+            <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span>Cetak Kartu Rombel</span>
           </button>
 
           {canEdit && (
@@ -665,6 +711,13 @@ export default function SiswaManagementPage() {
                     </td>
                     <td className="px-5 py-3.5 text-right space-x-1">
                       <button
+                        onClick={() => handleOpenIdCard(siswa)}
+                        title="Cetak Kartu Tanda Pelajar (Smart ID Card)"
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800"
+                      >
+                        <CreditCard className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => setSelectedSiswa(siswa)}
                         title="Lihat Detail Profil"
                         className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800"
@@ -761,10 +814,23 @@ export default function SiswaManagementPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const s = selectedSiswa;
+                  setSelectedSiswa(null);
+                  handleOpenIdCard(s);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-emerald-600/30 transition-all cursor-pointer"
+              >
+                <CreditCard className="h-4 w-4" />
+                <span>Cetak Kartu Pelajar</span>
+              </button>
+
               <button
                 onClick={() => setSelectedSiswa(null)}
-                className="px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-all"
+                className="px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-all cursor-pointer"
               >
                 Tutup
               </button>
@@ -1244,6 +1310,507 @@ export default function SiswaManagementPage() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: CETAK KARTU TANDA PELAJAR DIGITAL (SATUAN)        */}
+      {/* ========================================================= */}
+      {isIdCardModalOpen && idCardTargetSiswa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative my-6">
+            {/* Modal Header Toolbar (No Print) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6 no-print">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center shadow-xs">
+                  <CreditCard className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Kartu Tanda Pelajar Digital (CR80)</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                      Standard ISO
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Kartu identitas resmi peserta didik dua sisi dengan barcode NISN dan QR Code verifikasi digital.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setIdCardSide("both")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      idCardSide === "both"
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    Dua Sisi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIdCardSide("front")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      idCardSide === "front"
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    Depan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIdCardSide("back")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      idCardSide === "back"
+                        ? "bg-amber-500 text-white shadow-xs"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    Belakang
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintCard(
+                      `Kartu_Pelajar_${idCardTargetSiswa.nama}_${idCardTargetSiswa.nisn}`
+                    )
+                  }
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Cetak / PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsIdCardModalOpen(false)}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Print Area: Kartu CR80 Standar (85.6mm x 53.98mm) */}
+            <div className="flex flex-wrap items-center justify-center gap-6 p-4 bg-slate-50 dark:bg-slate-950/40 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+              {/* SISI DEPAN (FRONT FACE) */}
+              {(idCardSide === "both" || idCardSide === "front") && (
+                <div className="w-[350px] h-[220px] rounded-2xl p-4 bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-950 text-white shadow-xl relative overflow-hidden border border-amber-400/50 flex flex-col justify-between shrink-0 select-none">
+                  {/* Ornamen Latar Islami */}
+                  <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-amber-400/10 blur-xl pointer-events-none" />
+                  <div className="absolute -left-8 -top-8 w-28 h-28 rounded-full bg-emerald-400/10 blur-lg pointer-events-none" />
+
+                  {/* Header Kartu */}
+                  <div className="flex items-center justify-between border-b border-amber-400/30 pb-2 relative z-10">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-amber-500 text-slate-950 flex items-center justify-center font-black text-xs shadow-md">
+                        SDI
+                      </div>
+                      <div>
+                        <p className="text-[8px] uppercase tracking-widest text-amber-300 font-extrabold leading-none">
+                          KARTU TANDA PELAJAR
+                        </p>
+                        <p className="text-[11px] font-black tracking-tight text-white leading-tight">
+                          {profile.namaSekolah || "SDI SMART SCHOOL"}
+                        </p>
+                        <p className="text-[7.5px] text-emerald-200 leading-none">
+                          NPSN: {profile.npsn || "69882312"} &bull; Akreditasi: {profile.akreditasi || "A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Chip Smart Card Visual */}
+                    <div className="w-8 h-6 rounded bg-gradient-to-tr from-amber-300 via-amber-200 to-yellow-500 border border-amber-500/70 shadow-inner flex items-center justify-center">
+                      <div className="w-5 h-3 border border-amber-600/40 rounded-xs grid grid-cols-2 gap-0.5 opacity-70">
+                        <div className="border-r border-amber-600/40" />
+                        <div />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Body Kartu: Foto & Detail Siswa */}
+                  <div className="flex items-center gap-3.5 my-auto relative z-10">
+                    {/* Foto Siswa */}
+                    <div className="relative shrink-0">
+                      <img
+                        src={idCardTargetSiswa.avatar}
+                        alt={idCardTargetSiswa.nama}
+                        className="w-[72px] h-[86px] rounded-xl object-cover border-2 border-amber-400 shadow-md bg-white/10"
+                      />
+                      <span className="absolute -bottom-1.5 -right-1 px-1.5 py-0.2 rounded-full text-[7px] font-bold bg-emerald-500 text-white uppercase shadow-xs">
+                        Aktif
+                      </span>
+                    </div>
+
+                    {/* Identitas Siswa */}
+                    <div className="space-y-1 min-w-0">
+                      <div>
+                        <p className="text-[11px] font-black text-white uppercase tracking-tight truncate max-w-[200px] leading-snug">
+                          {idCardTargetSiswa.nama}
+                        </p>
+                        <p className="text-[10px] font-mono font-bold text-amber-300 tracking-wider">
+                          NISN: {idCardTargetSiswa.nisn}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[8px] text-slate-200 pt-0.5">
+                        <div>
+                          <span className="text-emerald-300 block text-[7px]">KELAS</span>
+                          <span className="font-bold text-white">{idCardTargetSiswa.kelas}</span>
+                        </div>
+                        <div>
+                          <span className="text-emerald-300 block text-[7px]">GENDER</span>
+                          <span className="font-bold text-white">
+                            {idCardTargetSiswa.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-emerald-300 block text-[7px]">TEMPAT / TGL LAHIR</span>
+                          <span className="font-semibold text-slate-100 truncate block">
+                            {idCardTargetSiswa.tempatLahir}, {idCardTargetSiswa.tanggalLahir}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barcode NISN & Footer */}
+                  <div className="flex items-center justify-between border-t border-amber-400/25 pt-1.5 relative z-10">
+                    <div className="flex flex-col">
+                      {/* Barcode Lines (SVG Vector Representation) */}
+                      <svg className="w-32 h-5" viewBox="0 0 120 20" fill="currentColor">
+                        <rect x="0" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="4" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="7" y="0" width="3" height="20" fill="#fff" />
+                        <rect x="12" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="16" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="19" y="0" width="4" height="20" fill="#fff" />
+                        <rect x="25" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="29" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="32" y="0" width="3" height="20" fill="#fff" />
+                        <rect x="37" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="41" y="0" width="4" height="20" fill="#fff" />
+                        <rect x="47" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="50" y="0" width="3" height="20" fill="#fff" />
+                        <rect x="55" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="59" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="62" y="0" width="4" height="20" fill="#fff" />
+                        <rect x="68" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="72" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="75" y="0" width="3" height="20" fill="#fff" />
+                        <rect x="80" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="84" y="0" width="4" height="20" fill="#fff" />
+                        <rect x="90" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="93" y="0" width="3" height="20" fill="#fff" />
+                        <rect x="98" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="102" y="0" width="4" height="20" fill="#fff" />
+                        <rect x="108" y="0" width="2" height="20" fill="#fff" />
+                        <rect x="112" y="0" width="1" height="20" fill="#fff" />
+                        <rect x="115" y="0" width="3" height="20" fill="#fff" />
+                      </svg>
+                      <span className="font-mono text-[7px] text-amber-200 tracking-widest text-center mt-0.5">
+                        *{idCardTargetSiswa.nisn}*
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[7px] text-emerald-300 block">SMART DIGITAL CARD</span>
+                      <span className="text-[8px] font-bold text-white">SDI Smart ID</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SISI BELAKANG (BACK FACE) */}
+              {(idCardSide === "both" || idCardSide === "back") && (
+                <div className="w-[350px] h-[220px] rounded-2xl p-4 bg-gradient-to-br from-slate-950 via-teal-950 to-emerald-950 text-white shadow-xl relative overflow-hidden border border-amber-400/50 flex flex-col justify-between shrink-0 select-none">
+                  {/* Ornamen Latar */}
+                  <div className="absolute -left-8 -bottom-8 w-28 h-28 rounded-full bg-amber-400/10 blur-xl pointer-events-none" />
+
+                  {/* Header Tata Tertib */}
+                  <div className="border-b border-amber-400/30 pb-1.5 text-center relative z-10">
+                    <p className="text-[8.5px] uppercase tracking-wider text-amber-300 font-extrabold">
+                      KETENTUAN & TATA TERTIB KARTU PELAJAR
+                    </p>
+                    <p className="text-[7px] text-slate-400">
+                      {profile.namaSekolah || "SDI SMART SCHOOL"}
+                    </p>
+                  </div>
+
+                  {/* 4 Poin Tata Tertib */}
+                  <div className="space-y-1 my-auto text-[7.5px] text-slate-200 relative z-10 px-1">
+                    <div className="flex items-start gap-1.5">
+                      <span className="font-bold text-amber-400">1.</span>
+                      <p className="leading-tight">
+                        Kartu ini adalah tanda pengenal sah peserta didik SDI Smart School.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="font-bold text-amber-400">2.</span>
+                      <p className="leading-tight">
+                        Wajib dibawa saat proses KBM, asesmen, dan peminjaman buku perpustakaan.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="font-bold text-amber-400">3.</span>
+                      <p className="leading-tight">
+                        Kartu ini tidak dapat dipindahtangankan kepada orang lain dengan alasan apapun.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="font-bold text-amber-400">4.</span>
+                      <p className="leading-tight">
+                        Jika kartu hilang/rusak, segera melapor kepada Tata Usaha Sekolah.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Bagian Bawah: QR Code Verifikasi & Tanda Tangan */}
+                  <div className="flex items-end justify-between border-t border-amber-400/25 pt-2 relative z-10">
+                    {/* QR Code Digital */}
+                    <div className="flex items-center gap-2">
+                      <div className="w-13 h-13 p-1 rounded-lg bg-white shadow-md flex items-center justify-center">
+                        {/* Simulative Crisp Vector QR Code */}
+                        <svg className="w-full h-full text-slate-900" viewBox="0 0 33 33" fill="currentColor">
+                          <rect x="0" y="0" width="9" height="9" fill="#000" />
+                          <rect x="2" y="2" width="5" height="5" fill="#fff" />
+                          <rect x="3.5" y="3.5" width="2" height="2" fill="#000" />
+                          <rect x="24" y="0" width="9" height="9" fill="#000" />
+                          <rect x="26" y="2" width="5" height="5" fill="#fff" />
+                          <rect x="27.5" y="3.5" width="2" height="2" fill="#000" />
+                          <rect x="0" y="24" width="9" height="9" fill="#000" />
+                          <rect x="2" y="26" width="5" height="5" fill="#fff" />
+                          <rect x="3.5" y="27.5" width="2" height="2" fill="#000" />
+                          <rect x="12" y="3" width="3" height="3" fill="#000" />
+                          <rect x="18" y="3" width="3" height="3" fill="#000" />
+                          <rect x="12" y="12" width="9" height="9" fill="#000" />
+                          <rect x="15" y="15" width="3" height="3" fill="#fff" />
+                          <rect x="24" y="14" width="4" height="2" fill="#000" />
+                          <rect x="27" y="20" width="3" height="4" fill="#000" />
+                          <rect x="14" y="26" width="4" height="3" fill="#000" />
+                          <rect x="22" y="26" width="5" height="4" fill="#000" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="text-[6.5px] uppercase text-emerald-300 font-bold block">
+                          SCAN VERIFIKASI
+                        </span>
+                        <span className="text-[6.5px] text-slate-300 block font-mono">
+                          ID: {idCardTargetSiswa.id}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Tanda Tangan Digital Kepala Sekolah */}
+                    <div className="text-right text-[7px] text-slate-300 relative">
+                      <p>Jakarta, {new Date().toLocaleDateString("id-ID", { month: "short", year: "numeric" })}</p>
+                      <p className="font-semibold text-white">Kepala Sekolah,</p>
+                      {/* Signature simulation line */}
+                      <div className="h-6 flex items-center justify-end my-0.5">
+                        <span className="font-serif italic text-amber-300 font-bold text-[10px] tracking-wide opacity-90">
+                          {profile.kepalaSekolah ? profile.kepalaSekolah.split(" ")[0] : "M. Rasyid"}
+                        </span>
+                      </div>
+                      <p className="font-bold text-white underline text-[7.5px]">
+                        {profile.kepalaSekolah || "Dr. H. Muhammad Rasyid, M.Pd."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Bottom Actions */}
+            <div className="mt-5 flex items-center justify-between text-xs text-slate-500 no-print">
+              <span>
+                Tip: Gunakan opsi printer <strong>"Save as PDF"</strong> atau cetak ke kertas PVC ID Card.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsIdCardModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer"
+              >
+                Tutup Pratinjau
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: CETAK KARTU PELAJAR ROMBEL (MULTI-KARTU LEMBAR A4) */}
+      {/* ========================================================= */}
+      {isBatchCardModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/75 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative my-6">
+            {/* Batch Header Bar (No Print) */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6 no-print">
+              <div>
+                <div className="flex items-center gap-2 text-amber-600 mb-1">
+                  <CreditCard className="h-5 w-5" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Cetak Massal Kartu Pelajar (Rombel Lembar A4)
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Pratinjau Multi-Kartu Pelajar Siswa
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Cetak langsung kumpulan kartu tanda pelajar dalam format lembar kerja A4 siap potong.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Kelas Rombel */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Kelas:</span>
+                  <select
+                    value={batchCardKelas}
+                    onChange={(e) => setBatchCardKelas(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="Semua">Semua Kelas</option>
+                    {kelasList.map((k) => (
+                      <option key={k.id} value={k.nama}>
+                        {k.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintCard(
+                      `Lembar_Kartu_Pelajar_${batchCardKelas === "Semua" ? "Seluruh_Siswa" : batchCardKelas}`
+                    )
+                  }
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-600/20 transition-all cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Cetak Seluruh Lembar A4</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBatchCardModalOpen(false)}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Grid Kartu Rombel */}
+            {(() => {
+              const targetStudents = baseSiswaList.filter((s) => {
+                if (batchCardKelas === "Semua") return true;
+                return s.kelas === batchCardKelas;
+              });
+
+              if (targetStudents.length === 0) {
+                return (
+                  <div className="py-16 text-center text-slate-400">
+                    <CreditCard className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-semibold text-sm">Tidak ada siswa pada rombel {batchCardKelas}.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between text-xs text-slate-500 no-print">
+                    <span>
+                      Menampilkan <strong>{targetStudents.length}</strong> siswa siap cetak kartu.
+                    </span>
+                    <span>Standar Cetak: Kertas A4 / Glossy Photo Paper</span>
+                  </div>
+
+                  {/* Container Grid Lembar Kerja */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 p-6 bg-slate-100 dark:bg-slate-950/60 rounded-3xl border border-slate-200 dark:border-slate-800 max-h-[70vh] overflow-y-auto">
+                    {targetStudents.map((s) => (
+                      <div
+                        key={s.id}
+                        className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center gap-3"
+                      >
+                        {/* Front Face Mini Preview */}
+                        <div className="w-[320px] h-[200px] rounded-xl p-3 bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-950 text-white shadow-md relative overflow-hidden border border-amber-400/50 flex flex-col justify-between select-none">
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-amber-400/30 pb-1.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black text-[10px]">
+                                SDI
+                              </div>
+                              <div>
+                                <p className="text-[7.5px] uppercase tracking-widest text-amber-300 font-extrabold leading-none">
+                                  KARTU TANDA PELAJAR
+                                </p>
+                                <p className="text-[10px] font-black tracking-tight text-white leading-tight">
+                                  {profile.namaSekolah || "SDI SMART SCHOOL"}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[7.5px] text-emerald-300 font-bold">CR80</span>
+                          </div>
+
+                          {/* Body */}
+                          <div className="flex items-center gap-3 my-auto">
+                            <img
+                              src={s.avatar}
+                              alt={s.nama}
+                              className="w-14 h-18 rounded-lg object-cover border border-amber-400 shadow-sm bg-white/10"
+                            />
+                            <div className="space-y-0.5 min-w-0">
+                              <p className="text-[10px] font-black text-white uppercase truncate max-w-[180px]">
+                                {s.nama}
+                              </p>
+                              <p className="text-[9px] font-mono font-bold text-amber-300">
+                                NISN: {s.nisn}
+                              </p>
+                              <p className="text-[8px] text-slate-200">
+                                Kelas: <strong>{s.kelas}</strong>
+                              </p>
+                              <p className="text-[7.5px] text-slate-300 truncate">
+                                {s.tempatLahir}, {s.tanggalLahir}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="flex items-center justify-between border-t border-amber-400/25 pt-1 text-[7px] text-slate-300">
+                            <span className="font-mono text-amber-200">*{s.nisn}*</span>
+                            <span className="font-semibold text-white">Status: AKTIF</span>
+                          </div>
+                        </div>
+
+                        {/* Student Name & Direct Action */}
+                        <div className="w-full flex items-center justify-between text-xs px-1 no-print">
+                          <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">
+                            {s.nama}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenIdCard(s)}
+                            className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer"
+                          >
+                            Detail Sisi Belakang &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
