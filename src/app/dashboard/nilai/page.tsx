@@ -33,6 +33,9 @@ import {
   ArrowRight,
   UserCheck,
   RefreshCw,
+  Download,
+  Users,
+  ChevronLeft,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -81,9 +84,15 @@ export default function NilaiManagementPage() {
     uas: 85,
   });
 
-  // E-Rapor Modal Print Preview
+  // E-Rapor Modal Print Preview (Single Student)
   const [raporSiswa, setRaporSiswa] = useState<Siswa | null>(null);
   const [raporPrintType, setRaporPrintType] = useState<JenisRapor>("tengah");
+
+  // E-Rapor Batch (Seluruh Siswa Rombel) Modal State
+  const [isBatchRaporOpen, setIsBatchRaporOpen] = useState(false);
+  const [batchRaporType, setBatchRaporType] = useState<JenisRapor>("tengah");
+  const [batchRaporViewMode, setBatchRaporViewMode] = useState<"bundel" | "leger">("bundel");
+  const [batchSelectedKelas, setBatchSelectedKelas] = useState<string>("Semua");
 
   // Single Form State for Grade Input / Editing
   const [formData, setFormData] = useState({
@@ -383,6 +392,37 @@ export default function NilaiManagementPage() {
     setRaporPrintType(type || (activeRaporTab === "akhir" ? "akhir" : "tengah"));
   };
 
+  // Single Student Navigation in Modal
+  const currentSiswaIndex = raporSiswa
+    ? baseSiswaList.findIndex((s) => s.id === raporSiswa.id)
+    : -1;
+
+  const handlePrevSiswa = () => {
+    if (currentSiswaIndex > 0) {
+      setRaporSiswa(baseSiswaList[currentSiswaIndex - 1]);
+    }
+  };
+
+  const handleNextSiswa = () => {
+    if (currentSiswaIndex >= 0 && currentSiswaIndex < baseSiswaList.length - 1) {
+      setRaporSiswa(baseSiswaList[currentSiswaIndex + 1]);
+    }
+  };
+
+  // Direct Print & PDF Filename Handler
+  const handlePrintReport = (docTitle: string) => {
+    const prevTitle = typeof document !== "undefined" ? document.title : "";
+    if (typeof document !== "undefined") {
+      document.title = docTitle.replace(/[/\\?%*:|"<>]/g, "_");
+    }
+    window.print();
+    setTimeout(() => {
+      if (typeof document !== "undefined") {
+        document.title = prevTitle;
+      }
+    }, 1500);
+  };
+
   // Nilai records for selected rapor siswa
   const studentNilaiRecords = raporSiswa
     ? nilaiList.filter((n) => n.siswaId === raporSiswa.id)
@@ -403,6 +443,15 @@ export default function NilaiManagementPage() {
             studentNilaiRecords.length
         )
       : 0;
+
+  // Students included in Batch Rapor
+  const batchStudents = baseSiswaList.filter((s) => {
+    if (teacherScope.isTeacher && teacherScope.assignedClass) {
+      return s.kelas.toLowerCase() === teacherScope.assignedClass.toLowerCase();
+    }
+    if (batchSelectedKelas === "Semua") return true;
+    return s.kelas.toLowerCase() === batchSelectedKelas.toLowerCase();
+  });
 
   // Live preview calculations for single form modal
   const liveMid = calculateMidGrade(Number(formData.tugas) || 0, Number(formData.uts) || 0);
@@ -452,30 +501,60 @@ export default function NilaiManagementPage() {
           </p>
         </div>
 
-        {canEdit && (
-          <div className="flex items-center gap-2.5">
-            {/* Tombol Input Bulk Nilai (Seluruh Mapel) */}
-            <button
-              onClick={() => handleOpenBulkAdd()}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-2"
-            >
-              <Zap className="h-4 w-4 fill-white" />
-              <span>Input Bulk Nilai Siswa</span>
-              <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-md font-semibold">
-                Semua Mapel
-              </span>
-            </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Tombol Cetak / Ekspor Rapor Seluruh Siswa */}
+          <button
+            onClick={() => {
+              setBatchRaporViewMode("bundel");
+              setBatchRaporType(activeRaporTab === "akhir" ? "akhir" : "tengah");
+              setBatchSelectedKelas(selectedKelas !== "Semua" ? selectedKelas : "Semua");
+              setIsBatchRaporOpen(true);
+            }}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Rapor Seluruh Siswa (PDF & Print)</span>
+          </button>
 
-            {/* Tombol Input Satuan */}
-            <button
-              onClick={handleOpenAdd}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Input Satuan</span>
-            </button>
-          </div>
-        )}
+          {/* Tombol Leger Nilai Rombel */}
+          <button
+            onClick={() => {
+              setBatchRaporViewMode("leger");
+              setBatchRaporType(activeRaporTab === "akhir" ? "akhir" : "tengah");
+              setBatchSelectedKelas(selectedKelas !== "Semua" ? selectedKelas : "Semua");
+              setIsBatchRaporOpen(true);
+            }}
+            className="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <FileText className="h-4 w-4" />
+            <span>Leger Nilai Rombel</span>
+          </button>
+
+          {canEdit && (
+            <>
+              {/* Tombol Input Bulk Nilai (Seluruh Mapel) */}
+              <button
+                onClick={() => handleOpenBulkAdd()}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-2"
+              >
+                <Zap className="h-4 w-4 fill-white" />
+                <span>Input Bulk Nilai</span>
+                <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-md font-semibold">
+                  Semua Mapel
+                </span>
+              </button>
+
+              {/* Tombol Input Satuan */}
+              <button
+                onClick={handleOpenAdd}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Input Satuan</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Teacher Homeroom Banner */}
@@ -1556,44 +1635,94 @@ export default function NilaiManagementPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-4xl bg-white text-slate-900 rounded-3xl p-8 sm:p-10 shadow-2xl relative my-8">
             {/* Action Bar (No Print) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-6 no-print">
-              {/* Type Switcher in Print Modal */}
-              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setRaporPrintType("tengah")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    raporPrintType === "tengah"
-                      ? "bg-amber-500 text-white shadow"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span>Rapor Tengah Semester (PTS)</span>
-                </button>
-                <button
-                  onClick={() => setRaporPrintType("akhir")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    raporPrintType === "akhir"
-                      ? "bg-blue-600 text-white shadow"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <GraduationCap className="h-3.5 w-3.5" />
-                  <span>Rapor Akhir Semester (PAS)</span>
-                </button>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-6 no-print">
+              {/* Type Switcher & Student Stepper in Print Modal */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Stepper Prev/Next */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={handlePrevSiswa}
+                    disabled={currentSiswaIndex <= 0}
+                    title="Siswa Sebelumnya"
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-[11px] font-bold px-2 text-slate-700">
+                    {currentSiswaIndex + 1} / {baseSiswaList.length}
+                  </span>
+                  <button
+                    onClick={handleNextSiswa}
+                    disabled={currentSiswaIndex >= baseSiswaList.length - 1}
+                    title="Siswa Berikutnya"
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Switcher PTS / PAS */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setRaporPrintType("tengah")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      raporPrintType === "tengah"
+                        ? "bg-amber-500 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Rapor PTS</span>
+                  </button>
+                  <button
+                    onClick={() => setRaporPrintType("akhir")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      raporPrintType === "akhir"
+                        ? "bg-blue-600 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    <span>Rapor PAS</span>
+                  </button>
+                </div>
               </div>
 
+              {/* Action Buttons (Direct Print & PDF Export) */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 shadow-md"
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                  title="Cetak langsung menggunakan dialog print peramban"
                 >
                   <Printer className="h-4 w-4" />
-                  <span>Cetak Lembar E-Rapor</span>
+                  <span>Cetak Langsung</span>
                 </button>
+
                 <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer"
+                  title="Simpan dokumen sebagai file PDF beresolusi tinggi"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Simpan / Ekspor PDF</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setRaporSiswa(null)}
-                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600"
+                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Tutup Modal"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -1839,6 +1968,564 @@ export default function NilaiManagementPage() {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 4: E-RAPOR SELURUH SISWA (BUNDEL RAPOR & LEGER NILAI) */}
+      {/* ========================================================= */}
+      {isBatchRaporOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-6xl bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl relative my-6 max-h-[95vh] overflow-y-auto print:m-0 print:p-0 print:max-w-none print:shadow-none print:rounded-none print:max-h-none">
+            {/* Action Bar (No Print) */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5 mb-6 no-print">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-1.5">
+                  <Printer className="h-3.5 w-3.5" />
+                  <span>Modul Cetak / Ekspor Rapor Seluruh Siswa</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
+                  <span>E-Rapor Rombel: {batchSelectedKelas === "Semua" ? "Seluruh Siswa" : `Kelas ${batchSelectedKelas}`}</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold">
+                    {batchStudents.length} Siswa
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pilih mode cetak: Bundel Rapor Lembar Individu (multi-halaman) atau Buku Leger Nilai Komprehensif.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Mode Selector: Bundel vs Leger */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setBatchRaporViewMode("bundel")}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      batchRaporViewMode === "bundel"
+                        ? "bg-emerald-600 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Bundel Rapor ({batchStudents.length} Lembar)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchRaporViewMode("leger")}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      batchRaporViewMode === "leger"
+                        ? "bg-indigo-600 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Buku Leger Nilai</span>
+                  </button>
+                </div>
+
+                {/* Switcher PTS / PAS */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setBatchRaporType("tengah")}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      batchRaporType === "tengah"
+                        ? "bg-amber-500 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Rapor PTS</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchRaporType("akhir")}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      batchRaporType === "akhir"
+                        ? "bg-blue-600 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <GraduationCap className="h-3.5 w-3.5" />
+                    <span>Rapor PAS</span>
+                  </button>
+                </div>
+
+                {/* Filter Kelas jika bukan guru terkunci */}
+                {!teacherScope.isTeacher && (
+                  <select
+                    value={batchSelectedKelas}
+                    onChange={(e) => setBatchSelectedKelas(e.target.value)}
+                    className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none"
+                  >
+                    <option value="Semua">Semua Kelas ({baseSiswaList.length} Siswa)</option>
+                    {kelasList.map((k) => (
+                      <option key={k.id} value={k.nama}>
+                        {k.nama} ({baseSiswaList.filter((s) => s.kelas.toLowerCase() === k.nama.toLowerCase()).length} Siswa)
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Tombol Cetak Langsung */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      batchRaporViewMode === "bundel"
+                        ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                        : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                    )
+                  }
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+                  title="Cetak langsung menggunakan printer atau dialog cetak"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Cetak Langsung</span>
+                </button>
+
+                {/* Tombol Simpan PDF */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      batchRaporViewMode === "bundel"
+                        ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                        : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                    )
+                  }
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 cursor-pointer transition-all"
+                  title="Simpan dokumen sebagai satu berkas PDF"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Simpan / Ekspor PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBatchRaporOpen(false)}
+                  className="p-2 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Tutup Modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* ========================================================= */}
+            {/* KONTEN 1: MODE BUNDEL LEMBAR RAPOR PER SISWA (MULTI-PAGE) */}
+            {/* ========================================================= */}
+            {batchRaporViewMode === "bundel" && (
+              <div className="space-y-12 print:space-y-0">
+                {batchStudents.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400">
+                    Tidak ada siswa yang ditemukan untuk kelas yang dipilih.
+                  </div>
+                ) : (
+                  batchStudents.map((siswa) => {
+                    const studentRecords = nilaiList.filter((n) => n.siswaId === siswa.id);
+                    const midAvg =
+                      studentRecords.length > 0
+                        ? Math.round(
+                            studentRecords.reduce(
+                              (acc, curr) => acc + getStudentMid(curr).nilaiMid,
+                              0
+                            ) / studentRecords.length
+                          )
+                        : 0;
+                    const akhirAvg =
+                      studentRecords.length > 0
+                        ? Math.round(
+                            studentRecords.reduce(
+                              (acc, curr) => acc + getStudentAkhir(curr).nilaiAkhir,
+                              0
+                            ) / studentRecords.length
+                          )
+                        : 0;
+
+                    const matchedKelasObj = kelasList.find(
+                      (k) => k.nama.toLowerCase() === siswa.kelas.toLowerCase()
+                    );
+                    const matchedWaliGuru = matchedKelasObj
+                      ? guruList.find((g) => g.id === matchedKelasObj.waliKelasId)
+                      : null;
+                    const waliNama =
+                      (matchedWaliGuru?.nama
+                        ? `${matchedWaliGuru.nama}, ${matchedWaliGuru.gelar || ""}`.trim()
+                        : null) ||
+                      matchedKelasObj?.waliKelasNama ||
+                      (teacherScope.isTeacher ? teacherScope.teacherName : "Wali Kelas");
+                    const waliNip = matchedWaliGuru?.nip || "198506122010012015";
+
+                    return (
+                      <div
+                        key={siswa.id}
+                        style={{ pageBreakAfter: "always", breakAfter: "page" }}
+                        className="p-6 sm:p-8 rounded-2xl border border-slate-200 bg-white print:border-none print:p-0 print:m-0"
+                      >
+                        {/* Kop Surat */}
+                        <div className="text-center border-b-2 border-slate-900 pb-4 mb-5">
+                          <div className="flex items-center justify-center gap-3 mb-2">
+                            <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold">
+                              <GraduationCap className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <h2 className="text-lg font-extrabold uppercase tracking-wide text-slate-900">
+                                {profile.namaSekolah}
+                              </h2>
+                              <p className="text-[11px] text-slate-600 font-medium">
+                                NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-500 max-w-xl mx-auto">
+                            {profile.alamat} &bull; Telp: {profile.telepon} &bull; Website: {profile.website}
+                          </p>
+                        </div>
+
+                        {/* Title */}
+                        <div className="text-center mb-4">
+                          <h3 className="text-sm font-extrabold underline tracking-wider uppercase text-slate-900">
+                            {batchRaporType === "tengah"
+                              ? "LAPORAN PENILAIAN HASIL BELAJAR TENGAH SEMESTER (PTS)"
+                              : "LAPORAN CAPAIAN HASIL BELAJAR AKHIR SEMESTER (PAS)"}
+                          </h3>
+                          <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
+                            Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {profile.semesterAktif}
+                          </p>
+                        </div>
+
+                        {/* Student Info Box */}
+                        <div className="grid grid-cols-2 gap-3 text-xs mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200 print:bg-slate-50">
+                          <div>
+                            <p className="text-slate-500">Nama Peserta Didik: <strong className="text-slate-900">{siswa.nama}</strong></p>
+                            <p className="text-slate-500 mt-0.5">NISN: <strong className="text-slate-900 font-mono">{siswa.nisn}</strong></p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Kelas: <strong className="text-slate-900">{siswa.kelas}</strong></p>
+                            <p className="text-slate-500 mt-0.5">Status: <strong className="text-slate-900">{siswa.status}</strong></p>
+                          </div>
+                        </div>
+
+                        {/* Table of Grades */}
+                        {batchRaporType === "tengah" ? (
+                          <table className="w-full text-xs text-left border-collapse border border-slate-300 mb-5">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-800 font-bold text-[11px]">
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-8">No</th>
+                                <th className="border border-slate-300 px-2 py-1.5">Mata Pelajaran</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20">UH (50%)</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20">Mid (50%)</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16 bg-amber-50">Nilai PTS</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
+                                <th className="border border-slate-300 px-2 py-1.5">Catatan Perkembangan</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {studentRecords.length === 0 ? (
+                                <tr>
+                                  <td colSpan={8} className="border border-slate-300 px-3 py-4 text-center text-slate-400">
+                                    Belum ada nilai yang diinputkan untuk siswa ini.
+                                  </td>
+                                </tr>
+                              ) : (
+                                studentRecords.map((item, idx) => {
+                                  const mid = getStudentMid(item);
+                                  const mapelObj = mapelList.find(
+                                    (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                  );
+                                  const kkm = mapelObj?.kkm || 75;
+
+                                  return (
+                                    <tr key={item.id} className="text-[11px]">
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                        {mid.nilaiMid}
+                                      </td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                        {mid.predikatMid}
+                                      </td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                        {mid.catatanMid || "-"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                            <tfoot>
+                              <tr className="bg-slate-50 font-semibold text-[11px]">
+                                <td colSpan={5} className="border border-slate-300 px-3 py-1.5 text-right">
+                                  Rata-Rata Nilai Rapor PTS:
+                                </td>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 font-mono bg-amber-50">
+                                  {midAvg}
+                                </td>
+                                <td colSpan={2} className="border border-slate-300 px-3 py-1.5 text-slate-600">
+                                  Predikat:{" "}
+                                  <strong>
+                                    {midAvg >= 88 ? "A (Sangat Baik)" : midAvg >= 75 ? "B (Baik)" : "C (Cukup)"}
+                                  </strong>
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        ) : (
+                          <table className="w-full text-xs text-left border-collapse border border-slate-300 mb-5">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-800 font-bold text-[11px]">
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-8">No</th>
+                                <th className="border border-slate-300 px-2 py-1.5">Mata Pelajaran</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16">UH (30%)</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16">Mid (30%)</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16">UAS (40%)</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16 bg-blue-50">Nilai Akhir</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
+                                <th className="border border-slate-300 px-2 py-1.5">Catatan Capaian</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {studentRecords.length === 0 ? (
+                                <tr>
+                                  <td colSpan={9} className="border border-slate-300 px-3 py-4 text-center text-slate-400">
+                                    Belum ada nilai yang diinputkan untuk siswa ini.
+                                  </td>
+                                </tr>
+                              ) : (
+                                studentRecords.map((item, idx) => {
+                                  const akhir = getStudentAkhir(item);
+                                  const mapelObj = mapelList.find(
+                                    (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                  );
+                                  const kkm = mapelObj?.kkm || 75;
+
+                                  return (
+                                    <tr key={item.id} className="text-[11px]">
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
+                                        {akhir.nilaiAkhir}
+                                      </td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                        {akhir.predikat}
+                                      </td>
+                                      <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                        {akhir.catatan || "-"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                            <tfoot>
+                              <tr className="bg-slate-50 font-semibold text-[11px]">
+                                <td colSpan={6} className="border border-slate-300 px-3 py-1.5 text-right">
+                                  Rata-Rata Nilai Rapor Akhir Semester (PAS):
+                                </td>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 font-mono bg-blue-50">
+                                  {akhirAvg}
+                                </td>
+                                <td colSpan={2} className="border border-slate-300 px-3 py-1.5 text-slate-600">
+                                  Predikat:{" "}
+                                  <strong>
+                                    {akhirAvg >= 88 ? "A (Sangat Baik)" : akhirAvg >= 75 ? "B (Baik)" : "C (Cukup)"}
+                                  </strong>
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        )}
+
+                        {/* Signature Area */}
+                        <div className="grid grid-cols-3 text-center text-xs pt-4 border-t border-slate-200">
+                          <div>
+                            <p className="text-slate-500">Orang Tua / Wali Murid,</p>
+                            <div className="h-14" />
+                            <p className="font-bold underline">{siswa.namaWali}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Wali Kelas {siswa.kelas},</p>
+                            <div className="h-14" />
+                            <p className="font-bold underline">{waliNama}</p>
+                            <p className="text-[10px] text-slate-400">NIP: {waliNip}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Jakarta, {formatDateIndo(new Date().toISOString().split("T")[0])}</p>
+                            <p className="text-slate-500">Kepala Sekolah,</p>
+                            <div className="h-12" />
+                            <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                            <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* ========================================================= */}
+            {/* KONTEN 2: MODE BUKU LEGER NILAI ROMBEL (TABEL REKAP)      */}
+            {/* ========================================================= */}
+            {batchRaporViewMode === "leger" && (
+              <div className="space-y-6">
+                {/* Kop Surat Leger */}
+                <div className="text-center border-b-2 border-slate-900 pb-4 mb-4">
+                  <h2 className="text-lg font-black uppercase text-slate-900">
+                    {profile.namaSekolah}
+                  </h2>
+                  <p className="text-xs text-slate-600 font-semibold">
+                    NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi} &bull; {profile.alamat}
+                  </p>
+                  <h3 className="text-base font-extrabold uppercase mt-2 text-indigo-950">
+                    BUKU LEGER NILAI HASIL BELAJAR {batchRaporType === "tengah" ? "TENGAH SEMESTER (PTS)" : "AKHIR SEMESTER (PAS)"}
+                  </h3>
+                  <p className="text-xs text-slate-600 font-medium">
+                    Kelas: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}</strong> &bull; Semester: <strong>{profile.semesterAktif}</strong> &bull; Tahun Ajaran: <strong>{profile.tahunAjaranAktif}</strong>
+                  </p>
+                </div>
+
+                {/* Tabel Leger Nilai Komprehensif */}
+                {(() => {
+                  const rankedStudents = batchStudents
+                    .map((s) => {
+                      const records = nilaiList.filter((n) => n.siswaId === s.id);
+                      let total = 0;
+                      let count = 0;
+                      const scoresByMapel: Record<string, number> = {};
+
+                      mapelList.forEach((m) => {
+                        const rec = records.find(
+                          (r) => r.mapel.toLowerCase() === m.nama.toLowerCase()
+                        );
+                        if (rec) {
+                          const val =
+                            batchRaporType === "tengah"
+                              ? getStudentMid(rec).nilaiMid
+                              : getStudentAkhir(rec).nilaiAkhir;
+                          scoresByMapel[m.nama] = val;
+                          total += val;
+                          count++;
+                        } else {
+                          scoresByMapel[m.nama] = 0;
+                        }
+                      });
+
+                      const avg = count > 0 ? Math.round(total / count) : 0;
+                      return {
+                        ...s,
+                        scoresByMapel,
+                        totalScore: total,
+                        avgScore: avg,
+                      };
+                    })
+                    .sort((a, b) => b.avgScore - a.avgScore);
+
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse border border-slate-300">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-900 font-bold text-[11px]">
+                            <th className="border border-slate-300 px-2 py-2 text-center w-9">No</th>
+                            <th className="border border-slate-300 px-2 py-2 text-center w-24">NISN</th>
+                            <th className="border border-slate-300 px-3 py-2 min-w-[160px]">Nama Peserta Didik</th>
+                            <th className="border border-slate-300 px-2 py-2 text-center w-14">Kelas</th>
+                            {mapelList.map((m) => (
+                              <th
+                                key={m.id}
+                                className="border border-slate-300 px-2 py-2 text-center min-w-[65px]"
+                                title={`${m.nama} (KKM: ${m.kkm || 75})`}
+                              >
+                                <span className="block truncate max-w-[70px]">{m.nama}</span>
+                                <span className="text-[9px] font-normal text-slate-500">KKM {m.kkm || 75}</span>
+                              </th>
+                            ))}
+                            <th className="border border-slate-300 px-2 py-2 text-center bg-slate-200 w-16">Total</th>
+                            <th className="border border-slate-300 px-2 py-2 text-center bg-amber-100 w-14">Rata2</th>
+                            <th className="border border-slate-300 px-2 py-2 text-center bg-emerald-100 w-12">Rank</th>
+                            <th className="border border-slate-300 px-2 py-2 text-center w-20">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 text-[11px]">
+                          {rankedStudents.length === 0 ? (
+                            <tr>
+                              <td colSpan={mapelList.length + 8} className="text-center py-6 text-slate-400">
+                                Tidak ada data siswa untuk ditampilkan.
+                              </td>
+                            </tr>
+                          ) : (
+                            rankedStudents.map((s, idx) => (
+                              <tr key={s.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center text-slate-500 font-semibold">{idx + 1}</td>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center font-mono text-[10px] text-slate-600">{s.nisn}</td>
+                                <td className="border border-slate-300 px-3 py-1.5 font-bold text-slate-900">{s.nama}</td>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center text-slate-600">{s.kelas}</td>
+                                {mapelList.map((m) => {
+                                  const val = s.scoresByMapel[m.nama];
+                                  const isTuntas = val >= (m.kkm || 75);
+                                  return (
+                                    <td
+                                      key={m.id}
+                                      className={`border border-slate-300 px-2 py-1.5 text-center font-mono ${
+                                        val === 0
+                                          ? "text-slate-300"
+                                          : isTuntas
+                                          ? "text-slate-800 font-semibold"
+                                          : "text-rose-600 font-bold bg-rose-50"
+                                      }`}
+                                    >
+                                      {val > 0 ? val : "-"}
+                                    </td>
+                                  );
+                                })}
+                                <td className="border border-slate-300 px-2 py-1.5 text-center font-mono font-bold bg-slate-100 text-slate-900">{s.totalScore}</td>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center font-mono font-black text-amber-900 bg-amber-50">{s.avgScore}</td>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-emerald-800 bg-emerald-50">#{idx + 1}</td>
+                                <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${s.avgScore >= 75 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                                    {s.avgScore >= 75 ? "Tuntas" : "Remidial"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+
+                {/* Tanda Tangan Leger */}
+                <div className="grid grid-cols-2 text-center text-xs pt-6 border-t border-slate-200">
+                  <div>
+                    <p className="text-slate-500">Mengetahui,</p>
+                    <p className="font-bold">Kepala Sekolah</p>
+                    <div className="h-16" />
+                    <p className="font-bold underline text-sm">{profile.kepalaSekolah}</p>
+                    <p className="text-[10px] text-slate-400">NIP. 197204151998031002</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Jakarta, {formatDateIndo(new Date().toISOString().split("T")[0])}</p>
+                    <p className="font-bold">Wali Kelas {batchSelectedKelas === "Semua" ? "" : batchSelectedKelas}</p>
+                    <div className="h-16" />
+                    <p className="font-bold underline text-sm">{teacherScope.teacherName || user?.name || "Wali Kelas"}</p>
+                    <p className="text-[10px] text-slate-400">Guru Pembina / Wali Kelas</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
