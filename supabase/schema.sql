@@ -417,3 +417,47 @@ BEGIN
         EXECUTE format('CREATE POLICY "Full access to all" ON public.%I FOR ALL TO public USING (true) WITH CHECK (true);', t);
     END LOOP;
 END $$;
+
+-- 27. Tahfidz Siswa (Jurnal Setoran Hafalan Al-Qur'an)
+CREATE TABLE IF NOT EXISTS tahfidz_siswa (
+    id TEXT PRIMARY KEY,
+    siswa_id TEXT NOT NULL,
+    siswa_nama TEXT NOT NULL,
+    nisn TEXT,
+    kelas TEXT NOT NULL,
+    tanggal TEXT NOT NULL,
+    jenis_setoran TEXT NOT NULL,
+    juz INTEGER DEFAULT 30,
+    surah TEXT NOT NULL,
+    ayat_mulai INTEGER DEFAULT 1,
+    ayat_selesai INTEGER DEFAULT 1,
+    halaman INTEGER,
+    jilid_iqra INTEGER,
+    halaman_iqra INTEGER,
+    kelancaran TEXT NOT NULL,
+    nilai_makhraj NUMERIC DEFAULT 85,
+    nilai_tajwid NUMERIC DEFAULT 85,
+    catatan_ustadz TEXT,
+    ustadz_pengampu TEXT NOT NULL,
+    ustadz_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 28. Mutaba'ah Siswa (Ibadah Harian Digital)
+CREATE TABLE IF NOT EXISTS mutabaah_siswa (
+    id TEXT PRIMARY KEY,
+    siswa_id TEXT NOT NULL,
+    siswa_nama TEXT NOT NULL,
+    nisn TEXT,
+    kelas TEXT NOT NULL,
+    tanggal TEXT NOT NULL,
+    shalat_wajib JSONB DEFAULT '{}'::jsonb,
+    ibadah_sunnah JSONB DEFAULT '{}'::jsonb,
+    akhlak_karakter JSONB DEFAULT '{}'::jsonb,
+    catatan_orang_tua TEXT,
+    skor_kebaikan INTEGER DEFAULT 0,
+    status_verifikasi TEXT DEFAULT 'Menunggu Verifikasi',
+    catatan_guru TEXT,
+    verified_by_guru TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);

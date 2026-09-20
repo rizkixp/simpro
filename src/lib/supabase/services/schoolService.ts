@@ -26,6 +26,8 @@ import {
   LMSBankSoal,
   LMSJadwalMateri,
   User,
+  TahfidzRecord,
+  MutabaahRecord,
 } from "@/types/school";
 
 export interface SupabaseHealthStatus {
@@ -1331,6 +1333,132 @@ export const SupabaseSchoolService = {
     return !error;
   },
 
+  // ==================== TAHFIDZ & TAHZIN AL-QUR'AN ====================
+  async getTahfidzRecords(): Promise<TahfidzRecord[] | null> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return null;
+    const { data, error } = await client
+      .from("tahfidz_siswa")
+      .select("*")
+      .order("tanggal", { ascending: false });
+    if (error || !data) return null;
+    return data.map((d: any) => ({
+      id: d.id,
+      siswaId: d.siswa_id,
+      siswaNama: d.siswa_nama,
+      nisn: d.nisn || "",
+      kelas: d.kelas,
+      tanggal: d.tanggal,
+      jenisSetoran: d.jenis_setoran,
+      juz: d.juz || 30,
+      surah: d.surah,
+      ayatMulai: d.ayat_mulai || 1,
+      ayatSelesai: d.ayat_selesai || 1,
+      halaman: d.halaman || undefined,
+      jilidIqra: d.jilid_iqra || undefined,
+      halamanIqra: d.halaman_iqra || undefined,
+      kelancaran: d.kelancaran,
+      nilaiMakhraj: d.nilai_makhraj || 85,
+      nilaiTajwid: d.nilai_tajwid || 85,
+      catatanUstadz: d.catatan_ustadz || undefined,
+      ustadzPengampu: d.ustadz_pengampu,
+      ustadzId: d.ustadz_id || undefined,
+      createdAt: d.created_at,
+    }));
+  },
+
+  async upsertTahfidzRecord(record: TahfidzRecord): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("tahfidz_siswa").upsert({
+      id: record.id,
+      siswa_id: record.siswaId,
+      siswa_nama: record.siswaNama,
+      nisn: record.nisn,
+      kelas: record.kelas,
+      tanggal: record.tanggal,
+      jenis_setoran: record.jenisSetoran,
+      juz: record.juz,
+      surah: record.surah,
+      ayat_mulai: record.ayatMulai,
+      ayat_selesai: record.ayatSelesai,
+      halaman: record.halaman || null,
+      jilid_iqra: record.jilidIqra || null,
+      halaman_iqra: record.halamanIqra || null,
+      kelancaran: record.kelancaran,
+      nilai_makhraj: record.nilaiMakhraj,
+      nilai_tajwid: record.nilaiTajwid,
+      catatan_ustadz: record.catatanUstadz || null,
+      ustadz_pengampu: record.ustadzPengampu,
+      ustadz_id: record.ustadzId || null,
+    });
+    return !error;
+  },
+
+  async deleteTahfidzRecord(id: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("tahfidz_siswa").delete().eq("id", id);
+    return !error;
+  },
+
+  // ==================== MUTABA'AH YAUMIYAH ====================
+  async getMutabaahRecords(): Promise<MutabaahRecord[] | null> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return null;
+    const { data, error } = await client
+      .from("mutabaah_siswa")
+      .select("*")
+      .order("tanggal", { ascending: false });
+    if (error || !data) return null;
+    return data.map((d: any) => ({
+      id: d.id,
+      siswaId: d.siswa_id,
+      siswaNama: d.siswa_nama,
+      nisn: d.nisn || "",
+      kelas: d.kelas,
+      tanggal: d.tanggal,
+      shalatWajib: d.shalat_wajib || {},
+      ibadahSunnah: d.ibadah_sunnah || {},
+      akhlakKarakter: d.akhlak_karakter || {},
+      catatanOrangTua: d.catatan_orang_tua || undefined,
+      skorKebaikan: d.skor_kebaikan || 0,
+      statusVerifikasi: d.status_verifikasi || "Menunggu Verifikasi",
+      catatanGuru: d.catatan_guru || undefined,
+      verifiedByGuru: d.verified_by_guru || undefined,
+      createdAt: d.created_at,
+    }));
+  },
+
+  async upsertMutabaahRecord(record: MutabaahRecord): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("mutabaah_siswa").upsert({
+      id: record.id,
+      siswa_id: record.siswaId,
+      siswa_nama: record.siswaNama,
+      nisn: record.nisn,
+      kelas: record.kelas,
+      tanggal: record.tanggal,
+      shalat_wajib: record.shalatWajib,
+      ibadah_sunnah: record.ibadahSunnah,
+      akhlak_karakter: record.akhlakKarakter,
+      catatan_orang_tua: record.catatanOrangTua || null,
+      skor_kebaikan: record.skorKebaikan,
+      status_verifikasi: record.statusVerifikasi,
+      catatan_guru: record.catatanGuru || null,
+      verified_by_guru: record.verifiedByGuru || null,
+    });
+    return !error;
+  },
+
+  async deleteMutabaahRecord(id: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("mutabaah_siswa").delete().eq("id", id);
+    return !error;
+  },
+
   // ==================== FETCH ALL SCHOOL DATA ====================
   async fetchAllSchoolData() {
     if (!this.isConfigured()) return null;
@@ -1362,6 +1490,8 @@ export const SupabaseSchoolService = {
         lmsMeetings,
         lmsBankSoal,
         lmsJadwalMateri,
+        tahfidz,
+        mutabaah,
       ] = await Promise.all([
         this.getProfile(),
         this.getUsers(),
@@ -1389,6 +1519,8 @@ export const SupabaseSchoolService = {
         this.getLMSMeetings(),
         this.getLMSBankSoal(),
         this.getLMSJadwalMateri(),
+        this.getTahfidzRecords(),
+        this.getMutabaahRecords(),
       ]);
 
       return {
@@ -1418,6 +1550,8 @@ export const SupabaseSchoolService = {
         lmsMeetings,
         lmsBankSoal,
         lmsJadwalMateri,
+        tahfidz,
+        mutabaah,
       };
     } catch (err) {
       console.error("Failed to fetch complete school data from Supabase:", err);
@@ -1453,6 +1587,8 @@ export const SupabaseSchoolService = {
     lmsMeetings: LMSVirtualMeeting[];
     lmsBankSoal: LMSBankSoal[];
     lmsJadwalMateri: LMSJadwalMateri[];
+    tahfidz?: TahfidzRecord[];
+    mutabaah?: MutabaahRecord[];
   }): Promise<{ success: boolean; message: string; details?: any }> {
     const client = getSupabaseBrowserClient();
     if (!client) {
@@ -1566,6 +1702,18 @@ export const SupabaseSchoolService = {
       }
       for (const lj of mockData.lmsJadwalMateri) {
         await this.upsertLMSJadwalMateri(lj);
+      }
+
+      // 16. Tahfidz & Mutaba'ah
+      if (mockData.tahfidz) {
+        for (const th of mockData.tahfidz) {
+          await this.upsertTahfidzRecord(th);
+        }
+      }
+      if (mockData.mutabaah) {
+        for (const mb of mockData.mutabaah) {
+          await this.upsertMutabaahRecord(mb);
+        }
       }
 
       return {

@@ -92,3 +92,7 @@ CREATE POLICY "Alokasi Waktu Policy" ON public.alokasi_waktu FOR ALL USING (true
 -- Catatan Keamanan Produksi:
 -- Script ini telah mengaktifkan Row Level Security (RLS) di seluruh tabel PostgreSQL Supabase.
 -- Enkripsi kata sandi menggunakan Web Crypto Salted SHA-256 berjalan pada level aplikasi.
+
+-- 7. Tabel Fitur Khas Sekolah Islam (Tahfidz & Mutaba'ah)
+CREATE POLICY "Tahfidz Siswa Policy" ON public.tahfidz_siswa FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Mutabaah Siswa Policy" ON public.mutabaah_siswa FOR ALL USING (true) WITH CHECK (true);

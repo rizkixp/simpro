@@ -22,6 +22,8 @@ import {
   Sparkles,
   Bus,
   BookOpenCheck,
+  BookOpen,
+  HeartHandshake,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -74,6 +76,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: "LMS Pembelajaran",
       href: "/dashboard/lms",
       icon: BookOpenCheck,
+      roles: ["admin", "guru", "siswa", "ortu"],
+    },
+    {
+      title: "Jurnal Tahfidz & Quran",
+      href: "/dashboard/tahfidz",
+      icon: BookOpen,
+      roles: ["admin", "guru", "siswa", "ortu"],
+    },
+    {
+      title: "Mutaba'ah Ibadah",
+      href: "/dashboard/mutabaah",
+      icon: HeartHandshake,
       roles: ["admin", "guru", "siswa", "ortu"],
     },
     {

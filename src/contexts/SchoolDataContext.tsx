@@ -35,6 +35,8 @@ import {
   LMSBankSoal,
   LMSBankSoalItem,
   LMSJadwalMateri,
+  TahfidzRecord,
+  MutabaahRecord,
 } from "@/types/school";
 import { SupabaseSchoolService, SupabaseHealthStatus } from "@/lib/supabase/services/schoolService";
 import {
@@ -63,6 +65,8 @@ import {
   INITIAL_LMS_MEETINGS,
   INITIAL_LMS_BANK_SOAL,
   INITIAL_LMS_JADWAL_MATERI,
+  INITIAL_TAHFIDZ_RECORDS,
+  INITIAL_MUTABAAH_RECORDS,
   generateStudentYearRecord,
 } from "@/lib/mock-data";
 
@@ -229,6 +233,22 @@ interface SchoolDataContextType {
     }
   ) => void;
 
+  // Islamic School Flagship Features
+  tahfidzList: TahfidzRecord[];
+  addTahfidzRecord: (record: Omit<TahfidzRecord, "id" | "createdAt">) => void;
+  updateTahfidzRecord: (id: string, data: Partial<TahfidzRecord>) => void;
+  deleteTahfidzRecord: (id: string) => void;
+
+  mutabaahList: MutabaahRecord[];
+  addOrUpdateMutabaahRecord: (record: Omit<MutabaahRecord, "id" | "createdAt">) => void;
+  verifyMutabaahRecord: (
+    id: string,
+    guruNama: string,
+    catatan?: string,
+    status?: "Terverifikasi Guru" | "Diberi Bintang Kebaikan"
+  ) => void;
+  deleteMutabaahRecord: (id: string) => void;
+
   resetToDefault: () => void;
 
   // Supabase Cloud State & Sync
@@ -273,6 +293,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const [lmsMeetingList, setLmsMeetingList] = useState<LMSVirtualMeeting[]>(INITIAL_LMS_MEETINGS);
   const [lmsBankSoalList, setLmsBankSoalList] = useState<LMSBankSoal[]>(INITIAL_LMS_BANK_SOAL);
   const [lmsJadwalMateriList, setLmsJadwalMateriList] = useState<LMSJadwalMateri[]>(INITIAL_LMS_JADWAL_MATERI);
+
+  // Islamic School Flagship States
+  const [tahfidzList, setTahfidzList] = useState<TahfidzRecord[]>(INITIAL_TAHFIDZ_RECORDS);
+  const [mutabaahList, setMutabaahList] = useState<MutabaahRecord[]>(INITIAL_MUTABAAH_RECORDS);
 
   // Supabase Cloud Integration States
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
@@ -397,6 +421,25 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         }
       });
       setLmsJadwalMateriList(mergedJadwalMateri);
+
+      // Islamic School Flagship Hydration
+      const loadedTahfidz = load("tahfidz", INITIAL_TAHFIDZ_RECORDS);
+      const mergedTahfidz = Array.isArray(loadedTahfidz) ? [...loadedTahfidz] : [...INITIAL_TAHFIDZ_RECORDS];
+      INITIAL_TAHFIDZ_RECORDS.forEach((it) => {
+        if (!mergedTahfidz.some((t) => t.id === it.id)) {
+          mergedTahfidz.push(it);
+        }
+      });
+      setTahfidzList(mergedTahfidz);
+
+      const loadedMutabaah = load("mutabaah", INITIAL_MUTABAAH_RECORDS);
+      const mergedMutabaah = Array.isArray(loadedMutabaah) ? [...loadedMutabaah] : [...INITIAL_MUTABAAH_RECORDS];
+      INITIAL_MUTABAAH_RECORDS.forEach((im) => {
+        if (!mergedMutabaah.some((m) => m.id === im.id)) {
+          mergedMutabaah.push(im);
+        }
+      });
+      setMutabaahList(mergedMutabaah);
     } catch (e) {
       console.warn("Could not read from local storage", e);
     }
@@ -473,6 +516,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         lmsMeetings: lmsMeetingList.length > 0 ? lmsMeetingList : INITIAL_LMS_MEETINGS,
         lmsBankSoal: lmsBankSoalList.length > 0 ? lmsBankSoalList : INITIAL_LMS_BANK_SOAL,
         lmsJadwalMateri: lmsJadwalMateriList.length > 0 ? lmsJadwalMateriList : INITIAL_LMS_JADWAL_MATERI,
+        tahfidz: tahfidzList.length > 0 ? tahfidzList : INITIAL_TAHFIDZ_RECORDS,
+        mutabaah: mutabaahList.length > 0 ? mutabaahList : INITIAL_MUTABAAH_RECORDS,
       });
 
       if (res.success) {
@@ -621,6 +666,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       if (data.lmsJadwalMateri && data.lmsJadwalMateri.length > 0) {
         setLmsJadwalMateriList(data.lmsJadwalMateri);
         saveState("lms_jadwal_materi", data.lmsJadwalMateri);
+      }
+      if (data.tahfidz && data.tahfidz.length > 0) {
+        setTahfidzList(data.tahfidz);
+        saveState("tahfidz", data.tahfidz);
+      }
+      if (data.mutabaah && data.mutabaah.length > 0) {
+        setMutabaahList(data.mutabaah);
+        saveState("mutabaah", data.mutabaah);
       }
 
       setIsSupabaseConnected(true);
@@ -2055,6 +2108,97 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     saveState("lms_jadwal_materi", updated);
   };
 
+  // ==================== TAHFIDZ & TAHZIN METHODS ====================
+  const addTahfidzRecord = (record: Omit<TahfidzRecord, "id" | "createdAt">) => {
+    const newRecord: TahfidzRecord = {
+      ...record,
+      id: `thf-${Date.now()}-${Math.floor(10 + Math.random() * 90)}`,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [newRecord, ...tahfidzList];
+    setTahfidzList(updated);
+    saveState("tahfidz", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertTahfidzRecord(newRecord));
+  };
+
+  const updateTahfidzRecord = (id: string, data: Partial<TahfidzRecord>) => {
+    const updated = tahfidzList.map((t) => (t.id === id ? { ...t, ...data } : t));
+    setTahfidzList(updated);
+    saveState("tahfidz", updated);
+    const target = updated.find((t) => t.id === id);
+    if (target) {
+      persistSupabase(() => SupabaseSchoolService.upsertTahfidzRecord(target));
+    }
+  };
+
+  const deleteTahfidzRecord = (id: string) => {
+    const updated = tahfidzList.filter((t) => t.id !== id);
+    setTahfidzList(updated);
+    saveState("tahfidz", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteTahfidzRecord(id));
+  };
+
+  // ==================== MUTABA'AH YAUMIYAH METHODS ====================
+  const addOrUpdateMutabaahRecord = (record: Omit<MutabaahRecord, "id" | "createdAt">) => {
+    const existingIndex = mutabaahList.findIndex(
+      (m) => m.siswaId === record.siswaId && m.tanggal === record.tanggal
+    );
+
+    if (existingIndex >= 0) {
+      const existing = mutabaahList[existingIndex];
+      const updatedRecord: MutabaahRecord = {
+        ...existing,
+        ...record,
+      };
+      const updatedList = [...mutabaahList];
+      updatedList[existingIndex] = updatedRecord;
+      setMutabaahList(updatedList);
+      saveState("mutabaah", updatedList);
+      persistSupabase(() => SupabaseSchoolService.upsertMutabaahRecord(updatedRecord));
+    } else {
+      const newRecord: MutabaahRecord = {
+        ...record,
+        id: `mtb-${Date.now()}-${Math.floor(10 + Math.random() * 90)}`,
+        createdAt: new Date().toISOString(),
+      };
+      const updatedList = [newRecord, ...mutabaahList];
+      setMutabaahList(updatedList);
+      saveState("mutabaah", updatedList);
+      persistSupabase(() => SupabaseSchoolService.upsertMutabaahRecord(newRecord));
+    }
+  };
+
+  const verifyMutabaahRecord = (
+    id: string,
+    guruNama: string,
+    catatan?: string,
+    status: "Terverifikasi Guru" | "Diberi Bintang Kebaikan" = "Terverifikasi Guru"
+  ) => {
+    const updated = mutabaahList.map((m) =>
+      m.id === id
+        ? {
+            ...m,
+            statusVerifikasi: status,
+            verifiedByGuru: guruNama,
+            catatanGuru: catatan || m.catatanGuru,
+          }
+        : m
+    );
+    setMutabaahList(updated);
+    saveState("mutabaah", updated);
+    const target = updated.find((m) => m.id === id);
+    if (target) {
+      persistSupabase(() => SupabaseSchoolService.upsertMutabaahRecord(target));
+    }
+  };
+
+  const deleteMutabaahRecord = (id: string) => {
+    const updated = mutabaahList.filter((m) => m.id !== id);
+    setMutabaahList(updated);
+    saveState("mutabaah", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteMutabaahRecord(id));
+  };
+
   const resetToDefault = () => {
     setProfile(INITIAL_SCHOOL_PROFILE);
     setSiswaList(INITIAL_SISWA);
@@ -2083,6 +2227,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     setLmsMeetingList(INITIAL_LMS_MEETINGS);
     setLmsBankSoalList(INITIAL_LMS_BANK_SOAL);
     setLmsJadwalMateriList(INITIAL_LMS_JADWAL_MATERI);
+
+    // Reset Islamic School Data
+    setTahfidzList(INITIAL_TAHFIDZ_RECORDS);
+    setMutabaahList(INITIAL_MUTABAAH_RECORDS);
 
     localStorage.clear();
   };
@@ -2182,6 +2330,16 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         updateJadwalMateri,
         deleteJadwalMateri,
         toggleRealisasiJadwal,
+
+        // Islamic School Flagship Features
+        tahfidzList,
+        addTahfidzRecord,
+        updateTahfidzRecord,
+        deleteTahfidzRecord,
+        mutabaahList,
+        addOrUpdateMutabaahRecord,
+        verifyMutabaahRecord,
+        deleteMutabaahRecord,
 
         resetToDefault,
 

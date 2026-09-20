@@ -477,4 +477,99 @@ export interface LMSJadwalMateri {
   createdAt?: string;
 }
 
+// =========================================================
+// FITUR KHAS SEKOLAH ISLAM: TAHFIDZ & MUTABA'AH YAUMIYAH
+// =========================================================
+
+export type JenisSetoranTahfidz =
+  | "Ziyadah (Hafalan Baru)"
+  | "Muraja'ah (Mengulang)"
+  | "Ujian Tasmi'"
+  | "Tahsin (Iqra/Tilawati)";
+
+export type PredikatKelancaran =
+  | "Mutqin (Sangat Lancar)"
+  | "Jayyid Jiddan (Lancar Sekali)"
+  | "Jayyid (Lancar)"
+  | "Maqbul (Cukup)"
+  | "Dhaif (Perlu Diulang)";
+
+export interface SurahJuz30Info {
+  nomorSurah: number;
+  namaLatin: string;
+  namaArab: string;
+  arti: string;
+  jumlahAyat: number;
+  tempatTurun: "Makkah" | "Madinah";
+}
+
+export interface TahfidzRecord {
+  id: string;
+  siswaId: string;
+  siswaNama: string;
+  nisn: string;
+  kelas: string;
+  tanggal: string; // YYYY-MM-DD
+  jenisSetoran: JenisSetoranTahfidz;
+  juz: number; // e.g. 30, 29, 28, 1
+  surah: string; // e.g. "An-Naba'"
+  ayatMulai: number;
+  ayatSelesai: number;
+  halaman?: number;
+  jilidIqra?: number;
+  halamanIqra?: number;
+  kelancaran: PredikatKelancaran;
+  nilaiMakhraj: number; // 0 - 100
+  nilaiTajwid: number; // 0 - 100
+  catatanUstadz?: string;
+  ustadzPengampu: string;
+  ustadzId?: string;
+  createdAt?: string;
+}
+
+export interface MutabaahShalatWajib {
+  subuh: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
+  dzuhur: "Berjamaah di Masjid/Sekolah" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
+  ashar: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
+  maghrib: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
+  isya: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
+}
+
+export interface MutabaahIbadahSunnah {
+  shalatDhuha: boolean;
+  qiyamulLail: boolean; // Shalat Malam / Tahajjud / Witir
+  rawatib: boolean; // Shalat Sunnah Rawatib
+  tilawahQuran: boolean; // Tadarus Al-Qur'an atau Iqra
+  jumlahHalamanTilawah?: number;
+  dzikirPagiPetang: boolean;
+  puasaSunnah: boolean; // Senin-Kamis / Ayyamul Bidh
+  infaqShadaqah: boolean;
+}
+
+export interface MutabaahAkhlakKarakter {
+  birrulWalidain: boolean; // Berbakti / Membantu Orang Tua
+  merapikanTempatTidur: boolean;
+  belajarMandiri: boolean;
+  adabMakanMinum: boolean;
+}
+
+export interface MutabaahRecord {
+  id: string;
+  siswaId: string;
+  siswaNama: string;
+  nisn: string;
+  kelas: string;
+  tanggal: string; // YYYY-MM-DD
+  shalatWajib: MutabaahShalatWajib;
+  ibadahSunnah: MutabaahIbadahSunnah;
+  akhlakKarakter: MutabaahAkhlakKarakter;
+  catatanOrangTua?: string;
+  skorKebaikan: number; // 0 - 100 poin
+  statusVerifikasi: "Menunggu Verifikasi" | "Terverifikasi Guru" | "Diberi Bintang Kebaikan";
+  catatanGuru?: string;
+  verifiedByGuru?: string;
+  createdAt?: string;
+}
+
+
 
