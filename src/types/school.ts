@@ -527,30 +527,32 @@ export interface TahfidzRecord {
   createdAt?: string;
 }
 
+export type MutabaahShalatStatus = "Ya" | "Tidak" | string;
+
 export interface MutabaahShalatWajib {
-  subuh: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
-  dzuhur: "Berjamaah di Masjid/Sekolah" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
-  ashar: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
-  maghrib: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
-  isya: "Berjamaah di Masjid" | "Munfarid Tepat Waktu" | "Masbuq/Terlambat" | "Tidak Shalat";
+  subuh: MutabaahShalatStatus;
+  dzuhur: MutabaahShalatStatus;
+  ashar: MutabaahShalatStatus;
+  maghrib: MutabaahShalatStatus;
+  isya: MutabaahShalatStatus;
 }
 
 export interface MutabaahIbadahSunnah {
   shalatDhuha: boolean;
-  qiyamulLail: boolean; // Shalat Malam / Tahajjud / Witir
   rawatib: boolean; // Shalat Sunnah Rawatib
-  tilawahQuran: boolean; // Tadarus Al-Qur'an atau Iqra
+  tilawahQuran: boolean; // Tilawah Al Qur'an
   jumlahHalamanTilawah?: number;
-  dzikirPagiPetang: boolean;
-  puasaSunnah: boolean; // Senin-Kamis / Ayyamul Bidh
-  infaqShadaqah: boolean;
+  qiyamulLail?: boolean;
+  dzikirPagiPetang?: boolean;
+  puasaSunnah?: boolean;
+  infaqShadaqah?: boolean;
 }
 
 export interface MutabaahAkhlakKarakter {
-  birrulWalidain: boolean; // Berbakti / Membantu Orang Tua
-  merapikanTempatTidur: boolean;
-  belajarMandiri: boolean;
-  adabMakanMinum: boolean;
+  birrulWalidain: boolean; // Membantu Orang Tua
+  belajarMandiri: boolean; // Belajar Mandiri di Rumah
+  merapikanTempatTidur?: boolean;
+  adabMakanMinum?: boolean;
 }
 
 export interface MutabaahRecord {

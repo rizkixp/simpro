@@ -241,6 +241,7 @@ interface SchoolDataContextType {
 
   mutabaahList: MutabaahRecord[];
   addOrUpdateMutabaahRecord: (record: Omit<MutabaahRecord, "id" | "createdAt">) => void;
+  batchAddOrUpdateMutabaahRecords: (records: Array<Omit<MutabaahRecord, "id" | "createdAt">>) => void;
   verifyMutabaahRecord: (
     id: string,
     guruNama: string,
@@ -2168,6 +2169,44 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const batchAddOrUpdateMutabaahRecords = (records: Array<Omit<MutabaahRecord, "id" | "createdAt">>) => {
+    let updatedList = [...mutabaahList];
+    const recordsToPersist: MutabaahRecord[] = [];
+
+    records.forEach((record) => {
+      const existingIndex = updatedList.findIndex(
+        (m) => m.siswaId === record.siswaId && m.tanggal === record.tanggal
+      );
+
+      if (existingIndex >= 0) {
+        const existing = updatedList[existingIndex];
+        const updatedRecord: MutabaahRecord = {
+          ...existing,
+          ...record,
+        };
+        updatedList[existingIndex] = updatedRecord;
+        recordsToPersist.push(updatedRecord);
+      } else {
+        const newRecord: MutabaahRecord = {
+          ...record,
+          id: `mtb-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+          createdAt: new Date().toISOString(),
+        };
+        updatedList = [newRecord, ...updatedList];
+        recordsToPersist.push(newRecord);
+      }
+    });
+
+    setMutabaahList(updatedList);
+    saveState("mutabaah", updatedList);
+    persistSupabase(async () => {
+      for (const rec of recordsToPersist) {
+        await SupabaseSchoolService.upsertMutabaahRecord(rec);
+      }
+      return true;
+    });
+  };
+
   const verifyMutabaahRecord = (
     id: string,
     guruNama: string,
@@ -2338,6 +2377,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         deleteTahfidzRecord,
         mutabaahList,
         addOrUpdateMutabaahRecord,
+        batchAddOrUpdateMutabaahRecords,
         verifyMutabaahRecord,
         deleteMutabaahRecord,
 
