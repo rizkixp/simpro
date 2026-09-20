@@ -31,6 +31,7 @@ import {
   ChevronRight,
   TrendingUp,
   GraduationCap,
+  Trash2,
 } from "lucide-react";
 
 export default function TabunganSiswaPage() {
@@ -43,6 +44,7 @@ export default function TabunganSiswaPage() {
     setorTabungan,
     tarikTabungan,
     bulkSetorTabungan,
+    clearAllTabungan,
     profile,
     guruList,
   } = useSchoolData();
@@ -297,6 +299,17 @@ export default function TabunganSiswaPage() {
     setSelectedKelasForPrint(namaKelas);
   };
 
+  const handleClearTabungan = async () => {
+    if (
+      confirm(
+        "Apakah Anda yakin ingin menghapus seluruh data tabungan siswa dan riwayat mutasi? Seluruh saldo tabungan akan dikosongkan."
+      )
+    ) {
+      await clearAllTabungan();
+      alert("Seluruh data tabungan siswa dan mutasi berhasil dihapus!");
+    }
+  };
+
   // Guard: Restrict Guru from viewing or accessing Tabungan Siswa
   if (user?.role === "guru") {
     return (
@@ -363,6 +376,16 @@ export default function TabunganSiswaPage() {
             >
               <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
               <span>⚡ Bulk Menabung Cepat</span>
+            </button>
+
+            {/* Hapus Semua Data Tabungan Button */}
+            <button
+              onClick={handleClearTabungan}
+              className="px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-xs font-semibold transition-all flex items-center gap-1.5"
+              title="Hapus seluruh data tabungan siswa dan riwayat transaksi"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+              <span>Hapus Data Demo</span>
             </button>
           </div>
         )}

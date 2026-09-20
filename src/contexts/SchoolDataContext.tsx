@@ -125,6 +125,7 @@ interface SchoolDataContextType {
   setorTabungan: (siswaId: string, nominal: number, keterangan?: string, petugas?: string, tanggal?: string) => void;
   tarikTabungan: (siswaId: string, nominal: number, keterangan?: string, petugas?: string, tanggal?: string) => { success: boolean; message?: string };
   bulkSetorTabungan: (items: { siswaId: string; nominal: number; keterangan?: string }[], petugas?: string, tanggal?: string) => void;
+  clearAllTabungan: () => Promise<void>;
   pesertaTransportList: PesertaTransportasi[];
   sppTransportRecords: RecordSPPTransportTahunAjaran[];
   transaksiSPPTransportList: TransaksiSPPTransport[];
@@ -328,8 +329,16 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       setSppList(load("spp", INITIAL_SPP));
       setJenisTagihanList(load("jenis_tagihan", INITIAL_JENIS_TAGIHAN));
       setPengumumanList(load("pengumuman", INITIAL_PENGUMUMAN));
-      setTabunganList(load("tabungan", INITIAL_TABUNGAN));
-      setTransaksiTabunganList(load("transaksi_tabungan", INITIAL_TRANSAKSI_TABUNGAN));
+      const savedTab = localStorage.getItem("sim_data_tabungan");
+      if (savedTab && (savedTab.includes("tab-001") || savedTab.includes("Ahmad Rizky"))) {
+        localStorage.setItem("sim_data_tabungan", JSON.stringify([]));
+        localStorage.setItem("sim_data_transaksi_tabungan", JSON.stringify([]));
+        setTabunganList([]);
+        setTransaksiTabunganList([]);
+      } else {
+        setTabunganList(load("tabungan", INITIAL_TABUNGAN));
+        setTransaksiTabunganList(load("transaksi_tabungan", INITIAL_TRANSAKSI_TABUNGAN));
+      }
       setPesertaTransportList(load("peserta_transport", INITIAL_PESERTA_TRANSPORT));
       setSppTransportRecords(load("spp_transport_records", INITIAL_SPP_TRANSPORT_RECORDS));
       setTransaksiSPPTransportList(load("transaksi_spp_transport", INITIAL_TRANSAKSI_SPP_TRANSPORT));
@@ -1367,6 +1376,24 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     saveState("transaksi_tabungan", updatedTrx);
   };
 
+  const clearAllTabungan = async (): Promise<void> => {
+    setTabunganList([]);
+    setTransaksiTabunganList([]);
+    saveState("tabungan", []);
+    saveState("transaksi_tabungan", []);
+    if (SupabaseSchoolService.isConfigured()) {
+      try {
+        const client = (await import("@/lib/supabase/client")).getSupabaseBrowserClient();
+        if (client) {
+          await client.from("transaksi_tabungan").delete().neq("id", "___none___");
+          await client.from("tabungan_siswa").delete().neq("id", "___none___");
+        }
+      } catch (err) {
+        console.warn("Gagal menghapus data tabungan di Supabase:", err);
+      }
+    }
+  };
+
   // SPP & Transportasi Actions
   const getStudentSPPTransportRecord = (siswaId: string, tahunAjaran: string): RecordSPPTransportTahunAjaran => {
     const existing = sppTransportRecords.find(
@@ -2109,6 +2136,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         setorTabungan,
         tarikTabungan,
         bulkSetorTabungan,
+        clearAllTabungan,
         pesertaTransportList,
         sppTransportRecords,
         transaksiSPPTransportList,
