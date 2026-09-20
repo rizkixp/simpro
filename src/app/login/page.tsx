@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserRole } from "@/types/school";
 import {
   GraduationCap,
   Lock,
@@ -12,99 +11,29 @@ import {
   EyeOff,
   ArrowRight,
   ShieldCheck,
-  UserCheck,
-  BookOpen,
-  HeartHandshake,
   CheckCircle2,
   AlertCircle,
-  Wallet,
 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("admin@sekolah.id");
-  const [password, setPassword] = useState("admin123");
-  const [selectedRole, setSelectedRole] = useState<UserRole>("admin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const demoAccounts: {
-    role: UserRole;
-    title: string;
-    email: string;
-    pass: string;
-    icon: React.ReactNode;
-    color: string;
-  }[] = [
-    {
-      role: "admin",
-      title: "Admin / Kepala SDI",
-      email: "admin@sekolah.id",
-      pass: "admin123",
-      icon: <ShieldCheck className="h-4 w-4" />,
-      color: "border-emerald-600 text-emerald-800 bg-emerald-50 dark:bg-emerald-950/40",
-    },
-    {
-      role: "bendahara",
-      title: "Bendahara SDI",
-      email: "bendahara@sekolah.id",
-      pass: "bendahara123",
-      icon: <Wallet className="h-4 w-4" />,
-      color: "border-amber-500 text-amber-700 bg-amber-50 dark:bg-amber-950/40",
-    },
-    {
-      role: "guru",
-      title: "Guru Kelas 6 (SDI)",
-      email: "guru.kelas6@sekolah.id",
-      pass: "guru123",
-      icon: <UserCheck className="h-4 w-4" />,
-      color: "border-emerald-600 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40",
-    },
-    {
-      role: "guru",
-      title: "Asatidz / Dewan Guru",
-      email: "guru@sekolah.id",
-      pass: "guru123",
-      icon: <UserCheck className="h-4 w-4" />,
-      color: "border-teal-600 text-teal-700 bg-teal-50 dark:bg-teal-950/40",
-    },
-    {
-      role: "siswa",
-      title: "Santri / Siswa",
-      email: "siswa@sekolah.id",
-      pass: "siswa123",
-      icon: <BookOpen className="h-4 w-4" />,
-      color: "border-emerald-600 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40",
-    },
-    {
-      role: "ortu",
-      title: "Wali Murid",
-      email: "ortu@sekolah.id",
-      pass: "ortu123",
-      icon: <HeartHandshake className="h-4 w-4" />,
-      color: "border-amber-600 text-amber-700 bg-amber-50 dark:bg-amber-950/40",
-    },
-  ];
-
-  const handleSelectDemo = (acc: typeof demoAccounts[0]) => {
-    setSelectedRole(acc.role);
-    setEmail(acc.email);
-    setPassword(acc.pass);
-    setErrorMsg(null);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!email || !password) {
-      setErrorMsg("Mohon masukkan email dan kata sandi Anda.");
+    if (!email.trim() || !password) {
+      setErrorMsg("Mohon masukkan email atau ID pengguna serta kata sandi Anda.");
       return;
     }
 
@@ -117,23 +46,19 @@ export default function LoginPage() {
 
     try {
       // Simulate network auth delay
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const result = await login(email, selectedRole, password);
+      const result = await login(email, undefined, password);
       if (result.success) {
-        setSuccessMsg("Autentikasi berhasil! Mengalihkan...");
+        setSuccessMsg("Autentikasi berhasil! Mengalihkan ke dashboard...");
         setTimeout(() => {
-          if (selectedRole === "bendahara") {
-            router.push("/dashboard/spp-transportasi");
-          } else {
-            router.push("/dashboard");
-          }
+          router.push("/dashboard");
         }, 400);
       } else {
-        setErrorMsg(result.message || "Gagal masuk. Periksa email atau password.");
+        setErrorMsg(result.message || "Gagal masuk. Periksa kembali email atau kata sandi Anda.");
       }
     } catch {
-      setErrorMsg("Terjadi kesalahan koneksi server. Coba lagi.");
+      setErrorMsg("Terjadi kesalahan koneksi ke server. Silakan coba lagi.");
     } finally {
       setIsLoading(false);
     }
@@ -215,37 +140,13 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-8">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               Assalamu'alaikum 🌿
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Silakan pilih akun demo atau masukkan kredensial Anda.
+              Masukkan email atau ID pengguna dan kata sandi Anda untuk mengakses sistem.
             </p>
-          </div>
-
-          {/* Quick Demo Switcher */}
-          <div className="mb-6">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-emerald-900/70 dark:text-slate-400 mb-2">
-              Akun Demo Siap Pakai (1-Klik):
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {demoAccounts.map((acc) => (
-                <button
-                  type="button"
-                  key={acc.role}
-                  onClick={() => handleSelectDemo(acc)}
-                  className={`px-3 py-2 text-xs font-medium rounded-xl border flex items-center gap-2 text-left transition-all ${
-                    selectedRole === acc.role
-                      ? `${acc.color} border-2 shadow-sm font-semibold`
-                      : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                  }`}
-                >
-                  <span className="shrink-0">{acc.icon}</span>
-                  <span className="truncate">{acc.title}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Status Notifications */}
@@ -271,7 +172,7 @@ export default function LoginPage() {
                 htmlFor="email"
                 className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Email / ID Pengguna
+                Email / ID Pengguna / NISN
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -280,12 +181,12 @@ export default function LoginPage() {
                 <input
                   id="email"
                   name="email"
-                  type="email"
+                  type="text"
                   autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@sekolah.id"
+                  placeholder="nama@sekolah.id atau NISN/NIP"
                   className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 />
               </div>
@@ -302,8 +203,8 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => alert("Untuk keperluan demo, Anda dapat menggunakan password default: 'admin123' atau klik tombol Akun Demo di atas.")}
-                  className="text-xs text-emerald-700 hover:text-emerald-800 font-medium"
+                  onClick={() => alert("Silakan hubungi administrator atau staf TU SDI Smart School untuk bantuan pemulihan kata sandi akun Anda.")}
+                  className="text-xs text-emerald-700 hover:text-emerald-800 font-medium cursor-pointer"
                 >
                   Lupa kata sandi?
                 </button>
@@ -327,7 +228,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -341,15 +242,12 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                 />
                 <span className="text-xs text-slate-600 dark:text-slate-400 font-medium select-none">
                   Ingat saya di perangkat ini
                 </span>
               </label>
-              <span className="text-xs text-slate-400 font-mono">
-                Peran: <span className="font-semibold text-emerald-700 capitalize">{selectedRole}</span>
-              </span>
             </div>
 
             {/* Submit Button */}
@@ -357,7 +255,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isLoading ? (
                   <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
