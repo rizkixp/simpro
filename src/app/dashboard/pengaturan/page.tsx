@@ -19,6 +19,8 @@ import {
   UploadCloud,
   Server,
   Activity,
+  Lock,
+  Key,
 } from "lucide-react";
 
 export default function PengaturanPage() {
@@ -293,6 +295,61 @@ export default function PengaturanPage() {
             <UploadCloud className="h-3.5 w-3.5" />
             <span>Sinkronisasi / Unggah Data ke Cloud</span>
           </button>
+        </div>
+      </div>
+
+      {/* Security Hardening & Cryptography Card */}
+      <div className="bg-gradient-to-br from-white via-white to-blue-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/20 rounded-3xl border border-blue-200/80 dark:border-blue-800/60 shadow-sm p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-blue-100 dark:border-blue-900/40">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Audit Keamanan & Kriptografi Data Sistem
+                </h3>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                  <CheckCircle className="w-3 h-3 text-emerald-600" />
+                  <span>Sistem Terenkripsi & Terlindungi</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Standar proteksi kriptografi Web Crypto API, anti-tamper sesi, dan Row Level Security (RLS) PostgreSQL.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Security Metric Badges */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <span className="text-[11px] font-medium text-slate-400 block">Enkripsi Kata Sandi</span>
+            <div className="text-slate-800 dark:text-white font-semibold text-xs flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-blue-600" />
+              <span>Salted SHA-256 + 16-Byte Salt</span>
+            </div>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Auto-upgrade Transparan Aktif</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <span className="text-[11px] font-medium text-slate-400 block">Integritas Sesi & Hak Akses</span>
+            <div className="text-slate-800 dark:text-white font-semibold text-xs flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Anti-Tamper Role Guard</span>
+            </div>
+            <span className="text-[10px] text-slate-400">Verifikasi otoritas terhadap database cloud</span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <span className="text-[11px] font-medium text-slate-400 block">Keamanan Cloud Database</span>
+            <div className="text-slate-800 dark:text-white font-semibold text-xs flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-purple-600" />
+              <span>Row Level Security (RLS)</span>
+            </div>
+            <span className="text-[10px] text-slate-400">Script RLS: supabase/security_rules.sql</span>
+          </div>
         </div>
       </div>
 

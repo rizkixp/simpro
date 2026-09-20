@@ -819,13 +819,19 @@ export default function PenggunaPage() {
                       {/* Password with Peek & Copy */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
-                          <div className="font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 min-w-[100px] flex items-center justify-between">
-                            <span>{isPeeked ? u.password || "-" : "••••••••"}</span>
+                          <div className="font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 min-w-[110px] flex items-center justify-between">
+                            <span className="truncate max-w-[120px]">
+                              {isPeeked
+                                ? u.password?.startsWith("s256:")
+                                  ? "s256:••• (Enkripsi)"
+                                  : u.password || "-"
+                                : "••••••••"}
+                            </span>
                             <button
                               type="button"
                               onClick={() => togglePasswordVisibility(u.id)}
-                              className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                              title={isPeeked ? "Sembunyikan password" : "Lihat password"}
+                              className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+                              title={isPeeked ? "Sembunyikan password" : "Lihat status password"}
                             >
                               {isPeeked ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                             </button>
@@ -835,8 +841,8 @@ export default function PenggunaPage() {
                             <button
                               type="button"
                               onClick={() => handleCopy(u.password || "", u.id)}
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
-                              title="Salin password"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors shrink-0"
+                              title={u.password.startsWith("s256:") ? "Salin Hash Kriptografi" : "Salin password"}
                             >
                               {copiedId === u.id ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -846,6 +852,11 @@ export default function PenggunaPage() {
                             </button>
                           )}
                         </div>
+                        {u.password?.startsWith("s256:") && (
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
+                            <ShieldCheck className="w-3 h-3" /> Hash Salted SHA-256
+                          </span>
+                        )}
                       </td>
 
                       {/* Status */}

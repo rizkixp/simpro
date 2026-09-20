@@ -11,6 +11,7 @@ export interface User {
   phone?: string;
   status: "Aktif" | "Nonaktif";
   password?: string;
+  sessionToken?: string;
   lastLogin?: string;
   createdAt?: string;
 }

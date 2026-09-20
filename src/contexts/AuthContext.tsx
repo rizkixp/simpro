@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, UserRole } from "@/types/school";
 import { DEMO_USERS } from "@/lib/mock-data";
 import { SupabaseSchoolService } from "@/lib/supabase/services/schoolService";
+import { hashPassword, verifyPassword, generateSessionToken } from "@/lib/security";
 
 interface AuthContextType {
   user: User | null;
@@ -17,8 +18,8 @@ interface AuthContextType {
   logout: () => void;
   switchRole: (role: UserRole) => void;
   switchUser: (userId: string) => void;
-  addUser: (userData: Omit<User, "id">) => User;
-  updateUser: (id: string, data: Partial<User>) => void;
+  addUser: (userData: Omit<User, "id">) => Promise<User>;
+  updateUser: (id: string, data: Partial<User>) => Promise<void> | void;
   deleteUser: (id: string) => { success: boolean; message?: string };
   resetPassword: (userId: string, newPassword?: string) => string;
   resetUsersToDefault: () => void;
@@ -35,23 +36,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       try {
         // 1. Instant hydration from localStorage
+        let currentUsers = DEMO_USERS;
         const savedUsers = localStorage.getItem("sim_auth_users");
         if (savedUsers) {
-          const parsed: User[] = JSON.parse(savedUsers);
-          const merged = [...parsed];
-          for (const demoU of DEMO_USERS) {
-            if (!merged.some((u) => u.id === demoU.id)) {
-              merged.push(demoU);
+          try {
+            const parsed: User[] = JSON.parse(savedUsers);
+            const merged = [...parsed];
+            for (const demoU of DEMO_USERS) {
+              if (!merged.some((u) => u.id === demoU.id)) {
+                merged.push(demoU);
+              }
             }
+            currentUsers = merged;
+            setUserList(merged);
+          } catch {
+            setUserList(DEMO_USERS);
           }
-          setUserList(merged);
         } else {
           setUserList(DEMO_USERS);
         }
 
         const savedUser = localStorage.getItem("sim_auth_user");
         if (savedUser) {
-          setUser(JSON.parse(savedUser));
+          try {
+            const parsedUser: User = JSON.parse(savedUser);
+            // Session integrity guard: verify against authentic user record
+            const verified = currentUsers.find((u) => u.id === parsedUser.id);
+            if (verified) {
+              if (verified.status === "Nonaktif") {
+                setUser(null);
+                localStorage.removeItem("sim_auth_user");
+              } else {
+                // Keep authentic role from authentic record, prevent local tampering
+                setUser({
+                  ...verified,
+                  sessionToken: parsedUser.sessionToken || generateSessionToken(),
+                  lastLogin: parsedUser.lastLogin || verified.lastLogin,
+                });
+              }
+            } else {
+              setUser(DEMO_USERS[0]);
+              localStorage.setItem("sim_auth_user", JSON.stringify(DEMO_USERS[0]));
+            }
+          } catch {
+            setUser(DEMO_USERS[0]);
+            localStorage.setItem("sim_auth_user", JSON.stringify(DEMO_USERS[0]));
+          }
         } else {
           setUser(DEMO_USERS[0]);
           localStorage.setItem("sim_auth_user", JSON.stringify(DEMO_USERS[0]));
@@ -63,10 +93,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (remoteUsers && remoteUsers.length > 0) {
             setUserList(remoteUsers);
             localStorage.setItem("sim_auth_users", JSON.stringify(remoteUsers));
+
+            // Anti-tamper recheck against remote authoritative source
+            setUser((activeUser) => {
+              if (!activeUser) return null;
+              const remoteMatched = remoteUsers.find((u) => u.id === activeUser.id);
+              if (remoteMatched) {
+                if (remoteMatched.status === "Nonaktif") {
+                  localStorage.removeItem("sim_auth_user");
+                  return null;
+                }
+                const updatedSession = {
+                  ...activeUser,
+                  role: remoteMatched.role,
+                  status: remoteMatched.status,
+                  name: remoteMatched.name,
+                };
+                localStorage.setItem("sim_auth_user", JSON.stringify(updatedSession));
+                return updatedSession;
+              }
+              return activeUser;
+            });
           } else if (remoteUsers && remoteUsers.length === 0) {
-            // Table is empty, seed DEMO_USERS into Supabase
+            // Table is empty, seed DEMO_USERS into Supabase with hashed passwords
             for (const u of DEMO_USERS) {
-              await SupabaseSchoolService.upsertUser(u);
+              const secureHash = await hashPassword(u.password || "password123");
+              await SupabaseSchoolService.upsertUser({ ...u, password: secureHash });
             }
           }
         }
@@ -115,18 +167,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // Password verification if provided
+    // Cryptographic password verification with transparent auto-upgrade
     if (password && matchedUser.password) {
-      if (password !== matchedUser.password) {
+      const verification = await verifyPassword(password, matchedUser.password);
+      if (!verification.valid) {
         return {
           success: false,
           message: "Kata sandi yang Anda masukkan salah. Coba lagi atau hubungi Admin.",
         };
       }
+
+      // If password was plaintext, automatically upgrade to salted SHA-256 hash
+      if (verification.needsUpgrade) {
+        const secureHashedPassword = await hashPassword(password);
+        matchedUser = {
+          ...matchedUser,
+          password: secureHashedPassword,
+        };
+        const updatedList = userList.map((u) =>
+          u.id === matchedUser!.id ? matchedUser! : u
+        );
+        setUserList(updatedList);
+        localStorage.setItem("sim_auth_users", JSON.stringify(updatedList));
+        if (SupabaseSchoolService.isConfigured()) {
+          SupabaseSchoolService.upsertUser(matchedUser).catch((err) =>
+            console.warn("Gagal auto-upgrade hash kata sandi di cloud:", err)
+          );
+        }
+      }
     }
 
+    const sessionToken = generateSessionToken();
     const updatedUser: User = {
       ...matchedUser,
+      sessionToken,
       lastLogin: new Date().toISOString(),
     };
 
@@ -160,11 +234,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addUser = (userData: Omit<User, "id">): User => {
+  const addUser = async (userData: Omit<User, "id">): Promise<User> => {
+    const rawPassword = userData.password || "sekolah123";
+    const securePassword = await hashPassword(rawPassword);
+
     const newUser: User = {
       ...userData,
       id: `usr-${Date.now()}-${Math.floor(10 + Math.random() * 90)}`,
-      password: userData.password || "sekolah123",
+      password: securePassword,
       avatar:
         userData.avatar ||
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userData.name)}`,
@@ -183,8 +260,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return newUser;
   };
 
-  const updateUser = (id: string, data: Partial<User>) => {
-    const updated = userList.map((u) => (u.id === id ? { ...u, ...data } : u));
+  const updateUser = async (id: string, data: Partial<User>) => {
+    let toUpdate = { ...data };
+    if (data.password && !data.password.startsWith("s256:")) {
+      toUpdate.password = await hashPassword(data.password);
+    }
+
+    const updated = userList.map((u) => (u.id === id ? { ...u, ...toUpdate } : u));
     setUserList(updated);
     localStorage.setItem("sim_auth_users", JSON.stringify(updated));
 
@@ -231,32 +313,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return `${prefix}#${num}`;
           })();
 
-    const updated = userList.map((u) =>
-      u.id === userId ? { ...u, password: passwordToSet } : u
-    );
-    setUserList(updated);
-    localStorage.setItem("sim_auth_users", JSON.stringify(updated));
+    // Asynchronously hash the password before saving to storage & database
+    hashPassword(passwordToSet).then((hashedPassword) => {
+      setUserList((prev) => {
+        const updated = prev.map((u) =>
+          u.id === userId ? { ...u, password: hashedPassword } : u
+        );
+        localStorage.setItem("sim_auth_users", JSON.stringify(updated));
+        return updated;
+      });
 
-    const updatedTarget = updated.find((u) => u.id === userId);
-    if (user?.id === userId && updatedTarget) {
-      setUser(updatedTarget);
-      localStorage.setItem("sim_auth_user", JSON.stringify(updatedTarget));
-    }
+      setUser((prevUser) => {
+        if (prevUser?.id === userId) {
+          const updated = { ...prevUser, password: hashedPassword };
+          localStorage.setItem("sim_auth_user", JSON.stringify(updated));
+          return updated;
+        }
+        return prevUser;
+      });
 
-    if (SupabaseSchoolService.isConfigured() && updatedTarget) {
-      SupabaseSchoolService.upsertUser(updatedTarget).catch((err) =>
-        console.warn("Gagal memperbarui password user di Supabase:", err)
-      );
-    }
+      if (SupabaseSchoolService.isConfigured()) {
+        const target = userList.find((u) => u.id === userId);
+        if (target) {
+          SupabaseSchoolService.upsertUser({ ...target, password: hashedPassword }).catch((err) =>
+            console.warn("Gagal memperbarui password user di Supabase:", err)
+          );
+        }
+      }
+    });
 
     return passwordToSet;
   };
 
-  const resetUsersToDefault = () => {
-    setUserList(DEMO_USERS);
-    localStorage.setItem("sim_auth_users", JSON.stringify(DEMO_USERS));
+  const resetUsersToDefault = async () => {
+    const secureDemoUsers = await Promise.all(
+      DEMO_USERS.map(async (u) => ({
+        ...u,
+        password: await hashPassword(u.password || "password123"),
+      }))
+    );
+    setUserList(secureDemoUsers);
+    localStorage.setItem("sim_auth_users", JSON.stringify(secureDemoUsers));
     if (SupabaseSchoolService.isConfigured()) {
-      for (const u of DEMO_USERS) {
+      for (const u of secureDemoUsers) {
         SupabaseSchoolService.upsertUser(u).catch(console.error);
       }
     }
