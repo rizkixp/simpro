@@ -40,6 +40,8 @@ import {
   Share2,
   Copy,
   Check,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -49,12 +51,29 @@ export default function NilaiManagementPage() {
     nilaiList,
     saveNilai,
     bulkSaveNilai,
+    deleteNilai,
+    deleteNilaiBySiswa,
     siswaList,
     mapelList,
     profile,
     kelasList,
     guruList,
   } = useSchoolData();
+
+  // Notification feedback state
+  const [notification, setNotification] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  // Delete modal states
+  const [deletingNilai, setDeletingNilai] = useState<NilaiSiswa | null>(null);
+  const [deletingAllSiswa, setDeletingAllSiswa] = useState<{
+    id: string;
+    nama: string;
+    kelas: string;
+    count: number;
+  } | null>(null);
 
   // Active Rapor Tab: "tengah" (PTS) | "akhir" (PAS) | "semua"
   const [activeRaporTab, setActiveRaporTab] = useState<"tengah" | "akhir" | "semua">("tengah");
@@ -273,6 +292,12 @@ export default function NilaiManagementPage() {
     });
 
     setIsInputModalOpen(false);
+    setNotification({
+      type: "success",
+      message: editingId
+        ? `Nilai mata pelajaran "${formData.mapel}" untuk ${siswa.nama} berhasil diperbarui.`
+        : `Nilai mata pelajaran "${formData.mapel}" untuk ${siswa.nama} berhasil disimpan.`,
+    });
   };
 
   // Bulk Input Handlers (All Subjects for One Student)
@@ -304,7 +329,7 @@ export default function NilaiManagementPage() {
       return {
         mapel: m.nama,
         kkm: m.kkm,
-        tugas: 80,
+        tugas: 82,
         uts: 80,
         uas: 85,
         catatanMid: "Pemahaman materi tengah semester tuntas dengan baik.",
@@ -313,18 +338,6 @@ export default function NilaiManagementPage() {
     });
 
     setBulkRows(rows);
-  };
-
-  const handleOpenBulkAdd = (preselectedSiswaId?: string) => {
-    const targetSiswa =
-      (preselectedSiswaId && baseSiswaList.find((s) => s.id === preselectedSiswaId)) ||
-      baseSiswaList[0] ||
-      siswaList[0];
-    if (!targetSiswa) return;
-
-    setBulkSiswaId(targetSiswa.id);
-    initBulkRowsForStudent(targetSiswa.id);
-    setIsBulkModalOpen(true);
   };
 
   const handleBulkSiswaChange = (newSiswaId: string) => {
@@ -345,14 +358,22 @@ export default function NilaiManagementPage() {
     setBulkRows(updated);
   };
 
+  const handleOpenBulkAdd = (preselectedSiswaId?: string) => {
+    const targetId = preselectedSiswaId || baseSiswaList[0]?.id || siswaList[0]?.id || "";
+    setBulkSiswaId(targetId);
+    initBulkRowsForStudent(targetId);
+    setIsBulkModalOpen(true);
+  };
+
   const handleApplyQuickFill = () => {
-    const updated = bulkRows.map((r) => ({
-      ...r,
-      tugas: Number(quickFillValues.tugas) || 0,
-      uts: Number(quickFillValues.uts) || 0,
-      uas: Number(quickFillValues.uas) || 0,
-    }));
-    setBulkRows(updated);
+    setBulkRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        tugas: quickFillValues.tugas,
+        uts: quickFillValues.uts,
+        uas: quickFillValues.uas,
+      }))
+    );
   };
 
   const handleSaveBulk = (e: React.FormEvent) => {
@@ -393,7 +414,45 @@ export default function NilaiManagementPage() {
 
     bulkSaveNilai(itemsToSave);
     setIsBulkModalOpen(false);
+    setNotification({
+      type: "success",
+      message: `Nilai seluruh mata pelajaran (${itemsToSave.length} mapel) untuk ${siswa.nama} berhasil disimpan.`,
+    });
   };
+
+  // Delete Handlers
+  const handleConfirmDeleteSingle = () => {
+    if (!deletingNilai) return;
+    const { id, mapel, siswaNama } = deletingNilai;
+    deleteNilai(id);
+    setDeletingNilai(null);
+    setNotification({
+      type: "success",
+      message: `Data nilai mata pelajaran "${mapel}" untuk ${siswaNama} berhasil dihapus.`,
+    });
+  };
+
+  const handleConfirmDeleteAllBySiswa = () => {
+    if (!deletingAllSiswa) return;
+    const { id, nama, count } = deletingAllSiswa;
+    deleteNilaiBySiswa(id);
+    setDeletingAllSiswa(null);
+    if (isBulkModalOpen) {
+      setIsBulkModalOpen(false);
+    }
+    setNotification({
+      type: "success",
+      message: `Seluruh data nilai (${count} mapel) untuk ${nama} berhasil dihapus dari sistem.`,
+    });
+  };
+
+  // Auto-dismiss notification
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // E-Rapor Print Modal Handlers
   const handleOpenRapor = (siswa: Siswa, type?: JenisRapor) => {
@@ -573,6 +632,30 @@ export default function NilaiManagementPage() {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          className={`fixed top-5 right-5 z-50 p-4 rounded-2xl shadow-xl flex items-center gap-3 border transition-all duration-300 max-w-md ${
+            notification.type === "success"
+              ? "bg-emerald-50 dark:bg-emerald-950/90 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100"
+              : "bg-rose-50 dark:bg-rose-950/90 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-100"
+          }`}
+        >
+          {notification.type === "success" ? (
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0" />
+          )}
+          <span className="text-xs font-semibold">{notification.message}</span>
+          <button
+            onClick={() => setNotification(null)}
+            className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 cursor-pointer ml-auto"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
         <div>
@@ -991,9 +1074,16 @@ export default function NilaiManagementPage() {
                               <button
                                 onClick={() => handleOpenEdit(n)}
                                 title="Edit Nilai Mapel Ini"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 cursor-pointer"
                               >
                                 <Edit2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => setDeletingNilai(n)}
+                                title="Hapus Nilai Mapel Ini"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             </>
                           )}
@@ -1001,7 +1091,7 @@ export default function NilaiManagementPage() {
                             <>
                               <button
                                 onClick={() => handleOpenRapor(siswaObj, "tengah")}
-                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <FileText className="h-3.5 w-3.5" />
                                 <span>Rapor PTS</span>
@@ -1012,7 +1102,7 @@ export default function NilaiManagementPage() {
                                   handleOpenWhatsAppModal(siswaObj);
                                 }}
                                 title="Kirim Rapor PTS via WhatsApp ke Wali"
-                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center"
+                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
                               >
                                 <MessageCircle className="h-3.5 w-3.5" />
                               </button>
@@ -1066,7 +1156,7 @@ export default function NilaiManagementPage() {
                               <button
                                 onClick={() => handleOpenBulkAdd(n.siswaId)}
                                 title="Input / Edit Seluruh Mapel Siswa Ini"
-                                className="px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors inline-flex items-center gap-1"
+                                className="px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <Zap className="h-3 w-3 fill-blue-500" />
                                 <span>Bulk Mapel</span>
@@ -1074,9 +1164,16 @@ export default function NilaiManagementPage() {
                               <button
                                 onClick={() => handleOpenEdit(n)}
                                 title="Edit Nilai Mapel Ini"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer"
                               >
                                 <Edit2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => setDeletingNilai(n)}
+                                title="Hapus Nilai Mapel Ini"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             </>
                           )}
@@ -1084,7 +1181,7 @@ export default function NilaiManagementPage() {
                             <>
                               <button
                                 onClick={() => handleOpenRapor(siswaObj, "akhir")}
-                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <FileText className="h-3.5 w-3.5" />
                                 <span>Rapor PAS</span>
@@ -1095,7 +1192,7 @@ export default function NilaiManagementPage() {
                                   handleOpenWhatsAppModal(siswaObj);
                                 }}
                                 title="Kirim Rapor PAS via WhatsApp ke Wali"
-                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center"
+                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
                               >
                                 <MessageCircle className="h-3.5 w-3.5" />
                               </button>
@@ -1139,7 +1236,7 @@ export default function NilaiManagementPage() {
                             <button
                               onClick={() => handleOpenBulkAdd(n.siswaId)}
                               title="Input / Edit Seluruh Mapel Siswa Ini"
-                              className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1"
+                              className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                             >
                               <Zap className="h-3 w-3 fill-amber-500" />
                               <span>Bulk</span>
@@ -1147,9 +1244,16 @@ export default function NilaiManagementPage() {
                             <button
                               onClick={() => handleOpenEdit(n)}
                               title="Edit Nilai"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 cursor-pointer"
                             >
                               <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeletingNilai(n)}
+                              title="Hapus Nilai Mapel Ini"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </>
                         )}
@@ -1250,16 +1354,37 @@ export default function NilaiManagementPage() {
                 </div>
 
                 {selectedBulkStudent && (
-                  <div className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-xs md:ml-auto">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center font-bold text-sm shadow">
-                      {selectedBulkStudent.nama.substring(0, 2).toUpperCase()}
+                  <div className="flex flex-wrap items-center gap-3 md:ml-auto">
+                    <div className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center font-bold text-sm shadow">
+                        {selectedBulkStudent.nama.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 dark:text-white">{selectedBulkStudent.nama}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Kelas <strong>{selectedBulkStudent.kelas}</strong> &bull; NISN: <span className="font-mono">{selectedBulkStudent.nisn}</span>
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-900 dark:text-white">{selectedBulkStudent.nama}</p>
-                      <p className="text-[11px] text-slate-500">
-                        Kelas <strong>{selectedBulkStudent.kelas}</strong> &bull; NISN: <span className="font-mono">{selectedBulkStudent.nisn}</span>
-                      </p>
-                    </div>
+                    {nilaiList.filter((n) => n.siswaId === selectedBulkStudent.id).length > 0 && canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const count = nilaiList.filter((n) => n.siswaId === selectedBulkStudent.id).length;
+                          setDeletingAllSiswa({
+                            id: selectedBulkStudent.id,
+                            nama: selectedBulkStudent.nama,
+                            kelas: selectedBulkStudent.kelas,
+                            count,
+                          });
+                        }}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900 flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                        title="Hapus seluruh rekaman nilai tersimpan untuk siswa ini"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Hapus Nilai Siswa Ini</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1349,6 +1474,7 @@ export default function NilaiManagementPage() {
                       <th className="px-2 py-2.5 text-center w-24">UAS (Akhir)</th>
                       <th className="px-2 py-2.5 text-center w-24 bg-blue-500/10">Rapor PAS</th>
                       <th className="px-3 py-2.5">Catatan Capaian Belajar</th>
+                      <th className="px-2 py-2.5 text-center w-12">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
@@ -1464,6 +1590,27 @@ export default function NilaiManagementPage() {
                               placeholder="Catatan capaian siswa..."
                               className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-amber-500"
                             />
+                          </td>
+
+                          {/* Aksi Hapus Baris */}
+                          <td className="px-2 py-2 text-center">
+                            {row.existingId && canEdit ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const item = nilaiList.find((n) => n.id === row.existingId);
+                                  if (item) {
+                                    setDeletingNilai(item);
+                                  }
+                                }}
+                                title="Hapus rekaman nilai mapel ini"
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <span className="text-slate-300 dark:text-slate-700 text-xs">-</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1727,21 +1874,42 @@ export default function NilaiManagementPage() {
                 />
               </div>
 
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsInputModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-md shadow-amber-500/20 flex items-center gap-2"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Simpan Nilai Siswa</span>
-                </button>
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
+                {editingId && canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const itemToDelete = nilaiList.find((n) => n.id === editingId);
+                      if (itemToDelete) {
+                        setIsInputModalOpen(false);
+                        setDeletingNilai(itemToDelete);
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Hapus Nilai Ini</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsInputModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-md shadow-amber-500/20 flex items-center gap-2 cursor-pointer"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{editingId ? "Perbarui Rekaman Nilai" : "Simpan Nilai Siswa"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1810,6 +1978,22 @@ export default function NilaiManagementPage() {
 
               {/* Action Buttons (Direct Print & PDF Export) */}
               <div className="flex items-center gap-2">
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetId = raporSiswa.id;
+                      setRaporSiswa(null);
+                      handleOpenBulkAdd(targetId);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                    title="Edit nilai seluruh mata pelajaran untuk siswa ini"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                    <span>Edit Nilai Siswa</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() =>
@@ -2799,6 +2983,123 @@ export default function NilaiManagementPage() {
                   <Share2 className="h-3.5 w-3.5" />
                 </a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 6: KONFIRMASI HAPUS NILAI MAPEL SATUAN             */}
+      {/* ========================================================= */}
+      {deletingNilai && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 relative animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-11 w-11 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Konfirmasi Hapus Nilai
+                </h3>
+                <p className="text-xs text-slate-500">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+              Apakah Anda yakin ingin menghapus data nilai mata pelajaran{" "}
+              <strong className="text-slate-900 dark:text-white">{deletingNilai.mapel}</strong> untuk siswa:
+            </p>
+
+            <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 mb-5 space-y-2 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="font-bold text-slate-900 dark:text-white">{deletingNilai.siswaNama}</span>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200/60 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">
+                  {deletingNilai.kelas}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center pt-1 font-mono text-[11px]">
+                <div className="p-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] text-slate-400 block font-sans">UH</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">{deletingNilai.tugas}</span>
+                </div>
+                <div className="p-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] text-slate-400 block font-sans">Mid (PTS)</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">{deletingNilai.uts}</span>
+                </div>
+                <div className="p-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="text-[10px] text-slate-400 block font-sans">UAS (PAS)</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">{deletingNilai.uas}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeletingNilai(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSingle}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Ya, Hapus Nilai</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 7: KONFIRMASI HAPUS SELURUH NILAI SISWA            */}
+      {/* ========================================================= */}
+      {deletingAllSiswa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 relative animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-11 w-11 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Hapus Seluruh Nilai Siswa
+                </h3>
+                <p className="text-xs text-slate-500">Pembersihan massal data penilaian</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+              Apakah Anda yakin ingin menghapus <strong>seluruh data nilai ({deletingAllSiswa.count} mata pelajaran)</strong> yang tersimpan untuk siswa ini?
+            </p>
+
+            <div className="bg-rose-50/50 dark:bg-rose-950/30 p-4 rounded-2xl border border-rose-200 dark:border-rose-900/50 mb-5">
+              <p className="font-bold text-slate-900 dark:text-white text-sm">{deletingAllSiswa.nama}</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Kelas <strong>{deletingAllSiswa.kelas}</strong> &bull; Total Mapel Terhapus: <strong className="text-rose-600">{deletingAllSiswa.count} Mapel</strong>
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeletingAllSiswa(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAllBySiswa}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Hapus Semua Nilai</span>
+              </button>
             </div>
           </div>
         </div>

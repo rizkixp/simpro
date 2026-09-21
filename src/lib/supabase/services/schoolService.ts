@@ -586,6 +586,20 @@ export const SupabaseSchoolService = {
     return !error;
   },
 
+  async deleteNilai(id: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("nilai_siswa").delete().eq("id", id);
+    return !error;
+  },
+
+  async deleteNilaiBySiswa(siswaId: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("nilai_siswa").delete().eq("siswa_id", siswaId);
+    return !error;
+  },
+
   // ==================== KEUANGAN & TAGIHAN ====================
   async getJenisTagihanList(): Promise<JenisTagihan[] | null> {
     const client = getSupabaseBrowserClient();

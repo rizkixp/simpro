@@ -99,6 +99,8 @@ interface SchoolDataContextType {
   nilaiList: NilaiSiswa[];
   saveNilai: (nilai: Omit<NilaiSiswa, "id"> & { id?: string }) => void;
   bulkSaveNilai: (items: (Omit<NilaiSiswa, "id"> & { id?: string })[]) => void;
+  deleteNilai: (id: string) => void;
+  deleteNilaiBySiswa: (siswaId: string) => void;
   sppList: TagihanSPP[];
   jenisTagihanList: JenisTagihan[];
   addJenisTagihan: (data: Omit<JenisTagihan, "id">) => void;
@@ -1000,22 +1002,40 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   // Nilai Actions
   const saveNilai = (data: Omit<NilaiSiswa, "id"> & { id?: string }) => {
-    let updated: NilaiSiswa[];
-    if (data.id) {
-      updated = nilaiList.map((n) => (n.id === data.id ? ({ ...n, ...data } as NilaiSiswa) : n));
-    } else {
-      const newNilai: NilaiSiswa = {
+    let updated = [...nilaiList];
+    let savedItem: NilaiSiswa;
+
+    const existingIndex = data.id
+      ? updated.findIndex((n) => n.id === data.id)
+      : updated.findIndex(
+          (n) =>
+            n.siswaId === data.siswaId &&
+            n.mapel.toLowerCase() === data.mapel.toLowerCase()
+        );
+
+    if (existingIndex >= 0) {
+      savedItem = {
+        ...updated[existingIndex],
         ...data,
-        id: `nil-${Date.now()}`,
-      };
-      updated = [newNilai, ...nilaiList];
+      } as NilaiSiswa;
+      updated[existingIndex] = savedItem;
+    } else {
+      savedItem = {
+        ...data,
+        id: data.id || `nil-${Date.now()}`,
+      } as NilaiSiswa;
+      updated = [savedItem, ...updated];
     }
+
     setNilaiList(updated);
     saveState("nilai", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertNilai(savedItem));
   };
 
   const bulkSaveNilai = (items: (Omit<NilaiSiswa, "id"> & { id?: string })[]) => {
     let updated = [...nilaiList];
+    const toUpsert: NilaiSiswa[] = [];
+
     items.forEach((item, index) => {
       const existingIndex = item.id
         ? updated.findIndex((n) => n.id === item.id)
@@ -1026,20 +1046,41 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           );
 
       if (existingIndex >= 0) {
-        updated[existingIndex] = {
+        const merged = {
           ...updated[existingIndex],
           ...item,
         } as NilaiSiswa;
+        updated[existingIndex] = merged;
+        toUpsert.push(merged);
       } else {
         const newNilai: NilaiSiswa = {
           ...item,
           id: item.id || `nil-${Date.now()}-${index}`,
-        };
+        } as NilaiSiswa;
         updated = [newNilai, ...updated];
+        toUpsert.push(newNilai);
       }
     });
+
     setNilaiList(updated);
     saveState("nilai", updated);
+    if (toUpsert.length > 0) {
+      persistSupabase(() => SupabaseSchoolService.bulkUpsertNilai(toUpsert));
+    }
+  };
+
+  const deleteNilai = (id: string) => {
+    const updated = nilaiList.filter((n) => n.id !== id);
+    setNilaiList(updated);
+    saveState("nilai", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteNilai(id));
+  };
+
+  const deleteNilaiBySiswa = (siswaId: string) => {
+    const updated = nilaiList.filter((n) => n.siswaId !== siswaId);
+    setNilaiList(updated);
+    saveState("nilai", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteNilaiBySiswa(siswaId));
   };
 
   // Jenis Tagihan (Billing Categories) Actions
@@ -2305,6 +2346,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         nilaiList,
         saveNilai,
         bulkSaveNilai,
+        deleteNilai,
+        deleteNilaiBySiswa,
         sppList,
         jenisTagihanList,
         addJenisTagihan,
