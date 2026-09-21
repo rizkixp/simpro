@@ -99,8 +99,34 @@ export default function NilaiManagementPage() {
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Bulk Input Modal State (All Subjects for One Student)
+  // Bulk Input Modal State (Dual-Mode: Per-Kelas / Rombel vs Per-Siswa)
+  type BulkInputMode = "per-kelas" | "per-siswa";
+  type BulkAssessmentTab = "sts-ganjil" | "sas-ganjil" | "sts-genap" | "sas-genap";
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkInputMode, setBulkInputMode] = useState<BulkInputMode>("per-kelas");
+  const [bulkAssessmentTab, setBulkAssessmentTab] = useState<BulkAssessmentTab>("sts-ganjil");
+
+  // Selection for Per-Kelas mode (1 Mapel, Seluruh Siswa di Rombel)
+  const [bulkSelectedKelas, setBulkSelectedKelas] = useState<string>("");
+  const [bulkSelectedMapel, setBulkSelectedMapel] = useState<string>("");
+
+  // Rows for Per-Kelas mode
+  const [bulkClassRows, setBulkClassRows] = useState<
+    {
+      siswaId: string;
+      siswaNama: string;
+      nisn: string;
+      kelas: string;
+      kkm: number;
+      tugas: number; // UH
+      uts: number; // Mid / STS
+      uas: number; // UAS / SAS
+      catatan: string;
+      existingId?: string;
+    }[]
+  >([]);
+
+  // Selection & Rows for Per-Siswa mode (1 Siswa, Seluruh Mapel)
   const [bulkSiswaId, setBulkSiswaId] = useState<string>("");
   const [bulkSemester, setBulkSemester] = useState<"Ganjil" | "Genap">("Ganjil");
   const [bulkRows, setBulkRows] = useState<
@@ -115,11 +141,19 @@ export default function NilaiManagementPage() {
       existingId?: string;
     }[]
   >([]);
+
+  // Quick fill toolbar states
+  const [quickFillSts, setQuickFillSts] = useState<number>(80);
   const [quickFillValues, setQuickFillValues] = useState({
     tugas: 80,
     uts: 80,
     uas: 85,
   });
+
+  // Derived helpers for Bulk Modal
+  const bulkIsTengah = bulkAssessmentTab === "sts-ganjil" || bulkAssessmentTab === "sts-genap";
+  const bulkActiveSemester: "Ganjil" | "Genap" =
+    bulkAssessmentTab === "sts-genap" || bulkAssessmentTab === "sas-genap" ? "Genap" : "Ganjil";
 
   // E-Rapor Modal Print Preview (Single Student)
   const [raporSiswa, setRaporSiswa] = useState<Siswa | null>(null);
@@ -322,13 +356,83 @@ export default function NilaiManagementPage() {
     });
   };
 
-  // Bulk Input Handlers (All Subjects for One Student)
-  const initBulkRowsForStudent = (targetSiswaId: string, sem: "Ganjil" | "Genap" = activeSemester) => {
-    const targetSiswa = siswaList.find((s) => s.id === targetSiswaId);
+  // =========================================================================
+  // Bulk Input Handlers (Dual-Mode: Per-Kelas / Rombel vs Per-Siswa)
+  // =========================================================================
+
+  // Inisialisasi baris Mode Per-Kelas (1 Mapel, Seluruh Siswa di Kelas)
+  const initBulkClassRows = (
+    targetKelas: string,
+    targetMapel: string,
+    tab: BulkAssessmentTab = bulkAssessmentTab
+  ) => {
+    const sem: "Ganjil" | "Genap" =
+      tab === "sts-genap" || tab === "sas-genap" ? "Genap" : "Ganjil";
+
+    const classStudents = baseSiswaList.filter(
+      (s) => s.kelas.toLowerCase() === targetKelas.toLowerCase()
+    );
+
+    const mapelObj = mapelList.find(
+      (m) => m.nama.toLowerCase() === targetMapel.toLowerCase()
+    );
+    const kkm = mapelObj?.kkm || 75;
+
+    const rows = classStudents.map((s) => {
+      const existing = nilaiList.find(
+        (n) =>
+          n.siswaId === s.id &&
+          n.mapel.toLowerCase() === targetMapel.toLowerCase() &&
+          (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase()
+      );
+
+      if (existing) {
+        return {
+          siswaId: s.id,
+          siswaNama: s.nama,
+          nisn: s.nisn,
+          kelas: s.kelas,
+          kkm,
+          tugas: typeof existing.tugas === "number" ? existing.tugas : 80,
+          uts: typeof existing.uts === "number" ? existing.uts : 80,
+          uas: typeof existing.uas === "number" ? existing.uas : 80,
+          catatan: existing.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+          existingId: existing.id,
+        };
+      }
+
+      return {
+        siswaId: s.id,
+        siswaNama: s.nama,
+        nisn: s.nisn,
+        kelas: s.kelas,
+        kkm,
+        tugas: 80,
+        uts: 80,
+        uas: 80,
+        catatan: "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+      };
+    });
+
+    setBulkClassRows(rows);
+  };
+
+  // Inisialisasi baris Mode Per-Siswa (1 Siswa, Seluruh Mapel)
+  const initBulkRowsForStudent = (
+    targetSiswaId: string,
+    sem: "Ganjil" | "Genap" = bulkActiveSemester
+  ) => {
+    const targetSiswa =
+      baseSiswaList.find((s) => s.id === targetSiswaId) ||
+      siswaList.find((s) => s.id === targetSiswaId);
     if (!targetSiswa) return;
 
-    // Subjects to show
-    const subjects = mapelList;
+    // Filter mapel jika akun merupakan guru mata pelajaran
+    const subjects = teacherScope.isTeacher && teacherScope.assignedSubjects.length > 0
+      ? mapelList.filter((m) =>
+          teacherScope.assignedSubjects.some((as) => as.toLowerCase() === m.nama.toLowerCase())
+        )
+      : mapelList;
 
     const existingStudentNilai = nilaiList.filter(
       (n) => n.siswaId === targetSiswaId && (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase()
@@ -342,10 +446,10 @@ export default function NilaiManagementPage() {
         return {
           mapel: m.nama,
           kkm: m.kkm,
-          tugas: existing.tugas,
-          uts: existing.uts,
-          uas: existing.uas,
-          catatanMid: existing.catatanMid || "Pemahaman materi tengah semester tuntas dengan baik.",
+          tugas: typeof existing.tugas === "number" ? existing.tugas : 82,
+          uts: typeof existing.uts === "number" ? existing.uts : 80,
+          uas: typeof existing.uas === "number" ? existing.uas : 85,
+          catatanMid: "",
           catatan: existing.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
           existingId: existing.id,
         };
@@ -356,7 +460,7 @@ export default function NilaiManagementPage() {
         tugas: 82,
         uts: 80,
         uas: 85,
-        catatanMid: "Pemahaman materi tengah semester tuntas dengan baik.",
+        catatanMid: "",
         catatan: "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
       };
     });
@@ -364,16 +468,38 @@ export default function NilaiManagementPage() {
     setBulkRows(rows);
   };
 
+  // Handler pergantian siswa (Mode Per-Siswa)
   const handleBulkSiswaChange = (newSiswaId: string) => {
     setBulkSiswaId(newSiswaId);
     initBulkRowsForStudent(newSiswaId, bulkSemester);
   };
 
-  const handleBulkSemesterChange = (newSemester: "Ganjil" | "Genap") => {
-    setBulkSemester(newSemester);
-    initBulkRowsForStudent(bulkSiswaId, newSemester);
+  // Handler pergantian kelas (Mode Per-Kelas)
+  const handleBulkClassChange = (newKelas: string) => {
+    setBulkSelectedKelas(newKelas);
+    initBulkClassRows(newKelas, bulkSelectedMapel, bulkAssessmentTab);
   };
 
+  // Handler pergantian mapel (Mode Per-Kelas)
+  const handleBulkMapelChange = (newMapel: string) => {
+    setBulkSelectedMapel(newMapel);
+    initBulkClassRows(bulkSelectedKelas, newMapel, bulkAssessmentTab);
+  };
+
+  // Handler navigasi 4 Jenis Penilaian di dalam modal
+  const handleSwitchBulkAssessment = (newTab: BulkAssessmentTab) => {
+    setBulkAssessmentTab(newTab);
+    const newSem: "Ganjil" | "Genap" =
+      newTab === "sts-genap" || newTab === "sas-genap" ? "Genap" : "Ganjil";
+    setBulkSemester(newSem);
+    if (bulkInputMode === "per-kelas") {
+      initBulkClassRows(bulkSelectedKelas, bulkSelectedMapel, newTab);
+    } else {
+      initBulkRowsForStudent(bulkSiswaId, newSem);
+    }
+  };
+
+  // Handler input field baris Per-Siswa
   const handleBulkRowChange = (
     index: number,
     field: "tugas" | "uts" | "uas" | "catatanMid" | "catatan",
@@ -387,39 +513,175 @@ export default function NilaiManagementPage() {
     setBulkRows(updated);
   };
 
-  const handleOpenBulkAdd = (preselectedSiswaId?: string, sem?: "Ganjil" | "Genap") => {
+  // Handler input field baris Per-Kelas
+  const handleBulkClassRowChange = (
+    index: number,
+    field: "tugas" | "uts" | "uas" | "catatan",
+    value: string | number
+  ) => {
+    setBulkClassRows((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: typeof value === "number" ? Math.max(0, Math.min(100, value)) : value,
+      };
+      return updated;
+    });
+  };
+
+  // Handler Buka Modal Bulk Input
+  const handleOpenBulkAdd = (
+    preselectedSiswaId?: string,
+    forcedMode?: "per-kelas" | "per-siswa"
+  ) => {
+    // Tentukan tab penilaian awal sesuai tab aktif di halaman
+    const initialTab: BulkAssessmentTab =
+      activeRaporTab === "sas-ganjil"
+        ? "sas-ganjil"
+        : activeRaporTab === "sts-genap"
+        ? "sts-genap"
+        : activeRaporTab === "sas-genap"
+        ? "sas-genap"
+        : "sts-ganjil";
+    setBulkAssessmentTab(initialTab);
+
+    const initialSem: "Ganjil" | "Genap" =
+      initialTab === "sts-genap" || initialTab === "sas-genap" ? "Genap" : "Ganjil";
+    setBulkSemester(initialSem);
+
+    // Tentukan kelas & mapel awal
+    const availableKelas = teacherScope.isTeacher && teacherScope.assignedClass
+      ? [teacherScope.assignedClass]
+      : Array.from(new Set(baseSiswaList.map((s) => s.kelas))).filter(Boolean);
+    const initialKelas =
+      selectedKelas !== "Semua" && availableKelas.includes(selectedKelas)
+        ? selectedKelas
+        : availableKelas[0] || (kelasList[0]?.nama || "");
+    setBulkSelectedKelas(initialKelas);
+
+    const availableMapel = teacherScope.isTeacher && teacherScope.assignedSubjects.length > 0
+      ? teacherScope.assignedSubjects
+      : mapelList.map((m) => m.nama);
+    const initialMapel =
+      selectedMapel !== "Semua" && availableMapel.includes(selectedMapel)
+        ? selectedMapel
+        : availableMapel[0] || (mapelList[0]?.nama || "");
+    setBulkSelectedMapel(initialMapel);
+
+    // Tentukan mode awal (jika dipanggil dari tombol baris siswa, mode per-siswa; jika dari header, mode per-kelas)
+    const mode = forcedMode || (preselectedSiswaId ? "per-siswa" : "per-kelas");
+    setBulkInputMode(mode);
+
     const targetId = preselectedSiswaId || baseSiswaList[0]?.id || siswaList[0]?.id || "";
-    const targetSem = sem || activeSemester;
     setBulkSiswaId(targetId);
-    setBulkSemester(targetSem);
-    initBulkRowsForStudent(targetId, targetSem);
+
+    // Inisialisasi baris data
+    initBulkClassRows(initialKelas, initialMapel, initialTab);
+    if (targetId) {
+      initBulkRowsForStudent(targetId, initialSem);
+    }
+
     setIsBulkModalOpen(true);
   };
 
-  const handleApplyQuickFill = () => {
-    setBulkRows((prev) =>
-      prev.map((r) => ({
-        ...r,
-        tugas: quickFillValues.tugas,
-        uts: quickFillValues.uts,
-        uas: quickFillValues.uas,
-      }))
-    );
+  // Quick-Fill untuk Mode Per-Kelas
+  const handleApplyQuickFillClass = () => {
+    if (bulkIsTengah) {
+      setBulkClassRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          uts: quickFillSts,
+        }))
+      );
+    } else {
+      setBulkClassRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          tugas: quickFillValues.tugas,
+          uts: quickFillValues.uts,
+          uas: quickFillValues.uas,
+        }))
+      );
+    }
   };
 
-  const handleSaveBulk = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Quick-Fill untuk Mode Per-Siswa
+  const handleApplyQuickFillStudent = () => {
+    if (bulkIsTengah) {
+      setBulkRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          uts: quickFillSts,
+        }))
+      );
+    } else {
+      setBulkRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          tugas: quickFillValues.tugas,
+          uts: quickFillValues.uts,
+          uas: quickFillValues.uas,
+        }))
+      );
+    }
+  };
+
+  // Simpan data Mode Per-Kelas (1 Mapel, Seluruh Siswa di Rombel)
+  const handleSaveBulkClass = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (bulkClassRows.length === 0) return;
+
+    const itemsToSave = bulkClassRows.map((row) => {
+      const { nilaiMid, predikatMid } = calculateMidGrade(Number(row.uts) || 0);
+      const { nilaiAkhir, predikat } = calculateSemesterGrade(
+        Number(row.tugas) || 0,
+        Number(row.uts) || 0,
+        Number(row.uas) || 0
+      );
+
+      return {
+        id: row.existingId,
+        siswaId: row.siswaId,
+        siswaNama: row.siswaNama,
+        nisn: row.nisn,
+        kelas: row.kelas,
+        mapel: bulkSelectedMapel,
+        semester: bulkActiveSemester,
+        tahunAjaran: profile.tahunAjaranAktif,
+        tugas: Number(row.tugas) || 0,
+        uts: Number(row.uts) || 0,
+        uas: Number(row.uas) || 0,
+        nilaiMid,
+        predikatMid,
+        catatanMid: "", // Catatan perkembangan dihilangkan untuk STS!
+        nilaiAkhir,
+        predikat,
+        catatan: row.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+      };
+    });
+
+    bulkSaveNilai(itemsToSave);
+    setIsBulkModalOpen(false);
+    setNotification({
+      type: "success",
+      message: `Nilai ${bulkIsTengah ? "STS" : "SAS"} mapel "${bulkSelectedMapel}" Kelas ${bulkSelectedKelas} (${itemsToSave.length} siswa) Semester ${bulkActiveSemester} berhasil disimpan.`,
+    });
+  };
+
+  // Simpan data Mode Per-Siswa (1 Siswa, Seluruh Mapel)
+  const handleSaveBulkStudent = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const siswa =
       baseSiswaList.find((s) => s.id === bulkSiswaId) ||
       siswaList.find((s) => s.id === bulkSiswaId);
     if (!siswa) return;
 
     const itemsToSave = bulkRows.map((row) => {
-      const { nilaiMid, predikatMid } = calculateMidGrade(Number(row.uts));
+      const { nilaiMid, predikatMid } = calculateMidGrade(Number(row.uts) || 0);
       const { nilaiAkhir, predikat } = calculateSemesterGrade(
-        Number(row.tugas),
-        Number(row.uts),
-        Number(row.uas)
+        Number(row.tugas) || 0,
+        Number(row.uts) || 0,
+        Number(row.uas) || 0
       );
 
       return {
@@ -429,17 +691,17 @@ export default function NilaiManagementPage() {
         nisn: siswa.nisn,
         kelas: siswa.kelas,
         mapel: row.mapel,
-        semester: bulkSemester,
+        semester: bulkActiveSemester,
         tahunAjaran: profile.tahunAjaranAktif,
-        tugas: Number(row.tugas),
-        uts: Number(row.uts),
-        uas: Number(row.uas),
+        tugas: Number(row.tugas) || 0,
+        uts: Number(row.uts) || 0,
+        uas: Number(row.uas) || 0,
         nilaiMid,
         predikatMid,
-        catatanMid: row.catatanMid,
+        catatanMid: "", // Catatan perkembangan dihilangkan untuk STS!
         nilaiAkhir,
         predikat,
-        catatan: row.catatan,
+        catatan: row.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
       };
     });
 
@@ -447,8 +709,18 @@ export default function NilaiManagementPage() {
     setIsBulkModalOpen(false);
     setNotification({
       type: "success",
-      message: `Nilai seluruh mata pelajaran (${itemsToSave.length} mapel) Semester ${bulkSemester} untuk ${siswa.nama} berhasil disimpan.`,
+      message: `Nilai ${bulkIsTengah ? "STS" : "SAS"} seluruh mata pelajaran (${itemsToSave.length} mapel) untuk ${siswa.nama} Semester ${bulkActiveSemester} berhasil disimpan.`,
     });
+  };
+
+  // Dispatcher Simpan Utama
+  const handleSaveBulk = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (bulkInputMode === "per-kelas") {
+      handleSaveBulkClass();
+    } else {
+      handleSaveBulkStudent();
+    }
   };
 
   // Delete Handlers
@@ -597,9 +869,9 @@ export default function NilaiManagementPage() {
       records.forEach((r, i) => {
         const score = isMid ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
         const pred = isMid ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
-        const note = isMid ? getStudentMid(r).catatanMid : getStudentAkhir(r).catatan;
+        const note = isMid ? "" : getStudentAkhir(r).catatan;
         msg += `${i + 1}. *${r.mapel}*: ${score} (${pred})\n`;
-        if (note && note !== "-") {
+        if (!isMid && note && note !== "-") {
           msg += `   _Catatan:_ "${note}"\n`;
         }
       });
@@ -668,15 +940,15 @@ export default function NilaiManagementPage() {
     Number(formData.uas) || 0
   );
 
-  // Selected student obj in bulk modal
+  // Selected student obj in bulk modal (Mode Per-Siswa)
   const selectedBulkStudent = siswaList.find((s) => s.id === bulkSiswaId);
 
-  // Bulk modal stats
+  // Bulk modal stats (Mode Per-Siswa)
   const bulkAvgMid =
     bulkRows.length > 0
       ? Math.round(
           bulkRows.reduce(
-            (acc, r) => acc + calculateMidGrade(Number(r.uts)).nilaiMid,
+            (acc, r) => acc + calculateMidGrade(Number(r.uts) || 0).nilaiMid,
             0
           ) / bulkRows.length
         )
@@ -688,11 +960,43 @@ export default function NilaiManagementPage() {
           bulkRows.reduce(
             (acc, r) =>
               acc +
-              calculateSemesterGrade(Number(r.tugas), Number(r.uts), Number(r.uas)).nilaiAkhir,
+              calculateSemesterGrade(Number(r.tugas) || 0, Number(r.uts) || 0, Number(r.uas) || 0).nilaiAkhir,
             0
           ) / bulkRows.length
         )
       : 0;
+
+  const bulkStudentTuntasCount = bulkRows.filter(
+    (r) => (Number(r.uts) || 0) >= (r.kkm || 75)
+  ).length;
+
+  // Bulk modal stats (Mode Per-Kelas)
+  const bulkClassAvgMid =
+    bulkClassRows.length > 0
+      ? Math.round(
+          bulkClassRows.reduce(
+            (acc, r) => acc + calculateMidGrade(Number(r.uts) || 0).nilaiMid,
+            0
+          ) / bulkClassRows.length
+        )
+      : 0;
+
+  const bulkClassAvgAkhir =
+    bulkClassRows.length > 0
+      ? Math.round(
+          bulkClassRows.reduce(
+            (acc, r) =>
+              acc +
+              calculateSemesterGrade(Number(r.tugas) || 0, Number(r.uts) || 0, Number(r.uas) || 0).nilaiAkhir,
+            0
+          ) / bulkClassRows.length
+        )
+      : 0;
+
+  const bulkClassTuntasCount = bulkClassRows.filter(
+    (r) => (Number(r.uts) || 0) >= (r.kkm || 75)
+  ).length;
+  const bulkClassRemedialCount = bulkClassRows.length - bulkClassTuntasCount;
 
   return (
     <div className="space-y-6">
@@ -765,15 +1069,25 @@ export default function NilaiManagementPage() {
 
           {canEdit && (
             <>
-              {/* Tombol Input Bulk Nilai (Seluruh Mapel) */}
+              {/* Tombol Input Bulk Nilai */}
               <button
                 onClick={() => handleOpenBulkAdd()}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-2"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Zap className="h-4 w-4 fill-white" />
-                <span>Input Bulk Nilai</span>
+                <span>
+                  {activeRaporTab === "sts-ganjil"
+                    ? "Input Bulk STS Ganjil"
+                    : activeRaporTab === "sas-ganjil"
+                    ? "Input Bulk SAS Ganjil"
+                    : activeRaporTab === "sts-genap"
+                    ? "Input Bulk STS Genap"
+                    : activeRaporTab === "sas-genap"
+                    ? "Input Bulk SAS Genap"
+                    : "Input Bulk Nilai"}
+                </span>
                 <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-md font-semibold">
-                  Semua Mapel
+                  {isTengah ? "100% Ujian STS" : "UH + STS + SAS"}
                 </span>
               </button>
 
@@ -1094,7 +1408,7 @@ export default function NilaiManagementPage() {
                     Nilai Ujian STS
                   </th>
                   <th className="px-3 py-3.5 text-center">Predikat</th>
-                  <th className="px-4 py-3.5">Catatan Perkembangan</th>
+                  <th className="px-4 py-3.5 text-center">Status Ketuntasan</th>
                   <th className="px-5 py-3.5 text-right">Aksi</th>
                 </tr>
               ) : activeRaporTab !== "semua" ? (
@@ -1145,6 +1459,8 @@ export default function NilaiManagementPage() {
                   const siswaObj = siswaList.find((s) => s.id === n.siswaId);
                   const mid = getStudentMid(n);
                   const akhir = getStudentAkhir(n);
+                  const mapelObj = mapelList.find((m) => m.nama.toLowerCase() === n.mapel.toLowerCase());
+                  const kkm = mapelObj?.kkm || 75;
 
                   if (isTengah) {
                     return (
@@ -1177,16 +1493,24 @@ export default function NilaiManagementPage() {
                             {mid.predikatMid}
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-[11px] text-slate-500 dark:text-slate-400 max-w-xs truncate">
-                          {mid.catatanMid}
+                        <td className="px-4 py-3.5 text-center">
+                          {mid.nilaiMid >= kkm ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                              Tuntas (KKM {kkm})
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                              Remedial (KKM {kkm})
+                            </span>
+                          )}
                         </td>
                         <td className="px-5 py-3.5 text-right space-x-1.5">
                           {canEdit && (
                             <>
                               <button
-                                onClick={() => handleOpenBulkAdd(n.siswaId, activeSemester)}
+                                onClick={() => handleOpenBulkAdd(n.siswaId, "per-siswa")}
                                 title="Input / Edit Seluruh Mapel Siswa Ini"
-                                className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1"
+                                className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <Zap className="h-3 w-3 fill-amber-500" />
                                 <span>Bulk Mapel</span>
@@ -1297,7 +1621,7 @@ export default function NilaiManagementPage() {
                           {canEdit && (
                             <>
                               <button
-                                onClick={() => handleOpenBulkAdd(n.siswaId, activeSemester)}
+                                onClick={() => handleOpenBulkAdd(n.siswaId, "per-siswa")}
                                 title="Input / Edit Seluruh Mapel Siswa Ini"
                                 className="px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
@@ -1400,7 +1724,7 @@ export default function NilaiManagementPage() {
                         {canEdit && (
                           <>
                             <button
-                              onClick={() => handleOpenBulkAdd(n.siswaId, n.semester || "Ganjil")}
+                              onClick={() => handleOpenBulkAdd(n.siswaId, "per-siswa")}
                               title="Input / Edit Seluruh Mapel Siswa Ini"
                               className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                             >
@@ -1480,409 +1804,1023 @@ export default function NilaiManagementPage() {
       {/* ========================================================= */}
       {/* MODAL 1: INPUT BULK NILAI SISWA (SELURUH MAPEL SEKALIGUS) */}
       {/* ========================================================= */}
+      {/* ========================================================================= */}
+      {/* MODAL 1: INPUT BULK NILAI SISWA (DUAL-MODE: PER-KELAS & PER-SISWA)         */}
+      {/* ========================================================================= */}
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 relative my-6">
+          <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 relative my-6 max-h-[92vh] flex flex-col">
             <button
               onClick={() => setIsBulkModalOpen(false)}
-              className="absolute top-5 right-5 p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="absolute top-5 right-5 p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
 
             {/* Modal Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-4 shrink-0">
               <div>
                 <div className="flex items-center gap-2 text-amber-500 mb-1">
                   <Zap className="h-5 w-5 fill-amber-500" />
                   <span className="text-xs font-bold uppercase tracking-wider">
-                    Input Nilai Cepat (Bulk Mode)
+                    Input Nilai Massal &bull; Multi-Penilaian &amp; Dual-Mode
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Input Nilai Seluruh Mata Pelajaran (1 Siswa)
+                  Input Bulk Nilai &mdash; {bulkInputMode === "per-kelas" ? `Per Rombel (${bulkSelectedKelas || "Pilih Kelas"})` : `Per Siswa (${selectedBulkStudent?.nama || "Pilih Siswa"})`}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Masukkan nilai Ulangan Harian, Ujian Mid (STS), dan Ujian Akhir (PAS) untuk semua mata pelajaran sekaligus.
+                  {bulkIsTengah
+                    ? "Mode Sumatif Tengah Semester (STS): Hanya menginput Nilai Ujian STS (100%) tanpa catatan perkembangan."
+                    : "Mode Sumatif Akhir Semester (SAS): Menginput Harian (UH 30%), STS (30%), SAS (40%), dan Catatan Capaian Belajar."}
                 </p>
               </div>
 
-              {/* Mode Switcher Button */}
+              {/* Mode Switcher Button to Satuan */}
               <button
                 type="button"
                 onClick={() => {
                   setIsBulkModalOpen(false);
                   handleOpenAdd();
                 }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 self-start sm:self-center"
+                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 self-start sm:self-center cursor-pointer"
               >
-                Ganti ke Input Per Mapel &rarr;
+                Ganti ke Input Satuan &rarr;
               </button>
             </div>
 
-            <form onSubmit={handleSaveBulk} className="space-y-4 text-xs">
-              {/* Step 1: Pilih Siswa & Semester */}
-              <div className="p-4 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
-                    <UserCheck className="h-4 w-4 text-amber-600" />
-                    <span>Pilih Peserta Didik Target *</span>
-                  </label>
-                  <select
-                    required
-                    value={bulkSiswaId}
-                    onChange={(e) => handleBulkSiswaChange(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
-                  >
-                    {baseSiswaList.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nama} &bull; Kelas {s.kelas} &bull; NISN: {s.nisn}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <form onSubmit={handleSaveBulk} className="flex flex-col flex-1 min-h-0 space-y-4 text-xs overflow-hidden">
+              {/* Bagian Kontrol Atas: 4 Tab Penilaian & Mode Pengisian */}
+              <div className="space-y-3 shrink-0">
+                {/* 1. Baris 4 Jenis Penilaian */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Jenis Penilaian:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      {/* STS Ganjil */}
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchBulkAssessment("sts-ganjil")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          bulkAssessmentTab === "sts-ganjil"
+                            ? "bg-amber-500 text-white shadow-sm"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>STS Ganjil</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
+                          bulkAssessmentTab === "sts-ganjil" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        }`}>
+                          100% STS
+                        </span>
+                      </button>
 
-                <div className="w-full md:w-1/4">
-                  <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-amber-600" />
-                    <span>Semester Target *</span>
-                  </label>
-                  <select
-                    value={bulkSemester}
-                    onChange={(e) => handleBulkSemesterChange(e.target.value as "Ganjil" | "Genap")}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
-                  >
-                    <option value="Ganjil">Semester Ganjil</option>
-                    <option value="Genap">Semester Genap</option>
-                  </select>
-                </div>
+                      {/* SAS Ganjil */}
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchBulkAssessment("sas-ganjil")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          bulkAssessmentTab === "sas-ganjil"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        <GraduationCap className="h-3.5 w-3.5" />
+                        <span>SAS Ganjil</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
+                          bulkAssessmentTab === "sas-ganjil" ? "bg-white/20 text-white" : "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                        }`}>
+                          30:30:40
+                        </span>
+                      </button>
 
-                {selectedBulkStudent && (
-                  <div className="flex flex-wrap items-center gap-3 md:ml-auto">
-                    <div className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
-                      <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center font-bold text-sm shadow">
-                        {selectedBulkStudent.nama.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900 dark:text-white">{selectedBulkStudent.nama}</p>
-                        <p className="text-[11px] text-slate-500">
-                          Kelas <strong>{selectedBulkStudent.kelas}</strong> &bull; NISN: <span className="font-mono">{selectedBulkStudent.nisn}</span>
-                        </p>
-                      </div>
+                      {/* STS Genap */}
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchBulkAssessment("sts-genap")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          bulkAssessmentTab === "sts-genap"
+                            ? "bg-amber-600 text-white shadow-sm"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>STS Genap</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
+                          bulkAssessmentTab === "sts-genap" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        }`}>
+                          100% STS
+                        </span>
+                      </button>
+
+                      {/* SAS Genap */}
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchBulkAssessment("sas-genap")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          bulkAssessmentTab === "sas-genap"
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700"
+                        }`}
+                      >
+                        <GraduationCap className="h-3.5 w-3.5" />
+                        <span>SAS Genap</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
+                          bulkAssessmentTab === "sas-genap" ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                        }`}>
+                          30:30:40
+                        </span>
+                      </button>
                     </div>
-                    {nilaiList.filter((n) => n.siswaId === selectedBulkStudent.id).length > 0 && canEdit && (
+                  </div>
+
+                  {/* 2. Switcher Mode Pengisian (Per-Kelas vs Per-Siswa) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Alur Pengisian:
+                    </span>
+                    <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                       <button
                         type="button"
                         onClick={() => {
-                          const count = nilaiList.filter((n) => n.siswaId === selectedBulkStudent.id).length;
-                          setDeletingAllSiswa({
-                            id: selectedBulkStudent.id,
-                            nama: selectedBulkStudent.nama,
-                            kelas: selectedBulkStudent.kelas,
-                            count,
-                          });
+                          setBulkInputMode("per-kelas");
+                          initBulkClassRows(bulkSelectedKelas, bulkSelectedMapel, bulkAssessmentTab);
                         }}
-                        className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900 flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-                        title="Hapus seluruh rekaman nilai tersimpan untuk siswa ini"
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          bulkInputMode === "per-kelas"
+                            ? "bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        }`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span>Hapus Nilai Siswa Ini</span>
+                        <Users className="h-3.5 w-3.5" />
+                        <span>Mode Per-Kelas (Rombel)</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          Guru Mapel
+                        </span>
                       </button>
-                    )}
-                    {canEdit && (
+
                       <button
                         type="button"
-                        onClick={() => setDeletingSiswaTarget(selectedBulkStudent)}
-                        className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-700 dark:text-rose-300 bg-rose-100/60 dark:bg-rose-950/60 hover:bg-rose-200/70 border border-rose-300 dark:border-rose-800 flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-                        title="Hapus data siswa ini beserta seluruh nilainya dari sistem"
+                        onClick={() => {
+                          setBulkInputMode("per-siswa");
+                          initBulkRowsForStudent(bulkSiswaId, bulkActiveSemester);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          bulkInputMode === "per-siswa"
+                            ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        }`}
                       >
-                        <UserX className="h-3.5 w-3.5" />
-                        <span>Hapus Siswa</span>
+                        <UserCheck className="h-3.5 w-3.5" />
+                        <span>Mode Per-Siswa (Semua Mapel)</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                          Wali Kelas
+                        </span>
                       </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Selector Target Berdasarkan Mode */}
+                {bulkInputMode === "per-kelas" ? (
+                  /* Target: Pilih Kelas & Mata Pelajaran */
+                  <div className="p-3.5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="w-full sm:w-1/3">
+                      <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                        <Users className="h-4 w-4 text-amber-600" />
+                        <span>Pilih Rombel / Kelas *</span>
+                      </label>
+                      <select
+                        required
+                        value={bulkSelectedKelas}
+                        onChange={(e) => handleBulkClassChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                      >
+                        {Array.from(new Set(baseSiswaList.map((s) => s.kelas)))
+                          .filter(Boolean)
+                          .map((k) => (
+                            <option key={k} value={k}>
+                              Kelas {k} ({baseSiswaList.filter((s) => s.kelas === k).length} siswa)
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="w-full sm:w-1/3">
+                      <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                        <BookOpen className="h-4 w-4 text-amber-600" />
+                        <span>Pilih Mata Pelajaran *</span>
+                      </label>
+                      <select
+                        required
+                        value={bulkSelectedMapel}
+                        onChange={(e) => handleBulkMapelChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                      >
+                        {(teacherScope.isTeacher && teacherScope.assignedSubjects.length > 0
+                          ? mapelList.filter((m) =>
+                              teacherScope.assignedSubjects.some(
+                                (as) => as.toLowerCase() === m.nama.toLowerCase()
+                              )
+                            )
+                          : mapelList
+                        ).map((m) => (
+                          <option key={m.id} value={m.nama}>
+                            {m.nama} (KKM: {m.kkm})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:ml-auto flex items-center gap-3">
+                      <div className="bg-white dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs shadow-sm">
+                        <span className="text-slate-400 block text-[10px]">KKM Mapel:</span>
+                        <span className="font-extrabold text-amber-600 dark:text-amber-400 font-mono text-sm">
+                          {mapelList.find((m) => m.nama.toLowerCase() === bulkSelectedMapel.toLowerCase())?.kkm || 75}
+                        </span>
+                      </div>
+                      <div className="bg-white dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs shadow-sm">
+                        <span className="text-slate-400 block text-[10px]">Siswa di Kelas:</span>
+                        <span className="font-extrabold text-slate-800 dark:text-slate-100 font-mono text-sm">
+                          {bulkClassRows.length} Siswa
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Target: Pilih Siswa (Mode Per-Siswa) */
+                  <div className="p-3.5 rounded-2xl bg-blue-500/5 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-800/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="w-full md:w-1/2">
+                      <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                        <UserCheck className="h-4 w-4 text-blue-600" />
+                        <span>Pilih Peserta Didik Target *</span>
+                      </label>
+                      <select
+                        required
+                        value={bulkSiswaId}
+                        onChange={(e) => handleBulkSiswaChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                      >
+                        {baseSiswaList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.nama} &bull; Kelas {s.kelas} &bull; NISN: {s.nisn}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {selectedBulkStudent && (
+                      <div className="flex flex-wrap items-center gap-3 md:ml-auto">
+                        <div className="flex items-center gap-2.5 bg-white dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
+                          <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow">
+                            {selectedBulkStudent.nama.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 dark:text-white leading-tight">
+                              {selectedBulkStudent.nama}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              Kelas <strong>{selectedBulkStudent.kelas}</strong> &bull; NISN:{" "}
+                              <span className="font-mono">{selectedBulkStudent.nisn}</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
+
+                {/* 4. Quick-Fill Toolbar Adaptif */}
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span className="font-bold text-slate-700 dark:text-slate-200 text-xs">
+                      {bulkIsTengah
+                        ? "Opsi Cepat Nilai STS (Terapkan Massal):"
+                        : "Opsi Cepat Nilai SAS (Terapkan Massal):"}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {bulkIsTengah ? (
+                      /* Quick-Fill STS: Hanya 1 Nilai STS */
+                      <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">
+                          Nilai STS:
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={quickFillSts}
+                          onChange={(e) => setQuickFillSts(Number(e.target.value))}
+                          className="w-14 text-center font-mono font-extrabold bg-transparent outline-none text-slate-900 dark:text-white text-sm"
+                        />
+                      </div>
+                    ) : (
+                      /* Quick-Fill SAS: UH, STS, UAS */
+                      <>
+                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <span className="text-[11px] text-slate-400 font-medium">UH:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={quickFillValues.tugas}
+                            onChange={(e) =>
+                              setQuickFillValues({
+                                ...quickFillValues,
+                                tugas: Number(e.target.value),
+                              })
+                            }
+                            className="w-11 text-center font-mono font-bold bg-transparent outline-none text-slate-900 dark:text-white"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <span className="text-[11px] text-slate-400 font-medium">STS:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={quickFillValues.uts}
+                            onChange={(e) =>
+                              setQuickFillValues({
+                                ...quickFillValues,
+                                uts: Number(e.target.value),
+                              })
+                            }
+                            className="w-11 text-center font-mono font-bold bg-transparent outline-none text-slate-900 dark:text-white"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <span className="text-[11px] text-slate-400 font-medium">SAS:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={quickFillValues.uas}
+                            onChange={(e) =>
+                              setQuickFillValues({
+                                ...quickFillValues,
+                                uas: Number(e.target.value),
+                              })
+                            }
+                            className="w-11 text-center font-mono font-bold bg-transparent outline-none text-slate-900 dark:text-white"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={
+                        bulkInputMode === "per-kelas"
+                          ? handleApplyQuickFillClass
+                          : handleApplyQuickFillStudent
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Zap className="h-3.5 w-3.5 fill-white" />
+                      <span>Terapkan ke Semua {bulkInputMode === "per-kelas" ? "Siswa" : "Mapel"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (bulkInputMode === "per-kelas") {
+                          initBulkClassRows(bulkSelectedKelas, bulkSelectedMapel, bulkAssessmentTab);
+                        } else {
+                          initBulkRowsForStudent(bulkSiswaId, bulkActiveSemester);
+                        }
+                      }}
+                      title="Muat Ulang Nilai Tersimpan"
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* Step 2: Fitur Isi Cepat Massal (Quick-Fill Toolbar) */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  <span className="font-bold text-slate-700 dark:text-slate-200">
-                    Opsi Nilai Cepat (Terapkan ke Semua Mapel):
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <span className="text-[11px] text-slate-400 font-medium">UH:</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={quickFillValues.tugas}
-                      onChange={(e) =>
-                        setQuickFillValues({ ...quickFillValues, tugas: Number(e.target.value) })
-                      }
-                      className="w-12 text-center font-mono font-bold bg-transparent outline-none text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <span className="text-[11px] text-slate-400 font-medium">Mid:</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={quickFillValues.uts}
-                      onChange={(e) =>
-                        setQuickFillValues({ ...quickFillValues, uts: Number(e.target.value) })
-                      }
-                      className="w-12 text-center font-mono font-bold bg-transparent outline-none text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <span className="text-[11px] text-slate-400 font-medium">UAS:</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={quickFillValues.uas}
-                      onChange={(e) =>
-                        setQuickFillValues({ ...quickFillValues, uas: Number(e.target.value) })
-                      }
-                      className="w-12 text-center font-mono font-bold bg-transparent outline-none text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleApplyQuickFill}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <Zap className="h-3.5 w-3.5 fill-white" />
-                    <span>Terapkan ke Semua</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => initBulkRowsForStudent(bulkSiswaId)}
-                    title="Muat Ulang Nilai Tersimpan"
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-200 text-slate-500"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Step 3: Tabel Seluruh Mata Pelajaran */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm max-h-[380px] overflow-y-auto">
+              {/* Tabel Input Massal */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex-1 min-h-[220px] overflow-y-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10">
-                    <tr>
-                      <th className="px-3 py-2.5 text-center w-8">No</th>
-                      <th className="px-4 py-2.5">Mata Pelajaran & KKM</th>
-                      <th className="px-2 py-2.5 text-center w-24">UH (Harian)</th>
-                      <th className="px-2 py-2.5 text-center w-24">Mid (STS)</th>
-                      <th className="px-2 py-2.5 text-center w-24 bg-amber-500/10">Rapor STS</th>
-                      <th className="px-2 py-2.5 text-center w-24">UAS (Akhir)</th>
-                      <th className="px-2 py-2.5 text-center w-24 bg-blue-500/10">Rapor PAS</th>
-                      <th className="px-3 py-2.5">Catatan Capaian Belajar</th>
-                      <th className="px-2 py-2.5 text-center w-12">Aksi</th>
-                    </tr>
+                    {bulkInputMode === "per-kelas" ? (
+                      /* Header Tabel Mode Per-Kelas */
+                      bulkIsTengah ? (
+                        /* Mode Per-Kelas & STS: No, NISN, Siswa, Nilai STS, Predikat, Ketuntasan, Aksi */
+                        <tr>
+                          <th className="px-3 py-2.5 text-center w-10">No</th>
+                          <th className="px-3 py-2.5 w-28">NISN</th>
+                          <th className="px-4 py-2.5">Nama Peserta Didik</th>
+                          <th className="px-3 py-2.5 text-center w-32 bg-amber-500/10">
+                            Nilai Ujian STS (0-100)
+                          </th>
+                          <th className="px-3 py-2.5 text-center w-24">Predikat STS</th>
+                          <th className="px-4 py-2.5 text-center w-36">Status Ketuntasan</th>
+                          <th className="px-3 py-2.5 text-center w-14">Aksi</th>
+                        </tr>
+                      ) : (
+                        /* Mode Per-Kelas & SAS: No, NISN, Siswa, UH, STS, SAS, Akhir, Predikat, Catatan, Aksi */
+                        <tr>
+                          <th className="px-3 py-2.5 text-center w-8">No</th>
+                          <th className="px-3 py-2.5 w-24">NISN</th>
+                          <th className="px-4 py-2.5">Nama Peserta Didik</th>
+                          <th className="px-2 py-2.5 text-center w-20">UH (30%)</th>
+                          <th className="px-2 py-2.5 text-center w-20">STS (30%)</th>
+                          <th className="px-2 py-2.5 text-center w-20">SAS (40%)</th>
+                          <th className="px-2 py-2.5 text-center w-24 bg-blue-500/10">Nilai Akhir</th>
+                          <th className="px-2 py-2.5 text-center w-16">Predikat</th>
+                          <th className="px-3 py-2.5">Catatan Capaian Belajar</th>
+                          <th className="px-2 py-2.5 text-center w-12">Aksi</th>
+                        </tr>
+                      )
+                    ) : (
+                      /* Header Tabel Mode Per-Siswa */
+                      bulkIsTengah ? (
+                        /* Mode Per-Siswa & STS: No, Mapel & KKM, Nilai STS, Predikat, Ketuntasan, Aksi */
+                        <tr>
+                          <th className="px-3 py-2.5 text-center w-10">No</th>
+                          <th className="px-4 py-2.5">Mata Pelajaran &amp; KKM</th>
+                          <th className="px-3 py-2.5 text-center w-36 bg-amber-500/10">
+                            Nilai Ujian STS (0-100)
+                          </th>
+                          <th className="px-3 py-2.5 text-center w-24">Predikat STS</th>
+                          <th className="px-4 py-2.5 text-center w-36">Status Ketuntasan</th>
+                          <th className="px-3 py-2.5 text-center w-14">Aksi</th>
+                        </tr>
+                      ) : (
+                        /* Mode Per-Siswa & SAS: No, Mapel & KKM, UH, STS, SAS, Akhir, Predikat, Catatan, Aksi */
+                        <tr>
+                          <th className="px-3 py-2.5 text-center w-8">No</th>
+                          <th className="px-4 py-2.5">Mata Pelajaran &amp; KKM</th>
+                          <th className="px-2 py-2.5 text-center w-20">UH (30%)</th>
+                          <th className="px-2 py-2.5 text-center w-20">STS (30%)</th>
+                          <th className="px-2 py-2.5 text-center w-20">SAS (40%)</th>
+                          <th className="px-2 py-2.5 text-center w-24 bg-blue-500/10">Nilai Akhir</th>
+                          <th className="px-2 py-2.5 text-center w-16">Predikat</th>
+                          <th className="px-3 py-2.5">Catatan Capaian Belajar</th>
+                          <th className="px-2 py-2.5 text-center w-12">Aksi</th>
+                        </tr>
+                      )
+                    )}
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                    {bulkRows.map((row, idx) => {
-                      const rowMid = calculateMidGrade(Number(row.tugas) || 0, Number(row.uts) || 0);
-                      const rowAkhir = calculateSemesterGrade(
-                        Number(row.tugas) || 0,
-                        Number(row.uts) || 0,
-                        Number(row.uas) || 0
-                      );
-
-                      return (
-                        <tr key={row.mapel} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                          <td className="px-3 py-2 text-center text-slate-400 font-mono">{idx + 1}</td>
-                          <td className="px-4 py-2">
-                            <span className="font-bold text-slate-900 dark:text-white block">
-                              {row.mapel}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              KKM: {row.kkm} {row.existingId ? "• Sudah ada nilai" : "• Belum diinput"}
-                            </span>
-                          </td>
-
-                          {/* Ulangan Harian Input */}
-                          <td className="px-2 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              required
-                              value={row.tugas}
-                              onChange={(e) =>
-                                handleBulkRowChange(idx, "tugas", Number(e.target.value))
-                              }
-                              className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
-                            />
-                          </td>
-
-                          {/* Ujian Mid Input */}
-                          <td className="px-2 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              required
-                              value={row.uts}
-                              onChange={(e) =>
-                                handleBulkRowChange(idx, "uts", Number(e.target.value))
-                              }
-                              className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
-                            />
-                          </td>
-
-                          {/* Live PTS Preview */}
-                          <td className="px-2 py-2 text-center bg-amber-500/5 dark:bg-amber-500/10 font-mono">
-                            <span className="font-extrabold text-amber-600 dark:text-amber-400">
-                              {rowMid.nilaiMid}
-                            </span>
-                            <span
-                              className={`ml-1 px-1.5 py-0.2 text-[9px] font-bold rounded ${
-                                rowMid.predikatMid === "A"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : rowMid.predikatMid === "B"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}
-                            >
-                              {rowMid.predikatMid}
-                            </span>
-                          </td>
-
-                          {/* Ujian UAS Input */}
-                          <td className="px-2 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              required
-                              value={row.uas}
-                              onChange={(e) =>
-                                handleBulkRowChange(idx, "uas", Number(e.target.value))
-                              }
-                              className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
-                            />
-                          </td>
-
-                          {/* Live PAS Preview */}
-                          <td className="px-2 py-2 text-center bg-blue-500/5 dark:bg-blue-500/10 font-mono">
-                            <span className="font-extrabold text-blue-600 dark:text-blue-400">
-                              {rowAkhir.nilaiAkhir}
-                            </span>
-                            <span
-                              className={`ml-1 px-1.5 py-0.2 text-[9px] font-bold rounded ${
-                                rowAkhir.predikat === "A"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : rowAkhir.predikat === "B"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}
-                            >
-                              {rowAkhir.predikat}
-                            </span>
-                          </td>
-
-                          {/* Catatan */}
-                          <td className="px-3 py-2">
-                            <input
-                              type="text"
-                              value={row.catatan}
-                              onChange={(e) =>
-                                handleBulkRowChange(idx, "catatan", e.target.value)
-                              }
-                              placeholder="Catatan capaian siswa..."
-                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-amber-500"
-                            />
-                          </td>
-
-                          {/* Aksi Hapus Baris */}
-                          <td className="px-2 py-2 text-center">
-                            {row.existingId && canEdit ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const item = nilaiList.find((n) => n.id === row.existingId);
-                                  if (item) {
-                                    setDeletingNilai(item);
-                                  }
-                                }}
-                                title="Hapus rekaman nilai mapel ini"
-                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            ) : (
-                              <span className="text-slate-300 dark:text-slate-700 text-xs">-</span>
-                            )}
+                    {bulkInputMode === "per-kelas" ? (
+                      /* ========================================= */
+                      /* BARIS DATA: MODE PER-KELAS                */
+                      /* ========================================= */
+                      bulkClassRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={bulkIsTengah ? 7 : 10} className="px-4 py-8 text-center text-slate-400">
+                            Tidak ada peserta didik di kelas ini.
                           </td>
                         </tr>
-                      );
-                    })}
+                      ) : (
+                        bulkClassRows.map((row, idx) => {
+                          const rowMid = calculateMidGrade(Number(row.uts) || 0);
+                          const rowAkhir = calculateSemesterGrade(
+                            Number(row.tugas) || 0,
+                            Number(row.uts) || 0,
+                            Number(row.uas) || 0
+                          );
+                          const isTuntas = (Number(row.uts) || 0) >= row.kkm;
+
+                          if (bulkIsTengah) {
+                            /* Baris STS Mode Per-Kelas */
+                            return (
+                              <tr key={row.siswaId} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                                <td className="px-3 py-2 text-center text-slate-400 font-mono">{idx + 1}</td>
+                                <td className="px-3 py-2 font-mono text-[11px] text-slate-500">{row.nisn}</td>
+                                <td className="px-4 py-2">
+                                  <span className="font-bold text-slate-900 dark:text-white block">
+                                    {row.siswaNama}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {row.existingId ? "• Nilai tersimpan di database" : "• Belum tersimpan"}
+                                  </span>
+                                </td>
+
+                                {/* Nilai Ujian STS Input */}
+                                <td className="px-3 py-2 text-center bg-amber-500/5 dark:bg-amber-500/10">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    required
+                                    value={row.uts}
+                                    onChange={(e) =>
+                                      handleBulkClassRowChange(idx, "uts", Number(e.target.value))
+                                    }
+                                    className="w-20 px-2 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 font-mono text-center font-extrabold text-amber-700 dark:text-amber-300 text-sm focus:ring-2 focus:ring-amber-500 outline-none shadow-sm"
+                                  />
+                                </td>
+
+                                {/* Predikat STS Live */}
+                                <td className="px-3 py-2 text-center">
+                                  <span
+                                    className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
+                                      rowMid.predikatMid === "A"
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                                        : rowMid.predikatMid === "B"
+                                        ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
+                                    }`}
+                                  >
+                                    Predikat {rowMid.predikatMid}
+                                  </span>
+                                </td>
+
+                                {/* Ketuntasan KKM Live */}
+                                <td className="px-4 py-2 text-center">
+                                  {isTuntas ? (
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                      Tuntas (KKM {row.kkm})
+                                    </span>
+                                  ) : (
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                      Remedial (KKM {row.kkm})
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Aksi Hapus Nilai Tersimpan */}
+                                <td className="px-3 py-2 text-center">
+                                  {row.existingId && canEdit ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const item = nilaiList.find((n) => n.id === row.existingId);
+                                        if (item) setDeletingNilai(item);
+                                      }}
+                                      title="Hapus rekaman nilai siswa ini"
+                                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-700">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          /* Baris SAS Mode Per-Kelas */
+                          return (
+                            <tr key={row.siswaId} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                              <td className="px-3 py-2 text-center text-slate-400 font-mono">{idx + 1}</td>
+                              <td className="px-3 py-2 font-mono text-[11px] text-slate-500">{row.nisn}</td>
+                              <td className="px-4 py-2">
+                                <span className="font-bold text-slate-900 dark:text-white block">
+                                  {row.siswaNama}
+                                </span>
+                              </td>
+
+                              {/* UH Input */}
+                              <td className="px-2 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  required
+                                  value={row.tugas}
+                                  onChange={(e) =>
+                                    handleBulkClassRowChange(idx, "tugas", Number(e.target.value))
+                                  }
+                                  className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </td>
+
+                              {/* STS Input */}
+                              <td className="px-2 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  required
+                                  value={row.uts}
+                                  onChange={(e) =>
+                                    handleBulkClassRowChange(idx, "uts", Number(e.target.value))
+                                  }
+                                  className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </td>
+
+                              {/* SAS Input */}
+                              <td className="px-2 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  required
+                                  value={row.uas}
+                                  onChange={(e) =>
+                                    handleBulkClassRowChange(idx, "uas", Number(e.target.value))
+                                  }
+                                  className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </td>
+
+                              {/* Live Nilai Akhir */}
+                              <td className="px-2 py-2 text-center bg-blue-500/5 dark:bg-blue-500/10 font-mono font-extrabold text-blue-600 dark:text-blue-400">
+                                {rowAkhir.nilaiAkhir}
+                              </td>
+
+                              {/* Live Predikat */}
+                              <td className="px-2 py-2 text-center">
+                                <span
+                                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                                    rowAkhir.predikat === "A"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : rowAkhir.predikat === "B"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-amber-100 text-amber-800"
+                                  }`}
+                                >
+                                  {rowAkhir.predikat}
+                                </span>
+                              </td>
+
+                              {/* Catatan Capaian Belajar */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.catatan}
+                                  onChange={(e) =>
+                                    handleBulkClassRowChange(idx, "catatan", e.target.value)
+                                  }
+                                  placeholder="Catatan capaian siswa..."
+                                  className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-blue-500"
+                                />
+                              </td>
+
+                              <td className="px-2 py-2 text-center">
+                                {row.existingId && canEdit ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const item = nilaiList.find((n) => n.id === row.existingId);
+                                      if (item) setDeletingNilai(item);
+                                    }}
+                                    title="Hapus rekaman nilai ini"
+                                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-700">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )
+                    ) : (
+                      /* ========================================= */
+                      /* BARIS DATA: MODE PER-SISWA                */
+                      /* ========================================= */
+                      bulkRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={bulkIsTengah ? 6 : 10} className="px-4 py-8 text-center text-slate-400">
+                            Tidak ada mata pelajaran yang dipilih.
+                          </td>
+                        </tr>
+                      ) : (
+                        bulkRows.map((row, idx) => {
+                          const rowMid = calculateMidGrade(Number(row.uts) || 0);
+                          const rowAkhir = calculateSemesterGrade(
+                            Number(row.tugas) || 0,
+                            Number(row.uts) || 0,
+                            Number(row.uas) || 0
+                          );
+                          const isTuntas = (Number(row.uts) || 0) >= row.kkm;
+
+                          if (bulkIsTengah) {
+                            /* Baris STS Mode Per-Siswa */
+                            return (
+                              <tr key={row.mapel} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                                <td className="px-3 py-2 text-center text-slate-400 font-mono">{idx + 1}</td>
+                                <td className="px-4 py-2">
+                                  <span className="font-bold text-slate-900 dark:text-white block">
+                                    {row.mapel}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-medium">
+                                    KKM: {row.kkm} {row.existingId ? "• Sudah ada nilai" : "• Belum diinput"}
+                                  </span>
+                                </td>
+
+                                {/* Nilai Ujian STS Input */}
+                                <td className="px-3 py-2 text-center bg-amber-500/5 dark:bg-amber-500/10">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    required
+                                    value={row.uts}
+                                    onChange={(e) =>
+                                      handleBulkRowChange(idx, "uts", Number(e.target.value))
+                                    }
+                                    className="w-20 px-2 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 font-mono text-center font-extrabold text-amber-700 dark:text-amber-300 text-sm focus:ring-2 focus:ring-amber-500 outline-none shadow-sm"
+                                  />
+                                </td>
+
+                                {/* Live Predikat */}
+                                <td className="px-3 py-2 text-center">
+                                  <span
+                                    className={`px-2.5 py-1 text-xs font-bold rounded-lg ${
+                                      rowMid.predikatMid === "A"
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                                        : rowMid.predikatMid === "B"
+                                        ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
+                                    }`}
+                                  >
+                                    Predikat {rowMid.predikatMid}
+                                  </span>
+                                </td>
+
+                                {/* Live Ketuntasan KKM */}
+                                <td className="px-4 py-2 text-center">
+                                  {isTuntas ? (
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                      Tuntas (KKM {row.kkm})
+                                    </span>
+                                  ) : (
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                      Remedial (KKM {row.kkm})
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Aksi Hapus Baris */}
+                                <td className="px-3 py-2 text-center">
+                                  {row.existingId && canEdit ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const item = nilaiList.find((n) => n.id === row.existingId);
+                                        if (item) setDeletingNilai(item);
+                                      }}
+                                      title="Hapus rekaman nilai mapel ini"
+                                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-700">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          /* Baris SAS Mode Per-Siswa */
+                          return (
+                            <tr key={row.mapel} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                              <td className="px-3 py-2 text-center text-slate-400 font-mono">{idx + 1}</td>
+                              <td className="px-4 py-2">
+                                <span className="font-bold text-slate-900 dark:text-white block">
+                                  {row.mapel}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  KKM: {row.kkm} {row.existingId ? "• Sudah ada nilai" : "• Belum diinput"}
+                                </span>
+                              </td>
+
+                              {/* UH */}
+                              <td className="px-2 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  required
+                                  value={row.tugas}
+                                  onChange={(e) =>
+                                    handleBulkRowChange(idx, "tugas", Number(e.target.value))
+                                  }
+                                  className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                              </td>
+
+                              {/* STS */}
+                              <td className="px-2 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  required
+                                  value={row.uts}
+                                  onChange={(e) =>
+                                    handleBulkRowChange(idx, "uts", Number(e.target.value))
+                                  }
+                                  className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                              </td>
+
+                              {/* SAS */}
+                              <td className="px-2 py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  required
+                                  value={row.uas}
+                                  onChange={(e) =>
+                                    handleBulkRowChange(idx, "uas", Number(e.target.value))
+                                  }
+                                  className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                              </td>
+
+                              {/* Live SAS Preview */}
+                              <td className="px-2 py-2 text-center bg-blue-500/5 dark:bg-blue-500/10 font-mono font-extrabold text-blue-600 dark:text-blue-400">
+                                {rowAkhir.nilaiAkhir}
+                              </td>
+
+                              {/* Live Predikat */}
+                              <td className="px-2 py-2 text-center">
+                                <span
+                                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                                    rowAkhir.predikat === "A"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : rowAkhir.predikat === "B"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-amber-100 text-amber-800"
+                                  }`}
+                                >
+                                  {rowAkhir.predikat}
+                                </span>
+                              </td>
+
+                              {/* Catatan Capaian Belajar */}
+                              <td className="px-3 py-2">
+                                <input
+                                  type="text"
+                                  value={row.catatan}
+                                  onChange={(e) =>
+                                    handleBulkRowChange(idx, "catatan", e.target.value)
+                                  }
+                                  placeholder="Catatan capaian siswa..."
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-slate-800 dark:text-slate-200 text-xs outline-none focus:border-amber-500"
+                                />
+                              </td>
+
+                              <td className="px-2 py-2 text-center">
+                                {row.existingId && canEdit ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const item = nilaiList.find((n) => n.id === row.existingId);
+                                      if (item) setDeletingNilai(item);
+                                    }}
+                                    title="Hapus rekaman nilai mapel ini"
+                                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-700">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* Step 4: Ringkasan Rata-Rata & Tombol Simpan */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-5 text-xs">
-                  <div>
-                    <span className="text-slate-400 text-[11px] block">Rata-Rata STS Siswa:</span>
-                    <span className="text-base font-extrabold text-amber-600 dark:text-amber-400 font-mono">
-                      {bulkAvgMid}
-                    </span>
-                    <span className="text-[10px] text-slate-500 ml-1">
-                      ({bulkAvgMid >= 88 ? "Sangat Baik" : bulkAvgMid >= 75 ? "Baik" : "Cukup"})
-                    </span>
-                  </div>
-
-                  <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
-
-                  <div>
-                    <span className="text-slate-400 text-[11px] block">Rata-Rata PAS Siswa:</span>
-                    <span className="text-base font-extrabold text-blue-600 dark:text-blue-400 font-mono">
-                      {bulkAvgAkhir}
-                    </span>
-                    <span className="text-[10px] text-slate-500 ml-1">
-                      ({bulkAvgAkhir >= 88 ? "Sangat Baik" : bulkAvgAkhir >= 75 ? "Baik" : "Cukup"})
-                    </span>
-                  </div>
-
-                  <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
-
-                  <div className="hidden sm:block">
-                    <span className="text-slate-400 text-[11px] block">Total Mapel:</span>
-                    <span className="text-sm font-bold text-slate-800 dark:text-white">
-                      {bulkRows.length} Mata Pelajaran
-                    </span>
-                  </div>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+                <div className="flex flex-wrap items-center gap-5 text-xs">
+                  {bulkInputMode === "per-kelas" ? (
+                    bulkIsTengah ? (
+                      /* Stats Per-Kelas STS */
+                      <>
+                        <div>
+                          <span className="text-slate-400 text-[11px] block">Rata-Rata STS Kelas:</span>
+                          <span className="text-base font-extrabold text-amber-600 dark:text-amber-400 font-mono">
+                            {bulkClassAvgMid}
+                          </span>
+                          <span className="text-[10px] text-slate-500 ml-1">
+                            ({bulkClassAvgMid >= 88 ? "Sangat Baik" : bulkClassAvgMid >= 75 ? "Baik" : "Cukup"})
+                          </span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
+                        <div>
+                          <span className="text-slate-400 text-[11px] block">Ketuntasan KKM:</span>
+                          <span className="text-emerald-600 font-bold">{bulkClassTuntasCount} Tuntas</span>
+                          <span className="text-slate-400 mx-1">&bull;</span>
+                          <span className="text-rose-600 font-bold">{bulkClassRemedialCount} Remedial</span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                        <div className="hidden sm:block">
+                          <span className="text-slate-400 text-[11px] block">Total Siswa:</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-white">
+                            {bulkClassRows.length} Siswa (Kelas {bulkSelectedKelas})
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      /* Stats Per-Kelas SAS */
+                      <>
+                        <div>
+                          <span className="text-slate-400 text-[11px] block">Rata-Rata Akhir SAS:</span>
+                          <span className="text-base font-extrabold text-blue-600 dark:text-blue-400 font-mono">
+                            {bulkClassAvgAkhir}
+                          </span>
+                          <span className="text-[10px] text-slate-500 ml-1">
+                            ({bulkClassAvgAkhir >= 88 ? "Sangat Baik" : bulkClassAvgAkhir >= 75 ? "Baik" : "Cukup"})
+                          </span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                        <div className="hidden sm:block">
+                          <span className="text-slate-400 text-[11px] block">Total Siswa:</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-white">
+                            {bulkClassRows.length} Siswa (Kelas {bulkSelectedKelas})
+                          </span>
+                        </div>
+                      </>
+                    )
+                  ) : (
+                    /* Stats Per-Siswa */
+                    bulkIsTengah ? (
+                      <>
+                        <div>
+                          <span className="text-slate-400 text-[11px] block">Rata-Rata STS Siswa:</span>
+                          <span className="text-base font-extrabold text-amber-600 dark:text-amber-400 font-mono">
+                            {bulkAvgMid}
+                          </span>
+                          <span className="text-[10px] text-slate-500 ml-1">
+                            ({bulkAvgMid >= 88 ? "Sangat Baik" : bulkAvgMid >= 75 ? "Baik" : "Cukup"})
+                          </span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
+                        <div>
+                          <span className="text-slate-400 text-[11px] block">Ketuntasan Mapel:</span>
+                          <span className="text-emerald-600 font-bold">{bulkStudentTuntasCount} Tuntas</span>
+                          <span className="text-slate-400 mx-1">&bull;</span>
+                          <span className="text-rose-600 font-bold">{bulkRows.length - bulkStudentTuntasCount} Remedial</span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                        <div className="hidden sm:block">
+                          <span className="text-slate-400 text-[11px] block">Total Mapel:</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-white">
+                            {bulkRows.length} Mata Pelajaran
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <span className="text-slate-400 text-[11px] block">Rata-Rata PAS Siswa:</span>
+                          <span className="text-base font-extrabold text-blue-600 dark:text-blue-400 font-mono">
+                            {bulkAvgAkhir}
+                          </span>
+                          <span className="text-[10px] text-slate-500 ml-1">
+                            ({bulkAvgAkhir >= 88 ? "Sangat Baik" : bulkAvgAkhir >= 75 ? "Baik" : "Cukup"})
+                          </span>
+                        </div>
+                        <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+                        <div className="hidden sm:block">
+                          <span className="text-slate-400 text-[11px] block">Total Mapel:</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-white">
+                            {bulkRows.length} Mata Pelajaran
+                          </span>
+                        </div>
+                      </>
+                    )
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2.5 self-end sm:self-center">
                   <button
                     type="button"
                     onClick={() => setIsBulkModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-md shadow-amber-500/20 flex items-center gap-2"
+                    className={`px-5 py-2.5 rounded-xl text-white font-bold shadow-md flex items-center gap-2 cursor-pointer ${
+                      bulkIsTengah
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-500/20"
+                        : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/20"
+                    }`}
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>Simpan Nilai Seluruh Mapel ({bulkRows.length} Mapel)</span>
+                    <span>
+                      {bulkInputMode === "per-kelas"
+                        ? `Simpan Nilai ${bulkIsTengah ? "STS" : "SAS"} (${bulkClassRows.length} Siswa)`
+                        : `Simpan Nilai ${bulkIsTengah ? "STS" : "SAS"} (${bulkRows.length} Mapel)`}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -2081,18 +3019,20 @@ export default function NilaiManagementPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Catatan Perkembangan (Sumatif Tengah Semester / STS)
-                </label>
-                <input
-                  type="text"
-                  value={formData.catatanMid}
-                  onChange={(e) => setFormData({ ...formData, catatanMid: e.target.value })}
-                  placeholder="Catatan keaktifan dan perkembangan belajar..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
+              {!isTengah && (
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Catatan Perkembangan (Sumatif Tengah Semester / STS)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.catatanMid}
+                    onChange={(e) => setFormData({ ...formData, catatanMid: e.target.value })}
+                    placeholder="Catatan keaktifan dan perkembangan belajar..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -2392,7 +3332,7 @@ export default function NilaiManagementPage() {
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">KKM</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-24 bg-amber-50">Nilai Ujian STS</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">Predikat</th>
-                    <th className="border border-slate-300 px-3 py-2">Catatan Perkembangan Belajar</th>
+                    <th className="border border-slate-300 px-3 py-2 text-center w-24">Keterangan</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2409,6 +3349,7 @@ export default function NilaiManagementPage() {
                         (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                       );
                       const kkm = mapelObj?.kkm || 75;
+                      const isTuntas = mid.nilaiMid >= kkm;
 
                       return (
                         <tr key={item.id}>
@@ -2421,8 +3362,12 @@ export default function NilaiManagementPage() {
                           <td className="border border-slate-300 px-2 py-2 text-center font-bold">
                             {mid.predikatMid}
                           </td>
-                          <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
-                            {mid.catatanMid || "-"}
+                          <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
+                            {isTuntas ? (
+                              <span className="text-emerald-700">Tuntas</span>
+                            ) : (
+                              <span className="text-rose-700">Remedial</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -2848,7 +3793,7 @@ export default function NilaiManagementPage() {
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-20 bg-amber-50">Nilai Ujian STS</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
-                                <th className="border border-slate-300 px-2 py-1.5">Catatan Perkembangan</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20">Keterangan</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -2865,6 +3810,7 @@ export default function NilaiManagementPage() {
                                     (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                                   );
                                   const kkm = mapelObj?.kkm || 75;
+                                  const isTuntas = mid.nilaiMid >= kkm;
 
                                   return (
                                     <tr key={item.id} className="text-[11px]">
@@ -2877,8 +3823,12 @@ export default function NilaiManagementPage() {
                                       <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
                                         {mid.predikatMid}
                                       </td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
-                                        {mid.catatanMid || "-"}
+                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
+                                        {isTuntas ? (
+                                          <span className="text-emerald-700">Tuntas</span>
+                                        ) : (
+                                          <span className="text-rose-700">Remedial</span>
+                                        )}
                                       </td>
                                     </tr>
                                   );
