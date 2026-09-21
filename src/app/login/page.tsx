@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -17,7 +17,17 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { user, login } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      if (user.role === "bendahara") {
+        router.push("/dashboard/spp-transportasi");
+      } else {
+        router.push("/dashboard");
+      }
+    }
+  }, [user, router]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

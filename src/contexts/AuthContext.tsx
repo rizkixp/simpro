@@ -75,16 +75,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 });
               }
             } else {
-              setUser(DEMO_USERS[0]);
-              localStorage.setItem("sim_auth_user", JSON.stringify(DEMO_USERS[0]));
+              setUser(null);
+              localStorage.removeItem("sim_auth_user");
             }
           } catch {
-            setUser(DEMO_USERS[0]);
-            localStorage.setItem("sim_auth_user", JSON.stringify(DEMO_USERS[0]));
+            setUser(null);
+            localStorage.removeItem("sim_auth_user");
           }
         } else {
-          setUser(DEMO_USERS[0]);
-          localStorage.setItem("sim_auth_user", JSON.stringify(DEMO_USERS[0]));
+          setUser(null);
         }
 
         // 2. Fetch and sync with Supabase cloud users table
@@ -124,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {
         console.error("Failed to load auth data", e);
-        setUser(DEMO_USERS[0]);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
