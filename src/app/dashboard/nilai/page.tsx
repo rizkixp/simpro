@@ -42,6 +42,8 @@ import {
   Check,
   Trash2,
   AlertTriangle,
+  UserX,
+  Eraser,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -53,6 +55,7 @@ export default function NilaiManagementPage() {
     bulkSaveNilai,
     deleteNilai,
     deleteNilaiBySiswa,
+    deleteSiswa,
     siswaList,
     mapelList,
     profile,
@@ -74,6 +77,9 @@ export default function NilaiManagementPage() {
     kelas: string;
     count: number;
   } | null>(null);
+  const [deletingSiswaTarget, setDeletingSiswaTarget] = useState<Siswa | null>(null);
+  const [isManageDeleteModalOpen, setIsManageDeleteModalOpen] = useState(false);
+  const [manageSiswaId, setManageSiswaId] = useState<string>("");
 
   // Active Rapor Tab: "tengah" (PTS) | "akhir" (PAS) | "semua"
   const [activeRaporTab, setActiveRaporTab] = useState<"tengah" | "akhir" | "semua">("tengah");
@@ -446,6 +452,30 @@ export default function NilaiManagementPage() {
     });
   };
 
+  const handleConfirmDeleteSiswa = () => {
+    if (!deletingSiswaTarget) return;
+    const { id, nama } = deletingSiswaTarget;
+    // Hapus seluruh nilai siswa terlebih dahulu
+    deleteNilaiBySiswa(id);
+    // Hapus rekaman data siswa dari sistem
+    deleteSiswa(id);
+
+    if (raporSiswa?.id === id) {
+      setRaporSiswa(null);
+    }
+    if (bulkSiswaId === id) {
+      setIsBulkModalOpen(false);
+    }
+    if (manageSiswaId === id) {
+      setManageSiswaId("");
+    }
+    setDeletingSiswaTarget(null);
+    setNotification({
+      type: "success",
+      message: `Data siswa "${nama}" beserta seluruh rekaman nilainya berhasil dihapus dari sistem.`,
+    });
+  };
+
   // Auto-dismiss notification
   useEffect(() => {
     if (notification) {
@@ -507,7 +537,7 @@ export default function NilaiManagementPage() {
   const generateRaporWhatsAppText = (siswa: Siswa, type: JenisRapor) => {
     const records = nilaiList.filter((n) => n.siswaId === siswa.id);
     const isTengah = type === "tengah";
-    const typeLabel = isTengah ? "Tengah Semester (PTS)" : "Akhir Semester (PAS)";
+    const typeLabel = isTengah ? "Sumatif Tengah Semester (STS)" : "Akhir Semester (PAS)";
     const avgScore =
       records.length > 0
         ? Math.round(
@@ -714,10 +744,25 @@ export default function NilaiManagementPage() {
               {/* Tombol Input Satuan */}
               <button
                 onClick={handleOpenAdd}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-2"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>Input Satuan</span>
+              </button>
+
+              {/* Tombol Pengelola Hapus Siswa & Nilai */}
+              <button
+                type="button"
+                onClick={() => {
+                  const initialId = baseSiswaList[0]?.id || siswaList[0]?.id || "";
+                  setManageSiswaId(initialId);
+                  setIsManageDeleteModalOpen(true);
+                }}
+                className="px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-900 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+                title="Kelola & Hapus Data Siswa atau Nilai yang Sudah Dibuat"
+              >
+                <UserX className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                <span>Hapus Siswa / Nilai</span>
               </button>
             </>
           )}
@@ -760,7 +805,7 @@ export default function NilaiManagementPage() {
           }`}
         >
           <Calendar className="h-4 w-4" />
-          <span>Rapor Tengah Semester (PTS)</span>
+          <span>Sumatif Tengah Semester (STS)</span>
           <span
             className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
               activeRaporTab === "tengah"
@@ -812,7 +857,7 @@ export default function NilaiManagementPage() {
           <div>
             <p className="text-[11px] font-semibold text-slate-400">
               {activeRaporTab === "tengah"
-                ? "Rata-Rata Rapor Tengah Semester"
+                ? "Rata-Rata Sumatif Tengah Semester (STS)"
                 : activeRaporTab === "akhir"
                 ? "Rata-Rata Rapor Akhir Semester"
                 : "Rata-Rata Nilai Keseluruhan"}
@@ -842,7 +887,7 @@ export default function NilaiManagementPage() {
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold text-slate-400">
-              Ketuntasan Belajar ({activeRaporTab === "tengah" ? "PTS" : "PAS"})
+              Ketuntasan Belajar ({activeRaporTab === "tengah" ? "STS" : "PAS"})
             </p>
             <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
               {tuntasPercent}%
@@ -861,7 +906,7 @@ export default function NilaiManagementPage() {
             <p className="text-[11px] font-semibold text-slate-400">Komposisi Perhitungan Rapor</p>
             <p className="text-xs font-bold text-slate-800 dark:text-slate-100 mt-1">
               {activeRaporTab === "tengah"
-                ? "50% UH + 50% Ujian Mid (PTS)"
+                ? "50% UH + 50% Ujian Mid (STS)"
                 : activeRaporTab === "akhir"
                 ? "30% UH + 30% Mid + 40% UAS"
                 : "Semua Komponen (UH, Mid, UAS)"}
@@ -966,10 +1011,10 @@ export default function NilaiManagementPage() {
                     Ulangan Harian (UH) <span className="text-amber-600 font-bold">(50%)</span>
                   </th>
                   <th className="px-3 py-3.5 text-center">
-                    Ujian Mid (PTS) <span className="text-amber-600 font-bold">(50%)</span>
+                    Ujian Mid (STS) <span className="text-amber-600 font-bold">(50%)</span>
                   </th>
                   <th className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
-                    Nilai Rapor PTS
+                    Nilai Rapor STS
                   </th>
                   <th className="px-3 py-3.5 text-center">Predikat</th>
                   <th className="px-4 py-3.5">Catatan Perkembangan</th>
@@ -1002,8 +1047,8 @@ export default function NilaiManagementPage() {
                   <th className="px-3 py-3.5">Kelas</th>
                   <th className="px-4 py-3.5">Mata Pelajaran</th>
                   <th className="px-2 py-3.5 text-center">UH</th>
-                  <th className="px-2 py-3.5 text-center">Mid (PTS)</th>
-                  <th className="px-3 py-3.5 text-center bg-amber-500/5 font-bold">Rapor PTS</th>
+                  <th className="px-2 py-3.5 text-center">Mid (STS)</th>
+                  <th className="px-3 py-3.5 text-center bg-amber-500/5 font-bold">Rapor STS</th>
                   <th className="px-2 py-3.5 text-center">UAS</th>
                   <th className="px-3 py-3.5 text-center bg-blue-500/5 font-bold">Rapor PAS</th>
                   <th className="px-3 py-3.5 text-center">Predikat Akhir</th>
@@ -1085,6 +1130,30 @@ export default function NilaiManagementPage() {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
+                              <button
+                                onClick={() => {
+                                  const count = nilaiList.filter((x) => x.siswaId === n.siswaId).length;
+                                  setDeletingAllSiswa({
+                                    id: n.siswaId,
+                                    nama: n.siswaNama,
+                                    kelas: n.kelas,
+                                    count,
+                                  });
+                                }}
+                                title="Hapus Seluruh Nilai Siswa Ini"
+                                className="p-1.5 rounded-lg text-rose-500/70 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <Eraser className="h-4 w-4" />
+                              </button>
+                              {siswaObj && (
+                                <button
+                                  onClick={() => setDeletingSiswaTarget(siswaObj)}
+                                  title="Hapus Siswa & Seluruh Nilai"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                                >
+                                  <UserX className="h-4 w-4" />
+                                </button>
+                              )}
                             </>
                           )}
                           {siswaObj && (
@@ -1094,14 +1163,14 @@ export default function NilaiManagementPage() {
                                 className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <FileText className="h-3.5 w-3.5" />
-                                <span>Rapor PTS</span>
+                                <span>Rapor STS</span>
                               </button>
                               <button
                                 onClick={() => {
                                   setRaporPrintType("tengah");
                                   handleOpenWhatsAppModal(siswaObj);
                                 }}
-                                title="Kirim Rapor PTS via WhatsApp ke Wali"
+                                title="Kirim Rapor STS via WhatsApp ke Wali"
                                 className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
                               >
                                 <MessageCircle className="h-3.5 w-3.5" />
@@ -1175,6 +1244,30 @@ export default function NilaiManagementPage() {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
+                              <button
+                                onClick={() => {
+                                  const count = nilaiList.filter((x) => x.siswaId === n.siswaId).length;
+                                  setDeletingAllSiswa({
+                                    id: n.siswaId,
+                                    nama: n.siswaNama,
+                                    kelas: n.kelas,
+                                    count,
+                                  });
+                                }}
+                                title="Hapus Seluruh Nilai Siswa Ini"
+                                className="p-1.5 rounded-lg text-rose-500/70 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              >
+                                <Eraser className="h-4 w-4" />
+                              </button>
+                              {siswaObj && (
+                                <button
+                                  onClick={() => setDeletingSiswaTarget(siswaObj)}
+                                  title="Hapus Siswa & Seluruh Nilai"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                                >
+                                  <UserX className="h-4 w-4" />
+                                </button>
+                              )}
                             </>
                           )}
                           {siswaObj && (
@@ -1255,6 +1348,30 @@ export default function NilaiManagementPage() {
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
+                            <button
+                              onClick={() => {
+                                const count = nilaiList.filter((x) => x.siswaId === n.siswaId).length;
+                                setDeletingAllSiswa({
+                                  id: n.siswaId,
+                                  nama: n.siswaNama,
+                                  kelas: n.kelas,
+                                  count,
+                                });
+                              }}
+                              title="Hapus Seluruh Nilai Siswa Ini"
+                              className="p-1.5 rounded-lg text-rose-500/70 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            >
+                              <Eraser className="h-4 w-4" />
+                            </button>
+                            {siswaObj && (
+                              <button
+                                onClick={() => setDeletingSiswaTarget(siswaObj)}
+                                title="Hapus Siswa & Seluruh Nilai"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                              >
+                                <UserX className="h-4 w-4" />
+                              </button>
+                            )}
                           </>
                         )}
                         {siswaObj && (
@@ -1314,7 +1431,7 @@ export default function NilaiManagementPage() {
                   Input Nilai Seluruh Mata Pelajaran (1 Siswa)
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Masukkan nilai Ulangan Harian, Ujian Mid (PTS), dan Ujian Akhir (PAS) untuk semua mata pelajaran sekaligus.
+                  Masukkan nilai Ulangan Harian, Ujian Mid (STS), dan Ujian Akhir (PAS) untuk semua mata pelajaran sekaligus.
                 </p>
               </div>
 
@@ -1383,6 +1500,17 @@ export default function NilaiManagementPage() {
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         <span>Hapus Nilai Siswa Ini</span>
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setDeletingSiswaTarget(selectedBulkStudent)}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-700 dark:text-rose-300 bg-rose-100/60 dark:bg-rose-950/60 hover:bg-rose-200/70 border border-rose-300 dark:border-rose-800 flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                        title="Hapus data siswa ini beserta seluruh nilainya dari sistem"
+                      >
+                        <UserX className="h-3.5 w-3.5" />
+                        <span>Hapus Siswa</span>
                       </button>
                     )}
                   </div>
@@ -1469,8 +1597,8 @@ export default function NilaiManagementPage() {
                       <th className="px-3 py-2.5 text-center w-8">No</th>
                       <th className="px-4 py-2.5">Mata Pelajaran & KKM</th>
                       <th className="px-2 py-2.5 text-center w-24">UH (Harian)</th>
-                      <th className="px-2 py-2.5 text-center w-24">Mid (PTS)</th>
-                      <th className="px-2 py-2.5 text-center w-24 bg-amber-500/10">Rapor PTS</th>
+                      <th className="px-2 py-2.5 text-center w-24">Mid (STS)</th>
+                      <th className="px-2 py-2.5 text-center w-24 bg-amber-500/10">Rapor STS</th>
                       <th className="px-2 py-2.5 text-center w-24">UAS (Akhir)</th>
                       <th className="px-2 py-2.5 text-center w-24 bg-blue-500/10">Rapor PAS</th>
                       <th className="px-3 py-2.5">Catatan Capaian Belajar</th>
@@ -1623,7 +1751,7 @@ export default function NilaiManagementPage() {
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-5 text-xs">
                   <div>
-                    <span className="text-slate-400 text-[11px] block">Rata-Rata PTS Siswa:</span>
+                    <span className="text-slate-400 text-[11px] block">Rata-Rata STS Siswa:</span>
                     <span className="text-base font-extrabold text-amber-600 dark:text-amber-400 font-mono">
                       {bulkAvgMid}
                     </span>
@@ -1774,12 +1902,12 @@ export default function NilaiManagementPage() {
                       onChange={(e) => setFormData({ ...formData, tugas: Number(e.target.value) })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-mono text-center font-bold"
                     />
-                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">PTS 50% &bull; PAS 30%</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">STS 50% &bull; PAS 30%</span>
                   </div>
 
                   <div>
                     <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 text-[11px]">
-                      Ujian Mid (PTS)
+                      Ujian Mid (STS)
                     </label>
                     <input
                       type="number"
@@ -1790,7 +1918,7 @@ export default function NilaiManagementPage() {
                       onChange={(e) => setFormData({ ...formData, uts: Number(e.target.value) })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-mono text-center font-bold"
                     />
-                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">PTS 50% &bull; PAS 30%</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">STS 50% &bull; PAS 30%</span>
                   </div>
 
                   <div>
@@ -1814,7 +1942,7 @@ export default function NilaiManagementPage() {
                 <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-700">
                   <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
                     <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300">
-                      Rapor Tengah Sem. (PTS)
+                      Sumatif Tengah Sem. (STS)
                     </p>
                     <div className="flex items-center justify-between mt-1">
                       <span className="text-lg font-extrabold font-mono text-amber-700 dark:text-amber-200">
@@ -1850,7 +1978,7 @@ export default function NilaiManagementPage() {
 
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Catatan Perkembangan (Rapor Tengah Semester / PTS)
+                  Catatan Perkembangan (Sumatif Tengah Semester / STS)
                 </label>
                 <input
                   type="text"
@@ -1960,7 +2088,7 @@ export default function NilaiManagementPage() {
                     }`}
                   >
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>Rapor PTS</span>
+                    <span>Rapor STS</span>
                   </button>
                   <button
                     onClick={() => setRaporPrintType("akhir")}
@@ -1979,19 +2107,51 @@ export default function NilaiManagementPage() {
               {/* Action Buttons (Direct Print & PDF Export) */}
               <div className="flex items-center gap-2">
                 {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const targetId = raporSiswa.id;
-                      setRaporSiswa(null);
-                      handleOpenBulkAdd(targetId);
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
-                    title="Edit nilai seluruh mata pelajaran untuk siswa ini"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                    <span>Edit Nilai Siswa</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetId = raporSiswa.id;
+                        setRaporSiswa(null);
+                        handleOpenBulkAdd(targetId);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                      title="Edit nilai seluruh mata pelajaran untuk siswa ini"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      <span>Edit Nilai Siswa</span>
+                    </button>
+
+                    {nilaiList.filter((n) => n.siswaId === raporSiswa.id).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const count = nilaiList.filter((n) => n.siswaId === raporSiswa.id).length;
+                          setDeletingAllSiswa({
+                            id: raporSiswa.id,
+                            nama: raporSiswa.nama,
+                            kelas: raporSiswa.kelas,
+                            count,
+                          });
+                        }}
+                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                        title="Hapus seluruh rekaman nilai untuk siswa ini"
+                      >
+                        <Eraser className="h-4 w-4" />
+                        <span>Hapus Seluruh Nilai</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setDeletingSiswaTarget(raporSiswa)}
+                      className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                      title="Hapus siswa ini dan seluruh rekaman nilainya dari sistem"
+                    >
+                      <UserX className="h-4 w-4" />
+                      <span>Hapus Siswa</span>
+                    </button>
+                  </>
                 )}
 
                 <button
@@ -2067,7 +2227,7 @@ export default function NilaiManagementPage() {
             <div className="text-center mb-5">
               <h3 className="text-base font-extrabold underline tracking-wider uppercase text-slate-900">
                 {raporPrintType === "tengah"
-                  ? "LAPORAN PENILAIAN HASIL BELAJAR TENGAH SEMESTER (PTS)"
+                  ? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
                   : "LAPORAN CAPAIAN HASIL BELAJAR AKHIR SEMESTER (PAS)"}
               </h3>
               <p className="text-xs text-slate-600 mt-1 font-medium">
@@ -2075,7 +2235,7 @@ export default function NilaiManagementPage() {
               </p>
               <div className="mt-2 inline-block px-3 py-1 rounded-full bg-slate-100 text-[10px] text-slate-700 font-medium">
                 {raporPrintType === "tengah"
-                  ? "Komposisi Penilaian PTS: 50% Nilai Ulangan Harian (UH) + 50% Nilai Ujian Mid (PTS)"
+                  ? "Komposisi Penilaian STS: 50% Nilai Ulangan Harian (UH) + 50% Nilai Ujian Mid (STS)"
                   : "Komposisi Penilaian PAS: 30% Nilai Harian + 30% Ujian Mid + 40% Ujian Akhir Semester"}
               </div>
             </div>
@@ -2103,7 +2263,7 @@ export default function NilaiManagementPage() {
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">KKM</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-24">Ulangan Harian (50%)</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-24">Ujian Mid (50%)</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-20 bg-amber-50">Nilai PTS</th>
+                    <th className="border border-slate-300 px-2 py-2 text-center w-20 bg-amber-50">Nilai STS</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">Predikat</th>
                     <th className="border border-slate-300 px-3 py-2">Catatan Perkembangan Belajar</th>
                   </tr>
@@ -2147,7 +2307,7 @@ export default function NilaiManagementPage() {
                 <tfoot>
                   <tr className="bg-slate-50 font-semibold">
                     <td colSpan={5} className="border border-slate-300 px-3 py-2 text-right">
-                      Rata-Rata Nilai Rapor Tengah Semester (PTS):
+                      Rata-Rata Nilai Sumatif Tengah Semester (STS):
                     </td>
                     <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-800 text-sm font-mono bg-amber-50">
                       {studentMidAverage}
@@ -2351,7 +2511,7 @@ export default function NilaiManagementPage() {
                     }`}
                   >
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>Rapor PTS</span>
+                    <span>Rapor STS</span>
                   </button>
                   <button
                     type="button"
@@ -2503,7 +2663,7 @@ export default function NilaiManagementPage() {
                         <div className="text-center mb-4">
                           <h3 className="text-sm font-extrabold underline tracking-wider uppercase text-slate-900">
                             {batchRaporType === "tengah"
-                              ? "LAPORAN PENILAIAN HASIL BELAJAR TENGAH SEMESTER (PTS)"
+                              ? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
                               : "LAPORAN CAPAIAN HASIL BELAJAR AKHIR SEMESTER (PAS)"}
                           </h3>
                           <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
@@ -2533,7 +2693,7 @@ export default function NilaiManagementPage() {
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-20">UH (50%)</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-20">Mid (50%)</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16 bg-amber-50">Nilai PTS</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16 bg-amber-50">Nilai STS</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
                                 <th className="border border-slate-300 px-2 py-1.5">Catatan Perkembangan</th>
                               </tr>
@@ -2577,7 +2737,7 @@ export default function NilaiManagementPage() {
                             <tfoot>
                               <tr className="bg-slate-50 font-semibold text-[11px]">
                                 <td colSpan={5} className="border border-slate-300 px-3 py-1.5 text-right">
-                                  Rata-Rata Nilai Rapor PTS:
+                                  Rata-Rata Nilai Rapor STS:
                                 </td>
                                 <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 font-mono bg-amber-50">
                                   {midAvg}
@@ -2704,7 +2864,7 @@ export default function NilaiManagementPage() {
                     NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi} &bull; {profile.alamat}
                   </p>
                   <h3 className="text-base font-extrabold uppercase mt-2 text-indigo-950">
-                    BUKU LEGER NILAI HASIL BELAJAR {batchRaporType === "tengah" ? "TENGAH SEMESTER (PTS)" : "AKHIR SEMESTER (PAS)"}
+                    BUKU LEGER NILAI HASIL BELAJAR {batchRaporType === "tengah" ? "SUMATIF TENGAH SEMESTER (STS)" : "AKHIR SEMESTER (PAS)"}
                   </h3>
                   <p className="text-xs text-slate-600 font-medium">
                     Kelas: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}</strong> &bull; Semester: <strong>{profile.semesterAktif}</strong> &bull; Tahun Ajaran: <strong>{profile.tahunAjaranAktif}</strong>
@@ -2911,7 +3071,7 @@ export default function NilaiManagementPage() {
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
                   }`}
                 >
-                  Rapor PTS
+                  Rapor STS
                 </button>
                 <button
                   type="button"
@@ -3024,7 +3184,7 @@ export default function NilaiManagementPage() {
                   <span className="font-bold text-slate-800 dark:text-slate-200">{deletingNilai.tugas}</span>
                 </div>
                 <div className="p-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <span className="text-[10px] text-slate-400 block font-sans">Mid (PTS)</span>
+                  <span className="text-[10px] text-slate-400 block font-sans">Mid (STS)</span>
                   <span className="font-bold text-amber-600 dark:text-amber-400">{deletingNilai.uts}</span>
                 </div>
                 <div className="p-1.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
@@ -3099,6 +3259,237 @@ export default function NilaiManagementPage() {
               >
                 <Trash2 className="h-4 w-4" />
                 <span>Hapus Semua Nilai</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 8: KONFIRMASI HAPUS SISWA BESERTA SELURUH NILAI     */}
+      {/* ========================================================= */}
+      {deletingSiswaTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-rose-200 dark:border-rose-900/80 relative animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-11 w-11 rounded-2xl bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 shadow-inner">
+                <UserX className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                  Hapus Data & Nama Siswa
+                </h3>
+                <p className="text-xs text-rose-500 font-semibold">Tindakan permanen dan tidak dapat diurungkan</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+              Apakah Anda yakin ingin menghapus nama siswa ini dari sistem? Tindakan ini akan <strong>menghapus data profil siswa sekaligus seluruh rekaman nilai ({nilaiList.filter((n) => n.siswaId === deletingSiswaTarget.id).length} mapel)</strong> yang telah dibuat.
+            </p>
+
+            <div className="bg-rose-50 dark:bg-rose-950/40 p-4 rounded-2xl border border-rose-200 dark:border-rose-900/60 mb-5 space-y-2 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-rose-200/60 dark:border-rose-900/60">
+                <span className="text-slate-500 dark:text-slate-400">Nama Lengkap:</span>
+                <span className="font-bold text-slate-900 dark:text-white">{deletingSiswaTarget.nama}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-rose-200/60 dark:border-rose-900/60">
+                <span className="text-slate-500 dark:text-slate-400">Kelas / Rombel:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{deletingSiswaTarget.kelas}</span>
+              </div>
+              <div className="flex items-center justify-between pb-2 border-b border-rose-200/60 dark:border-rose-900/60">
+                <span className="text-slate-500 dark:text-slate-400">NISN:</span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">{deletingSiswaTarget.nisn}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-slate-500 dark:text-slate-400">Nilai Ikut Terhapus:</span>
+                <span className="font-bold text-rose-600 dark:text-rose-400">
+                  {nilaiList.filter((n) => n.siswaId === deletingSiswaTarget.id).length} Mata Pelajaran
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeletingSiswaTarget(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSiswa}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-600/25 flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                <UserX className="h-4 w-4" />
+                <span>Ya, Hapus Siswa & Nilai</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 9: PENGELOLA CEPAT HAPUS SISWA / NILAI              */}
+      {/* ========================================================= */}
+      {isManageDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 relative animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                  <UserX className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                    Kelola & Hapus Siswa / Nilai
+                  </h3>
+                  <p className="text-xs text-slate-500">Pilih peserta didik untuk menghapus rekaman nilai atau data siswa</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManageDeleteModalOpen(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Selector Siswa */}
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-amber-600" />
+                  <span>Pilih Nama Siswa Target:</span>
+                </label>
+                <select
+                  value={manageSiswaId}
+                  onChange={(e) => setManageSiswaId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-rose-500 shadow-sm"
+                >
+                  <option value="" disabled>-- Pilih Siswa --</option>
+                  {baseSiswaList.map((s) => {
+                    const count = nilaiList.filter((n) => n.siswaId === s.id).length;
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {s.nama} &bull; Kelas {s.kelas} ({count} Nilai Tersimpan)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Detail Siswa Terpilih */}
+              {(() => {
+                const targetSiswa = baseSiswaList.find((s) => s.id === manageSiswaId) || siswaList.find((s) => s.id === manageSiswaId);
+                if (!targetSiswa) return (
+                  <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                    Silakan pilih siswa pada daftar di atas.
+                  </div>
+                );
+
+                const targetNilai = nilaiList.filter((n) => n.siswaId === targetSiswa.id);
+
+                return (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white flex items-center justify-center font-bold text-sm shadow">
+                          {targetSiswa.nama.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-slate-900 dark:text-white">{targetSiswa.nama}</p>
+                          <p className="text-[11px] text-slate-500">
+                            Kelas <strong>{targetSiswa.kelas}</strong> &bull; NISN: <span className="font-mono">{targetSiswa.nisn}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-slate-200/70 dark:border-slate-700/70 flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Total Nilai Tersimpan:</span>
+                        <span className={`font-bold px-2.5 py-0.5 rounded-full ${
+                          targetNilai.length > 0
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                        }`}>
+                          {targetNilai.length} Mata Pelajaran
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action Cards */}
+                    <div className="space-y-2.5">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Pilih Opsi Tindakan:
+                      </p>
+
+                      {/* Opsi 1: Hapus Nilai Saja */}
+                      <div className="p-3.5 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <Eraser className="h-4 w-4 text-amber-600" />
+                            <span>Hapus Seluruh Nilai Siswa Ini</span>
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Menghapus seluruh rekaman nilai ({targetNilai.length} mapel), nama siswa tetap tersimpan di sekolah.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={targetNilai.length === 0}
+                          onClick={() => {
+                            setIsManageDeleteModalOpen(false);
+                            setDeletingAllSiswa({
+                              id: targetSiswa.id,
+                              nama: targetSiswa.nama,
+                              kelas: targetSiswa.kelas,
+                              count: targetNilai.length,
+                            });
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:pointer-events-none text-white font-bold text-xs shadow transition-all shrink-0 cursor-pointer"
+                        >
+                          Hapus Nilai
+                        </button>
+                      </div>
+
+                      {/* Opsi 2: Hapus Data & Nama Siswa */}
+                      <div className="p-3.5 rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/20 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+                            <UserX className="h-4 w-4 text-rose-600" />
+                            <span>Hapus Siswa & Seluruh Nilai</span>
+                          </p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Menghapus permanen profil siswa beserta seluruh rekaman nilai yang pernah dibuat.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsManageDeleteModalOpen(false);
+                            setDeletingSiswaTarget(targetSiswa);
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow transition-all shrink-0 cursor-pointer"
+                        >
+                          Hapus Siswa
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsManageDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Tutup
               </button>
             </div>
           </div>
