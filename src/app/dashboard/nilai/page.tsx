@@ -245,6 +245,40 @@ export default function NilaiManagementPage() {
     return matchSearch && matchKelas && matchMapel && matchSemester;
   });
 
+  // Daftar Siswa Terfilter untuk Tabel Utama (menampilkan seluruh siswa dengan kondisi default jika belum ada nilai)
+  const filteredSiswa = baseSiswaList.filter((s) => {
+    const matchSearch =
+      s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.nisn.includes(searchTerm) ||
+      s.kelas.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchKelas =
+      teacherScope.isTeacher
+        ? true
+        : selectedKelas === "Semua" || s.kelas === selectedKelas;
+    return matchSearch && matchKelas;
+  });
+
+  const siswaWithGrades = filteredSiswa.filter((s) => {
+    const records = nilaiList.filter(
+      (n) =>
+        n.siswaId === s.id &&
+        (activeRaporTab === "semua"
+          ? true
+          : (n.semester || "Ganjil").toLowerCase() === activeSemester.toLowerCase()) &&
+        (selectedMapel === "Semua"
+          ? true
+          : n.mapel.toLowerCase() === selectedMapel.toLowerCase())
+    );
+    return records.length > 0;
+  });
+
+  const getPredikatFromScore = (score: number): "A" | "B" | "C" | "D" => {
+    if (score >= 88) return "A";
+    if (score >= 75) return "B";
+    if (score >= 60) return "C";
+    return "D";
+  };
+
   // KPI Statistics calculations
   const statsMidScores = filteredNilai.map((n) => getStudentMid(n).nilaiMid);
   const avgMidScore =
@@ -1290,7 +1324,7 @@ export default function NilaiManagementPage() {
               {tuntasPercent}%
             </p>
             <span className="text-[10px] text-slate-500">
-              {tuntasCount} dari {filteredNilai.length} entri tuntas
+              {tuntasCount} dari {filteredNilai.length} entri tuntas ({siswaWithGrades.length} dari {filteredSiswa.length} siswa)
             </span>
           </div>
           <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600">
@@ -1389,408 +1423,712 @@ export default function NilaiManagementPage() {
           </select>
 
           <span className="text-xs text-slate-500 ml-auto md:ml-2">
-            Total Nilai: <strong>{filteredNilai.length}</strong>
+            Total Siswa: <strong>{filteredSiswa.length}</strong>
+            {siswaWithGrades.length < filteredSiswa.length ? (
+              <span className="ml-1 text-slate-400">({siswaWithGrades.length} dinilai)</span>
+            ) : (
+              <span className="ml-1 text-emerald-600 font-semibold">(Semua dinilai)</span>
+            )}
           </span>
         </div>
       </div>
 
-      {/* Nilai Table */}
+      {/* Nilai Table: Menampilkan Seluruh Siswa (Default Belum Diisi jika belum ada nilai) */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
-              {isTengah ? (
-                <tr>
-                  <th className="px-5 py-3.5">Nama Siswa</th>
-                  <th className="px-3 py-3.5">Kelas</th>
-                  <th className="px-4 py-3.5">Mata Pelajaran</th>
-                  <th className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
-                    Nilai Ujian STS
-                  </th>
-                  <th className="px-3 py-3.5 text-center">Predikat</th>
-                  <th className="px-4 py-3.5 text-center">Status Ketuntasan</th>
-                  <th className="px-5 py-3.5 text-right">Aksi</th>
-                </tr>
-              ) : activeRaporTab !== "semua" ? (
-                <tr>
-                  <th className="px-5 py-3.5">Nama Siswa</th>
-                  <th className="px-3 py-3.5">Kelas</th>
-                  <th className="px-4 py-3.5">Mata Pelajaran</th>
-                  <th className="px-3 py-3.5 text-center">
-                    Harian (UH) <span className="text-blue-600 font-bold">(30%)</span>
-                  </th>
-                  <th className="px-3 py-3.5 text-center">
-                    Ujian Mid <span className="text-blue-600 font-bold">(30%)</span>
-                  </th>
-                  <th className="px-3 py-3.5 text-center">
-                    Ujian Akhir (SAS) <span className="text-blue-600 font-bold">(40%)</span>
-                  </th>
-                  <th className="px-4 py-3.5 text-center bg-blue-500/5 dark:bg-blue-500/10">
-                    Nilai Akhir Rapor
-                  </th>
-                  <th className="px-3 py-3.5 text-center">Predikat</th>
-                  <th className="px-4 py-3.5">Catatan Capaian</th>
-                  <th className="px-5 py-3.5 text-right">Aksi</th>
-                </tr>
+              {selectedMapel === "Semua" ? (
+                isTengah ? (
+                  <tr>
+                    <th className="px-3 py-3.5 text-center w-12">No</th>
+                    <th className="px-5 py-3.5">Peserta Didik</th>
+                    <th className="px-3 py-3.5 text-center w-24">Kelas</th>
+                    <th className="px-4 py-3.5 text-center">Status Pengisian Nilai</th>
+                    <th className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
+                      Rata-Rata STS ({activeSemester})
+                    </th>
+                    <th className="px-3 py-3.5 text-center">Predikat</th>
+                    <th className="px-4 py-3.5 text-center">Ketuntasan</th>
+                    <th className="px-5 py-3.5 text-right">Aksi</th>
+                  </tr>
+                ) : activeRaporTab !== "semua" ? (
+                  <tr>
+                    <th className="px-3 py-3.5 text-center w-12">No</th>
+                    <th className="px-5 py-3.5">Peserta Didik</th>
+                    <th className="px-3 py-3.5 text-center w-24">Kelas</th>
+                    <th className="px-4 py-3.5 text-center">Status Pengisian Nilai</th>
+                    <th className="px-4 py-3.5 text-center bg-blue-500/5 dark:bg-blue-500/10">
+                      Rata-Rata SAS ({activeSemester})
+                    </th>
+                    <th className="px-3 py-3.5 text-center">Predikat Umum</th>
+                    <th className="px-4 py-3.5 text-center">Ketuntasan</th>
+                    <th className="px-5 py-3.5 text-right">Aksi</th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th className="px-3 py-3.5 text-center w-12">No</th>
+                    <th className="px-5 py-3.5">Peserta Didik</th>
+                    <th className="px-3 py-3.5 text-center w-24">Kelas</th>
+                    <th className="px-4 py-3.5 text-center">Status Pengisian Nilai</th>
+                    <th className="px-3 py-3.5 text-center bg-amber-500/5 font-bold">Rata-Rata STS</th>
+                    <th className="px-3 py-3.5 text-center bg-blue-500/5 font-bold">Rata-Rata SAS</th>
+                    <th className="px-3 py-3.5 text-center">Predikat Umum</th>
+                    <th className="px-4 py-3.5 text-center">Ketuntasan</th>
+                    <th className="px-5 py-3.5 text-right">Aksi</th>
+                  </tr>
+                )
               ) : (
-                <tr>
-                  <th className="px-5 py-3.5">Nama Siswa</th>
-                  <th className="px-3 py-3.5">Kelas</th>
-                  <th className="px-4 py-3.5">Mata Pelajaran</th>
-                  <th className="px-2 py-3.5 text-center">UH</th>
-                  <th className="px-2 py-3.5 text-center">Mid (STS)</th>
-                  <th className="px-3 py-3.5 text-center bg-amber-500/5 font-bold">Rapor STS</th>
-                  <th className="px-2 py-3.5 text-center">UAS</th>
-                  <th className="px-3 py-3.5 text-center bg-blue-500/5 font-bold">Rapor SAS</th>
-                  <th className="px-3 py-3.5 text-center">Predikat Akhir</th>
-                  <th className="px-5 py-3.5 text-right">Aksi</th>
-                </tr>
+                isTengah ? (
+                  <tr>
+                    <th className="px-3 py-3.5 text-center w-12">No</th>
+                    <th className="px-5 py-3.5">Peserta Didik</th>
+                    <th className="px-3 py-3.5 text-center w-24">Kelas</th>
+                    <th className="px-4 py-3.5">Mata Pelajaran</th>
+                    <th className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
+                      Nilai Ujian STS ({activeSemester})
+                    </th>
+                    <th className="px-3 py-3.5 text-center">Predikat</th>
+                    <th className="px-4 py-3.5 text-center">Status Ketuntasan</th>
+                    <th className="px-5 py-3.5 text-right">Aksi</th>
+                  </tr>
+                ) : activeRaporTab !== "semua" ? (
+                  <tr>
+                    <th className="px-3 py-3.5 text-center w-12">No</th>
+                    <th className="px-5 py-3.5">Peserta Didik</th>
+                    <th className="px-3 py-3.5 text-center w-24">Kelas</th>
+                    <th className="px-4 py-3.5">Mata Pelajaran</th>
+                    <th className="px-3 py-3.5 text-center">Harian (UH)</th>
+                    <th className="px-3 py-3.5 text-center">Ujian Mid</th>
+                    <th className="px-3 py-3.5 text-center">Ujian Akhir (SAS)</th>
+                    <th className="px-4 py-3.5 text-center bg-blue-500/5 dark:bg-blue-500/10">
+                      Nilai Akhir Rapor
+                    </th>
+                    <th className="px-3 py-3.5 text-center">Predikat</th>
+                    <th className="px-4 py-3.5 text-center">Status Ketuntasan</th>
+                    <th className="px-5 py-3.5 text-right">Aksi</th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th className="px-3 py-3.5 text-center w-12">No</th>
+                    <th className="px-5 py-3.5">Peserta Didik</th>
+                    <th className="px-3 py-3.5 text-center w-24">Kelas</th>
+                    <th className="px-4 py-3.5">Mata Pelajaran</th>
+                    <th className="px-2 py-3.5 text-center">UH</th>
+                    <th className="px-2 py-3.5 text-center">Mid (STS)</th>
+                    <th className="px-2 py-3.5 text-center">UAS (SAS)</th>
+                    <th className="px-3 py-3.5 text-center bg-blue-500/5 font-bold">Nilai Akhir</th>
+                    <th className="px-3 py-3.5 text-center">Predikat</th>
+                    <th className="px-4 py-3.5 text-center">Status Ketuntasan</th>
+                    <th className="px-5 py-3.5 text-right">Aksi</th>
+                  </tr>
+                )
               )}
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredNilai.length === 0 ? (
+              {filteredSiswa.length === 0 ? (
                 <tr>
-                  <td colSpan={isTengah ? 7 : activeRaporTab !== "semua" ? 10 : 10} className="px-5 py-10 text-center text-slate-400">
-                    Belum ada rekaman nilai pada kriteria ini.
+                  <td colSpan={10} className="px-5 py-12 text-center text-slate-400">
+                    Tidak ada peserta didik yang sesuai dengan kriteria filter.
                   </td>
                 </tr>
               ) : (
-                filteredNilai.map((n) => {
-                  const siswaObj = siswaList.find((s) => s.id === n.siswaId);
-                  const mid = getStudentMid(n);
-                  const akhir = getStudentAkhir(n);
-                  const mapelObj = mapelList.find((m) => m.nama.toLowerCase() === n.mapel.toLowerCase());
-                  const kkm = mapelObj?.kkm || 75;
+                filteredSiswa.map((s, index) => {
+                  const studentRecords = nilaiList.filter(
+                    (n) =>
+                      n.siswaId === s.id &&
+                      (activeRaporTab === "semua"
+                        ? true
+                        : (n.semester || "Ganjil").toLowerCase() === activeSemester.toLowerCase())
+                  );
 
-                  if (isTengah) {
+                  const totalMapelCount = teacherScope.isTeacher
+                    ? Math.max(1, teacherScope.scopedMapelList.length)
+                    : Math.max(1, mapelList.length);
+
+                  const filledCount = studentRecords.length;
+                  const hasGrades = filledCount > 0;
+
+                  // Single subject record if filtered by mapel
+                  const singleRecord = selectedMapel !== "Semua"
+                    ? studentRecords.find((n) => n.mapel.toLowerCase() === selectedMapel.toLowerCase())
+                    : null;
+
+                  // Averages for STS & SAS
+                  const midScores = studentRecords.map((n) => getStudentMid(n).nilaiMid);
+                  const avgMid = midScores.length > 0
+                    ? Math.round(midScores.reduce((a, b) => a + b, 0) / midScores.length)
+                    : 0;
+
+                  const akhirScores = studentRecords.map((n) => getStudentAkhir(n).nilaiAkhir);
+                  const avgAkhir = akhirScores.length > 0
+                    ? Math.round(akhirScores.reduce((a, b) => a + b, 0) / akhirScores.length)
+                    : 0;
+
+                  const predikatMid = hasGrades ? calculateMidGrade(avgMid).predikatMid : "-";
+                  const predikatAkhir = hasGrades ? getPredikatFromScore(avgAkhir) : "-";
+
+                  // Render Baris: Mode Semua Mapel (Ringkasan Siswa)
+                  if (selectedMapel === "Semua") {
                     return (
-                      <tr key={n.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                      <tr
+                        key={s.id}
+                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                      >
+                        <td className="px-3 py-3.5 text-center font-mono text-slate-400 text-xs">
+                          {index + 1}
+                        </td>
                         <td className="px-5 py-3.5">
-                          <span className="font-semibold text-slate-900 dark:text-white block">
-                            {n.siswaNama}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">NISN: {n.nisn}</span>
-                        </td>
-                        <td className="px-3 py-3.5">{n.kelas}</td>
-                        <td className="px-4 py-3.5 font-medium text-slate-900 dark:text-white">
-                          {n.mapel}
-                        </td>
-                        <td className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
-                          <span className="font-bold text-sm text-amber-600 dark:text-amber-400 font-mono">
-                            {mid.nilaiMid}
-                          </span>
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                              {s.nama.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-900 dark:text-white block text-xs">
+                                {s.nama}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                NISN: {s.nisn}
+                              </span>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-3 py-3.5 text-center">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                              mid.predikatMid === "A"
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
-                                : mid.predikatMid === "B"
-                                ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
-                            }`}
-                          >
-                            {mid.predikatMid}
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {s.kelas}
                           </span>
                         </td>
                         <td className="px-4 py-3.5 text-center">
-                          {mid.nilaiMid >= kkm ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
-                              Tuntas (KKM {kkm})
+                          {!hasGrades ? (
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400 inline-flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                              <span>0 / {totalMapelCount} Mapel (Belum Diisi)</span>
                             </span>
                           ) : (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
-                              Remedial (KKM {kkm})
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold inline-flex items-center gap-1.5 ${
+                                filledCount >= totalMapelCount
+                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                  : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  filledCount >= totalMapelCount ? "bg-emerald-500" : "bg-amber-500"
+                                }`}
+                              ></span>
+                              <span>
+                                {filledCount} / {totalMapelCount} Mapel {filledCount >= totalMapelCount ? "(Lengkap)" : ""}
+                              </span>
                             </span>
                           )}
                         </td>
-                        <td className="px-5 py-3.5 text-right space-x-1.5">
-                          {canEdit && (
-                            <>
-                              <button
-                                onClick={() => handleOpenBulkAdd(n.siswaId, "per-siswa")}
-                                title="Input / Edit Seluruh Mapel Siswa Ini"
-                                className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <Zap className="h-3 w-3 fill-amber-500" />
-                                <span>Bulk Mapel</span>
-                              </button>
-                              <button
-                                onClick={() => handleOpenEdit(n)}
-                                title="Edit Nilai Mapel Ini"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 cursor-pointer"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => setDeletingNilai(n)}
-                                title="Hapus Nilai Mapel Ini"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const count = nilaiList.filter((x) => x.siswaId === n.siswaId).length;
-                                  setDeletingAllSiswa({
-                                    id: n.siswaId,
-                                    nama: n.siswaNama,
-                                    kelas: n.kelas,
-                                    count,
-                                  });
-                                }}
-                                title="Hapus Seluruh Nilai Siswa Ini"
-                                className="p-1.5 rounded-lg text-rose-500/70 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              >
-                                <Eraser className="h-4 w-4" />
-                              </button>
-                              {siswaObj && (
-                                <button
-                                  onClick={() => setDeletingSiswaTarget(siswaObj)}
-                                  title="Hapus Siswa & Seluruh Nilai"
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
-                                >
-                                  <UserX className="h-4 w-4" />
-                                </button>
+
+                        {/* Skor & Predikat */}
+                        {isTengah ? (
+                          <>
+                            <td className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
+                              {hasGrades ? (
+                                <span className="font-bold text-sm text-amber-600 dark:text-amber-400 font-mono">
+                                  {avgMid}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
                               )}
-                            </>
-                          )}
-                          {siswaObj && (
-                            <>
-                              <button
-                                onClick={() => handleOpenRapor(siswaObj, "tengah", activeSemester)}
-                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <FileText className="h-3.5 w-3.5" />
-                                <span>Rapor STS</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleOpenWhatsAppModal(siswaObj, "tengah", activeSemester);
-                                }}
-                                title="Kirim Rapor STS via WhatsApp ke Wali"
-                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
-                              >
-                                <MessageCircle className="h-3.5 w-3.5" />
-                              </button>
-                            </>
-                          )}
+                            </td>
+                            <td className="px-3 py-3.5 text-center">
+                              {hasGrades ? (
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                    predikatMid === "A"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                                      : predikatMid === "B"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
+                                  }`}
+                                >
+                                  {predikatMid}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              {hasGrades ? (
+                                avgMid >= 75 ? (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                    Tuntas (&ge; 75)
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                    Remedial (&lt; 75)
+                                  </span>
+                                )
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                  Belum Dinilai
+                                </span>
+                              )}
+                            </td>
+                          </>
+                        ) : activeRaporTab !== "semua" ? (
+                          <>
+                            <td className="px-4 py-3.5 text-center bg-blue-500/5 dark:bg-blue-500/10">
+                              {hasGrades ? (
+                                <span className="font-bold text-sm text-blue-600 dark:text-blue-400 font-mono">
+                                  {avgAkhir}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3.5 text-center">
+                              {hasGrades ? (
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                    predikatAkhir === "A"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                                      : predikatAkhir === "B"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
+                                  }`}
+                                >
+                                  {predikatAkhir}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              {hasGrades ? (
+                                avgAkhir >= 75 ? (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                    Tuntas (&ge; 75)
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                    Remedial (&lt; 75)
+                                  </span>
+                                )
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                  Belum Dinilai
+                                </span>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-3.5 text-center bg-amber-500/5">
+                              {hasGrades ? (
+                                <span className="font-bold text-xs text-amber-600 dark:text-amber-400 font-mono">
+                                  {avgMid} ({predikatMid})
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-center bg-blue-500/5">
+                              {hasGrades ? (
+                                <span className="font-bold text-xs text-blue-600 dark:text-blue-400 font-mono">
+                                  {avgAkhir} ({predikatAkhir})
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3.5 text-center">
+                              {hasGrades ? (
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                    predikatAkhir === "A"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                                      : predikatAkhir === "B"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
+                                  }`}
+                                >
+                                  {predikatAkhir}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              {hasGrades ? (
+                                avgAkhir >= 75 ? (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                    Tuntas
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                    Remedial
+                                  </span>
+                                )
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                  Belum Dinilai
+                                </span>
+                              )}
+                            </td>
+                          </>
+                        )}
+
+                        {/* Kolom Aksi: Edit Nilai, Hapus, Cetak Rapor */}
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {canEdit && (
+                              <>
+                                {/* Tombol Input / Edit Nilai */}
+                                <button
+                                  onClick={() => handleOpenBulkAdd(s.id, "per-siswa")}
+                                  title={hasGrades ? `Edit Seluruh Nilai (${filledCount} Mapel)` : `Input Nilai Siswa Ini`}
+                                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                                    hasGrades
+                                      ? isTengah
+                                        ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20"
+                                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
+                                      : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-700"
+                                  }`}
+                                >
+                                  <Zap className={`h-3.5 w-3.5 ${hasGrades ? "fill-white" : "fill-amber-500"}`} />
+                                  <span>{hasGrades ? "Edit Nilai" : "Input Nilai"}</span>
+                                </button>
+
+                                {/* Tombol Hapus */}
+                                {hasGrades ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setDeletingAllSiswa({
+                                        id: s.id,
+                                        nama: s.nama,
+                                        kelas: s.kelas,
+                                        count: filledCount,
+                                      })
+                                    }
+                                    title={`Hapus Seluruh Nilai ${s.nama} (${filledCount} Mapel)`}
+                                    className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 text-xs font-semibold border border-rose-200 dark:border-rose-900 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    <span>Hapus</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeletingSiswaTarget(s)}
+                                    title={`Hapus Data Siswa ${s.nama}`}
+                                    className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 text-xs font-semibold border border-rose-200 dark:border-rose-900 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <UserX className="h-3.5 w-3.5" />
+                                    <span>Hapus</span>
+                                  </button>
+                                )}
+                              </>
+                            )}
+
+                            {/* Tombol Cetak Rapor */}
+                            <button
+                              onClick={() => handleOpenRapor(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                              title={`Cetak E-Rapor ${isTengah ? "STS" : "SAS"} untuk ${s.nama}`}
+                              className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm shadow-indigo-600/20 transition-all inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              <span>Cetak Rapor</span>
+                            </button>
+
+                            {/* Tombol WhatsApp */}
+                            <button
+                              onClick={() => handleOpenWhatsAppModal(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                              title="Kirim Ringkasan Nilai via WhatsApp ke Wali"
+                              className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 transition-colors inline-flex items-center cursor-pointer"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
                   }
 
-                  if (!isTengah && activeRaporTab !== "semua") {
-                    return (
-                      <tr key={n.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <span className="font-semibold text-slate-900 dark:text-white block">
-                            {n.siswaNama}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">NISN: {n.nisn}</span>
-                        </td>
-                        <td className="px-3 py-3.5">{n.kelas}</td>
-                        <td className="px-4 py-3.5 font-medium text-slate-900 dark:text-white">
-                          {n.mapel}
-                        </td>
-                        <td className="px-3 py-3.5 text-center font-mono font-medium">{n.tugas}</td>
-                        <td className="px-3 py-3.5 text-center font-mono font-medium">{n.uts}</td>
-                        <td className="px-3 py-3.5 text-center font-mono font-medium">{n.uas}</td>
-                        <td className="px-4 py-3.5 text-center bg-blue-500/5 dark:bg-blue-500/10">
-                          <span className="font-bold text-sm text-blue-600 dark:text-blue-400 font-mono">
-                            {akhir.nilaiAkhir}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3.5 text-center">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                              akhir.predikat === "A"
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
-                                : akhir.predikat === "B"
-                                ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
-                                : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
-                            }`}
-                          >
-                            {akhir.predikat}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-[11px] text-slate-500 dark:text-slate-400 max-w-xs truncate">
-                          {akhir.catatan}
-                        </td>
-                        <td className="px-5 py-3.5 text-right space-x-1.5">
-                          {canEdit && (
-                            <>
-                              <button
-                                onClick={() => handleOpenBulkAdd(n.siswaId, "per-siswa")}
-                                title="Input / Edit Seluruh Mapel Siswa Ini"
-                                className="px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <Zap className="h-3 w-3 fill-blue-500" />
-                                <span>Bulk Mapel</span>
-                              </button>
-                              <button
-                                onClick={() => handleOpenEdit(n)}
-                                title="Edit Nilai Mapel Ini"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => setDeletingNilai(n)}
-                                title="Hapus Nilai Mapel Ini"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const count = nilaiList.filter((x) => x.siswaId === n.siswaId).length;
-                                  setDeletingAllSiswa({
-                                    id: n.siswaId,
-                                    nama: n.siswaNama,
-                                    kelas: n.kelas,
-                                    count,
-                                  });
-                                }}
-                                title="Hapus Seluruh Nilai Siswa Ini"
-                                className="p-1.5 rounded-lg text-rose-500/70 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              >
-                                <Eraser className="h-4 w-4" />
-                              </button>
-                              {siswaObj && (
-                                <button
-                                  onClick={() => setDeletingSiswaTarget(siswaObj)}
-                                  title="Hapus Siswa & Seluruh Nilai"
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
-                                >
-                                  <UserX className="h-4 w-4" />
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {siswaObj && (
-                            <>
-                              <button
-                                onClick={() => handleOpenRapor(siswaObj, "akhir", activeSemester)}
-                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <FileText className="h-3.5 w-3.5" />
-                                <span>Rapor SAS</span>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleOpenWhatsAppModal(siswaObj, "akhir", activeSemester);
-                                }}
-                                title="Kirim Rapor SAS via WhatsApp ke Wali"
-                                className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
-                              >
-                                <MessageCircle className="h-3.5 w-3.5" />
-                              </button>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  }
+                  // Render Baris: Mode Mata Pelajaran Tertentu
+                  const mapelObj = mapelList.find(
+                    (m) => m.nama.toLowerCase() === selectedMapel.toLowerCase()
+                  );
+                  const kkm = mapelObj?.kkm || 75;
+                  const mid = singleRecord ? getStudentMid(singleRecord) : null;
+                  const akhir = singleRecord ? getStudentAkhir(singleRecord) : null;
 
-                  // Rekap Lengkap
                   return (
-                    <tr key={n.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr
+                      key={s.id}
+                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      <td className="px-3 py-3.5 text-center font-mono text-slate-400 text-xs">
+                        {index + 1}
+                      </td>
                       <td className="px-5 py-3.5">
-                        <span className="font-semibold text-slate-900 dark:text-white block">
-                          {n.siswaNama}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">NISN: {n.nisn}</span>
-                      </td>
-                      <td className="px-3 py-3.5">{n.kelas}</td>
-                      <td className="px-4 py-3.5 font-medium text-slate-900 dark:text-white">
-                        {n.mapel}
-                      </td>
-                      <td className="px-2 py-3.5 text-center font-mono text-xs">{n.tugas}</td>
-                      <td className="px-2 py-3.5 text-center font-mono text-xs">{n.uts}</td>
-                      <td className="px-3 py-3.5 text-center bg-amber-500/5 font-mono font-bold text-amber-600">
-                        {mid.nilaiMid} ({mid.predikatMid})
-                      </td>
-                      <td className="px-2 py-3.5 text-center font-mono text-xs">{n.uas}</td>
-                      <td className="px-3 py-3.5 text-center bg-blue-500/5 font-mono font-bold text-blue-600">
-                        {akhir.nilaiAkhir} ({akhir.predikat})
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                            {s.nama.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-slate-900 dark:text-white block text-xs">
+                              {s.nama}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              NISN: {s.nisn}
+                            </span>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-3 py-3.5 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                          {akhir.predikat}
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {s.kelas}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right space-x-1.5">
-                        {canEdit && (
-                          <>
-                            <button
-                              onClick={() => handleOpenBulkAdd(n.siswaId, "per-siswa")}
-                              title="Input / Edit Seluruh Mapel Siswa Ini"
-                              className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Zap className="h-3 w-3 fill-amber-500" />
-                              <span>Bulk</span>
-                            </button>
-                            <button
-                              onClick={() => handleOpenEdit(n)}
-                              title="Edit Nilai"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 cursor-pointer"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => setDeletingNilai(n)}
-                              title="Hapus Nilai Mapel Ini"
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                const count = nilaiList.filter((x) => x.siswaId === n.siswaId).length;
-                                setDeletingAllSiswa({
-                                  id: n.siswaId,
-                                  nama: n.siswaNama,
-                                  kelas: n.kelas,
-                                  count,
-                                });
-                              }}
-                              title="Hapus Seluruh Nilai Siswa Ini"
-                              className="p-1.5 rounded-lg text-rose-500/70 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                            >
-                              <Eraser className="h-4 w-4" />
-                            </button>
-                            {siswaObj && (
-                              <button
-                                onClick={() => setDeletingSiswaTarget(siswaObj)}
-                                title="Hapus Siswa & Seluruh Nilai"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
-                              >
-                                <UserX className="h-4 w-4" />
-                              </button>
+                      <td className="px-4 py-3.5">
+                        <span className="font-semibold text-slate-900 dark:text-white text-xs block">
+                          {selectedMapel}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          KKM: {kkm}
+                        </span>
+                      </td>
+
+                      {/* Nilai Columns */}
+                      {isTengah ? (
+                        <>
+                          <td className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
+                            {mid ? (
+                              <span className="font-bold text-sm text-amber-600 dark:text-amber-400 font-mono">
+                                {mid.nilaiMid}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">-</span>
                             )}
-                          </>
-                        )}
-                        {siswaObj && (
-                          <>
-                            <button
-                              onClick={() => handleOpenRapor(siswaObj, "akhir", n.semester || "Ganjil")}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                              <span>Cetak</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleOpenWhatsAppModal(siswaObj, "akhir", n.semester || "Ganjil");
-                              }}
-                              title="Kirim Rapor via WhatsApp ke Wali"
-                              className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
-                            >
-                              <MessageCircle className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        )}
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            {mid ? (
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  mid.predikatMid === "A"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                                    : mid.predikatMid === "B"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
+                                }`}
+                              >
+                                {mid.predikatMid}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {mid ? (
+                              mid.nilaiMid >= kkm ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                  Tuntas (KKM {kkm})
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                  Remedial (KKM {kkm})
+                                </span>
+                              )
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                Belum Diisi
+                              </span>
+                            )}
+                          </td>
+                        </>
+                      ) : activeRaporTab !== "semua" ? (
+                        <>
+                          <td className="px-3 py-3.5 text-center font-mono font-medium text-xs">
+                            {singleRecord ? singleRecord.tugas : "-"}
+                          </td>
+                          <td className="px-3 py-3.5 text-center font-mono font-medium text-xs">
+                            {singleRecord ? singleRecord.uts : "-"}
+                          </td>
+                          <td className="px-3 py-3.5 text-center font-mono font-medium text-xs">
+                            {singleRecord ? singleRecord.uas : "-"}
+                          </td>
+                          <td className="px-4 py-3.5 text-center bg-blue-500/5 dark:bg-blue-500/10">
+                            {akhir ? (
+                              <span className="font-bold text-sm text-blue-600 dark:text-blue-400 font-mono">
+                                {akhir.nilaiAkhir}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            {akhir ? (
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  akhir.predikat === "A"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                                    : akhir.predikat === "B"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400"
+                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400"
+                                }`}
+                              >
+                                {akhir.predikat}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {akhir ? (
+                              akhir.nilaiAkhir >= kkm ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                  Tuntas (KKM {kkm})
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                  Remedial (KKM {kkm})
+                                </span>
+                              )
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                Belum Diisi
+                              </span>
+                            )}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-2 py-3.5 text-center font-mono text-xs">
+                            {singleRecord ? singleRecord.tugas : "-"}
+                          </td>
+                          <td className="px-2 py-3.5 text-center font-mono text-xs">
+                            {singleRecord ? singleRecord.uts : "-"}
+                          </td>
+                          <td className="px-2 py-3.5 text-center font-mono text-xs">
+                            {singleRecord ? singleRecord.uas : "-"}
+                          </td>
+                          <td className="px-3 py-3.5 text-center bg-blue-500/5 font-mono font-bold text-xs text-blue-600">
+                            {akhir ? akhir.nilaiAkhir : "-"}
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            {akhir ? (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                {akhir.predikat}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {akhir ? (
+                              akhir.nilaiAkhir >= kkm ? (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                  Tuntas
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                  Remedial
+                                </span>
+                              )
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                Belum Diisi
+                              </span>
+                            )}
+                          </td>
+                        </>
+                      )}
+
+                      {/* Actions */}
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {canEdit && (
+                            <>
+                              {/* Tombol Input / Edit Nilai */}
+                              <button
+                                onClick={() => {
+                                  if (singleRecord) {
+                                    handleOpenEdit(singleRecord);
+                                  } else {
+                                    handleOpenBulkAdd(s.id, "per-siswa");
+                                  }
+                                }}
+                                title={singleRecord ? `Edit Nilai ${selectedMapel}` : `Input Nilai ${selectedMapel} untuk ${s.nama}`}
+                                className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                                  singleRecord
+                                    ? isTengah
+                                      ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20"
+                                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20"
+                                    : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300 dark:border-amber-700"
+                                }`}
+                              >
+                                <Zap className={`h-3.5 w-3.5 ${singleRecord ? "fill-white" : "fill-amber-500"}`} />
+                                <span>{singleRecord ? "Edit Nilai" : "Input Nilai"}</span>
+                              </button>
+
+                              {/* Tombol Hapus */}
+                              {singleRecord ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingNilai(singleRecord)}
+                                  title={`Hapus Nilai ${selectedMapel} untuk ${s.nama}`}
+                                  className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 text-xs font-semibold border border-rose-200 dark:border-rose-900 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>Hapus</span>
+                                </button>
+                              ) : hasGrades ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDeletingAllSiswa({
+                                      id: s.id,
+                                      nama: s.nama,
+                                      kelas: s.kelas,
+                                      count: filledCount,
+                                    })
+                                  }
+                                  title={`Hapus Seluruh Nilai ${s.nama} (${filledCount} Mapel)`}
+                                  className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 text-xs font-semibold border border-rose-200 dark:border-rose-900 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>Hapus</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingSiswaTarget(s)}
+                                  title={`Hapus Siswa ${s.nama} dari Sistem`}
+                                  className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 text-xs font-semibold border border-rose-200 dark:border-rose-900 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <UserX className="h-3.5 w-3.5" />
+                                  <span>Hapus</span>
+                                </button>
+                              )}
+                            </>
+                          )}
+
+                          {/* Tombol Cetak Rapor */}
+                          <button
+                            onClick={() => handleOpenRapor(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                            title={`Cetak E-Rapor ${isTengah ? "STS" : "SAS"} untuk ${s.nama}`}
+                            className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm shadow-indigo-600/20 transition-all inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            <span>Cetak Rapor</span>
+                          </button>
+
+                          {/* Tombol WhatsApp */}
+                          <button
+                            onClick={() => handleOpenWhatsAppModal(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                            title="Kirim Ringkasan Nilai via WhatsApp ke Wali"
+                            className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 transition-colors inline-flex items-center cursor-pointer"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
