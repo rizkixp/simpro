@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSchoolData } from "@/contexts/SchoolDataContext";
 import {
   GraduationCap,
   Lock,
@@ -13,11 +14,20 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
+  School,
+  BookOpen,
+  Sparkles,
 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { user, login } = useAuth();
+  const { profile } = useSchoolData();
+
+  const appName = profile?.appName || "SIM SDI Islamic";
+  const appTagline = profile?.appTagline || profile?.namaSekolah || "SD Islam Smart School Management System";
+  const appLogoUrl = profile?.appLogoUrl;
+  const appIconPreset = profile?.appIconPreset || "graduation";
 
   useEffect(() => {
     if (user) {
@@ -85,14 +95,24 @@ export default function LoginPage() {
 
         {/* Brand Header */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-950/40 border border-emerald-400/30">
-            <GraduationCap className="h-7 w-7 text-white" />
+          <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-950/40 border border-emerald-400/30 overflow-hidden shrink-0">
+            {appLogoUrl ? (
+              <img src={appLogoUrl} alt={appName} className="h-full w-full object-cover" />
+            ) : (
+              <div className="text-white">
+                {appIconPreset === "school" && <School className="h-7 w-7" />}
+                {appIconPreset === "book" && <BookOpen className="h-7 w-7" />}
+                {appIconPreset === "shield" && <ShieldCheck className="h-7 w-7" />}
+                {appIconPreset === "sparkles" && <Sparkles className="h-7 w-7" />}
+                {(!appIconPreset || appIconPreset === "graduation") && <GraduationCap className="h-7 w-7" />}
+              </div>
+            )}
           </div>
           <div>
             <h2 className="font-bold text-xl tracking-tight text-white flex items-center gap-2">
-              SIM SDI <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-400/30">ISLAMIC</span>
+              {appName}
             </h2>
-            <p className="text-xs text-emerald-200/80">SD Islam Smart School Management System</p>
+            <p className="text-xs text-emerald-200/80">{appTagline}</p>
           </div>
         </div>
 
@@ -141,12 +161,22 @@ export default function LoginPage() {
         <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-emerald-100 dark:border-slate-800 p-8 sm:p-10 transition-all">
           {/* Mobile Brand Header */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
-            <div className="h-10 w-10 rounded-xl bg-emerald-700 flex items-center justify-center text-white shadow-md">
-              <GraduationCap className="h-6 w-6" />
+            <div className="h-10 w-10 rounded-xl bg-emerald-700 flex items-center justify-center text-white shadow-md overflow-hidden shrink-0">
+              {appLogoUrl ? (
+                <img src={appLogoUrl} alt={appName} className="h-full w-full object-cover" />
+              ) : (
+                <div className="text-white">
+                  {appIconPreset === "school" && <School className="h-6 w-6" />}
+                  {appIconPreset === "book" && <BookOpen className="h-6 w-6" />}
+                  {appIconPreset === "shield" && <ShieldCheck className="h-6 w-6" />}
+                  {appIconPreset === "sparkles" && <Sparkles className="h-6 w-6" />}
+                  {(!appIconPreset || appIconPreset === "graduation") && <GraduationCap className="h-6 w-6" />}
+                </div>
+              )}
             </div>
-            <div>
-              <h2 className="font-bold text-lg text-slate-900 dark:text-white">SIM SDI Smart School</h2>
-              <p className="text-xs text-emerald-700">Portal Akses Terpadu</p>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-bold text-lg text-slate-900 dark:text-white truncate">{appName}</h2>
+              <p className="text-xs text-emerald-700 truncate">{appTagline}</p>
             </div>
           </div>
 

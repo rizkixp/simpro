@@ -133,13 +133,24 @@ export const SupabaseSchoolService = {
       kepalaSekolah: data.kepala_sekolah || "",
       tahunAjaranAktif: data.tahun_ajaran_aktif || "2025/2026",
       semesterAktif: data.semester_aktif || "Ganjil",
+      appName: data.app_name || undefined,
+      appTagline: data.app_tagline || undefined,
+      appLogoUrl: data.app_logo_url || undefined,
+      appIconPreset: data.app_icon_preset || undefined,
+      landingHeroBadge: data.landing_hero_badge || undefined,
+      landingHeroTitle: data.landing_hero_title || undefined,
+      landingHeroSubtitle: data.landing_hero_subtitle || undefined,
+      landingCtaText: data.landing_cta_text || undefined,
+      landingShowDemoButton: data.landing_show_demo_button !== undefined ? data.landing_show_demo_button : undefined,
+      landingFooterText: data.landing_footer_text || undefined,
     };
   },
 
   async updateProfile(profile: SchoolProfile): Promise<boolean> {
     const client = getSupabaseBrowserClient();
     if (!client) return false;
-    const { error } = await client.from("school_profile").upsert({
+
+    const basePayload: any = {
       id: "default_profile",
       nama_sekolah: profile.namaSekolah,
       npsn: profile.npsn,
@@ -152,8 +163,29 @@ export const SupabaseSchoolService = {
       tahun_ajaran_aktif: profile.tahunAjaranAktif,
       semester_aktif: profile.semesterAktif,
       updated_at: new Date().toISOString(),
-    });
-    return !error;
+    };
+
+    const extendedPayload = {
+      ...basePayload,
+      ...(profile.appName !== undefined ? { app_name: profile.appName } : {}),
+      ...(profile.appTagline !== undefined ? { app_tagline: profile.appTagline } : {}),
+      ...(profile.appLogoUrl !== undefined ? { app_logo_url: profile.appLogoUrl } : {}),
+      ...(profile.appIconPreset !== undefined ? { app_icon_preset: profile.appIconPreset } : {}),
+      ...(profile.landingHeroBadge !== undefined ? { landing_hero_badge: profile.landingHeroBadge } : {}),
+      ...(profile.landingHeroTitle !== undefined ? { landing_hero_title: profile.landingHeroTitle } : {}),
+      ...(profile.landingHeroSubtitle !== undefined ? { landing_hero_subtitle: profile.landingHeroSubtitle } : {}),
+      ...(profile.landingCtaText !== undefined ? { landing_cta_text: profile.landingCtaText } : {}),
+      ...(profile.landingShowDemoButton !== undefined ? { landing_show_demo_button: profile.landingShowDemoButton } : {}),
+      ...(profile.landingFooterText !== undefined ? { landing_footer_text: profile.landingFooterText } : {}),
+    };
+
+    // Try upserting extended fields first
+    const { error: extError } = await client.from("school_profile").upsert(extendedPayload);
+    if (!extError) return true;
+
+    // Fallback to base columns if extended columns are not yet in Supabase schema
+    const { error: baseError } = await client.from("school_profile").upsert(basePayload);
+    return !baseError;
   },
 
   // ==================== USERS ====================

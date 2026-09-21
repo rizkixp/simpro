@@ -1,4 +1,4 @@
-﻿-- =========================================================
+-- =========================================================
 -- SIM SEKOLAH PRO - SUPABASE DATABASE SCHEMA MIGRATION
 -- =========================================================
 
@@ -15,6 +15,16 @@ CREATE TABLE IF NOT EXISTS school_profile (
     kepala_sekolah TEXT,
     tahun_ajaran_aktif TEXT DEFAULT '2025/2026',
     semester_aktif TEXT DEFAULT 'Ganjil',
+    app_name TEXT DEFAULT 'SIM Sekolah PRO',
+    app_tagline TEXT DEFAULT 'Sistem Informasi Manajemen Sekolah Terpadu',
+    app_logo_url TEXT,
+    app_icon_preset TEXT DEFAULT 'graduation',
+    landing_hero_badge TEXT DEFAULT 'Platform Manajemen Sekolah Generasi Terbaru #1',
+    landing_hero_title TEXT DEFAULT 'Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu',
+    landing_hero_subtitle TEXT,
+    landing_cta_text TEXT DEFAULT 'Buka Portal & Form Login',
+    landing_show_demo_button BOOLEAN DEFAULT TRUE,
+    landing_footer_text TEXT,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

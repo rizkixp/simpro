@@ -189,6 +189,18 @@ export interface SchoolProfile {
   kepalaSekolah: string;
   tahunAjaranAktif: string;
   semesterAktif: "Ganjil" | "Genap";
+  // Pengaturan Identitas & Branding Aplikasi
+  appName?: string;
+  appTagline?: string;
+  appLogoUrl?: string;
+  appIconPreset?: "graduation" | "school" | "book" | "shield" | "sparkles";
+  // Pengaturan Tampilan Awal (Landing Page)
+  landingHeroBadge?: string;
+  landingHeroTitle?: string;
+  landingHeroSubtitle?: string;
+  landingCtaText?: string;
+  landingShowDemoButton?: boolean;
+  landingFooterText?: string;
 }
 
 export interface TabunganSiswa {

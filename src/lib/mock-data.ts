@@ -11,6 +11,16 @@ export const INITIAL_SCHOOL_PROFILE: SchoolProfile = {
   kepalaSekolah: "Dr. H. Muhammad Rasyid, M.Pd.",
   tahunAjaranAktif: "2025/2026",
   semesterAktif: "Ganjil",
+  appName: "SIM Sekolah PRO",
+  appTagline: "Sistem Informasi Manajemen Sekolah Terpadu",
+  appLogoUrl: "",
+  appIconPreset: "graduation",
+  landingHeroBadge: "Platform Manajemen Sekolah Generasi Terbaru #1",
+  landingHeroTitle: "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
+  landingHeroSubtitle: "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
+  landingCtaText: "Buka Portal & Form Login",
+  landingShowDemoButton: true,
+  landingFooterText: "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
 };
 
 export const DEMO_USERS: User[] = [

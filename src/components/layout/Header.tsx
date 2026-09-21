@@ -15,7 +15,7 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const router = useRouter();
   const { user, switchRole, switchUser, userList } = useAuth();
-  const { isSupabaseConnected, isSyncing } = useSchoolData();
+  const { isSupabaseConnected, isSyncing, profile } = useSchoolData();
 
   const roleConfigs: { role: UserRole; label: string; icon: React.ReactNode; color: string }[] = [
     { role: "admin", label: "Admin", icon: <Shield className="h-3.5 w-3.5" />, color: "bg-[#064e3b] text-white" },
@@ -41,9 +41,11 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
 
         <div className="hidden sm:block">
           <h1 className="text-sm font-bold text-slate-800 dark:text-white leading-tight flex items-center gap-2">
-            SIM SD Islam Smart School
+            {profile?.appName || "SIM SD Islam Smart School"}
           </h1>
-          <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">Kurikulum Merdeka & Pendidikan Karakter Qur'ani</p>
+          <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+            {profile?.appTagline || profile?.namaSekolah || "Kurikulum Merdeka & Pendidikan Karakter Qur'ani"}
+          </p>
         </div>
 
         {/* Islamic Hijri Chip */}

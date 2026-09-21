@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSchoolData } from "@/contexts/SchoolDataContext";
 import {
   LayoutDashboard,
   Users,
@@ -24,6 +25,7 @@ import {
   BookOpenCheck,
   BookOpen,
   HeartHandshake,
+  School,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -34,6 +36,12 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { profile } = useSchoolData();
+
+  const appName = profile?.appName || "SIM Sekolah PRO";
+  const appTagline = profile?.appTagline || profile?.namaSekolah || "SD Islam Smart School";
+  const appLogoUrl = profile?.appLogoUrl;
+  const appIconPreset = profile?.appIconPreset || "graduation";
 
   const navItems = [
     {
@@ -160,14 +168,30 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               href={user?.role === "bendahara" ? "/dashboard/spp-transportasi" : "/dashboard"}
               className="flex items-center gap-3 group"
             >
-              <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-900/50 border border-emerald-400/30 group-hover:scale-105 transition-transform">
-                <GraduationCap className="h-6 w-6 text-white" />
+              <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-900/50 border border-emerald-400/30 group-hover:scale-105 transition-transform overflow-hidden shrink-0">
+                {appLogoUrl ? (
+                  <img
+                    src={appLogoUrl}
+                    alt={appName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="text-white">
+                    {appIconPreset === "school" && <School className="h-6 w-6" />}
+                    {appIconPreset === "book" && <BookOpen className="h-6 w-6" />}
+                    {appIconPreset === "shield" && <ShieldCheck className="h-6 w-6" />}
+                    {appIconPreset === "sparkles" && <Sparkles className="h-6 w-6" />}
+                    {(!appIconPreset || appIconPreset === "graduation") && <GraduationCap className="h-6 w-6" />}
+                  </div>
+                )}
               </div>
-              <div>
-                <span className="font-bold text-base tracking-tight text-white flex items-center gap-1.5">
-                  SIM SDI <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-400/30 tracking-wider">ISLAMIC</span>
+              <div className="min-w-0 flex-1">
+                <span className="font-bold text-base tracking-tight text-white block truncate leading-tight">
+                  {appName}
                 </span>
-                <p className="text-[11px] text-emerald-300/80 truncate max-w-[150px]">SD Islam Smart School</p>
+                <p className="text-[11px] text-emerald-300/80 truncate max-w-[150px] mt-0.5">
+                  {appTagline}
+                </p>
               </div>
             </Link>
 

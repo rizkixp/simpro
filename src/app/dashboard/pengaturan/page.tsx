@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { SchoolProfile } from "@/types/school";
 import {
   Settings,
   Save,
@@ -21,6 +22,17 @@ import {
   Activity,
   Lock,
   Key,
+  GraduationCap,
+  Image as ImageIcon,
+  Upload,
+  Trash2,
+  Layout,
+  Sparkles,
+  BookOpen,
+  Eye,
+  Link as LinkIcon,
+  Monitor,
+  Check,
 } from "lucide-react";
 
 export default function PengaturanPage() {
@@ -38,11 +50,62 @@ export default function PengaturanPage() {
     testSupabaseHealth,
   } = useSchoolData();
 
-  const [formData, setFormData] = useState({ ...profile });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [formData, setFormData] = useState<SchoolProfile>({
+    ...profile,
+    appName: profile?.appName || "SIM Sekolah PRO",
+    appTagline: profile?.appTagline || "Sistem Informasi Manajemen Sekolah Terpadu",
+    appLogoUrl: profile?.appLogoUrl || "",
+    appIconPreset: profile?.appIconPreset || "graduation",
+    landingHeroBadge: profile?.landingHeroBadge || "Platform Manajemen Sekolah Generasi Terbaru #1",
+    landingHeroTitle: profile?.landingHeroTitle || "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
+    landingHeroSubtitle: profile?.landingHeroSubtitle || "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
+    landingCtaText: profile?.landingCtaText || "Buka Portal & Form Login",
+    landingShowDemoButton: profile?.landingShowDemoButton !== undefined ? profile.landingShowDemoButton : true,
+    landingFooterText: profile?.landingFooterText || "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
+  });
+
+  useEffect(() => {
+    if (profile) {
+      setFormData((prev) => ({
+        ...prev,
+        ...profile,
+        appName: profile.appName || prev.appName || "SIM Sekolah PRO",
+        appTagline: profile.appTagline || prev.appTagline || "Sistem Informasi Manajemen Sekolah Terpadu",
+        appLogoUrl: profile.appLogoUrl !== undefined ? profile.appLogoUrl : prev.appLogoUrl,
+        appIconPreset: profile.appIconPreset || prev.appIconPreset || "graduation",
+        landingHeroBadge: profile.landingHeroBadge || prev.landingHeroBadge || "Platform Manajemen Sekolah Generasi Terbaru #1",
+        landingHeroTitle: profile.landingHeroTitle || prev.landingHeroTitle || "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
+        landingHeroSubtitle: profile.landingHeroSubtitle || prev.landingHeroSubtitle || "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
+        landingCtaText: profile.landingCtaText || prev.landingCtaText || "Buka Portal & Form Login",
+        landingShowDemoButton: profile.landingShowDemoButton !== undefined ? profile.landingShowDemoButton : (prev.landingShowDemoButton !== undefined ? prev.landingShowDemoButton : true),
+        landingFooterText: profile.landingFooterText || prev.landingFooterText || "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
+      }));
+    }
+  }, [profile]);
+
   const [isSaved, setIsSaved] = useState(false);
   const [testingHealth, setTestingHealth] = useState(false);
   const [healthResult, setHealthResult] = useState<any>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Ukuran file logo maksimal 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Url = event.target?.result as string;
+      setFormData((prev) => ({ ...prev, appLogoUrl: base64Url }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const canEdit = user?.role === "admin";
 
@@ -356,6 +419,349 @@ export default function PengaturanPage() {
       {/* Main Settings Form */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8">
         <form onSubmit={handleSave} className="space-y-6 text-xs">
+          {/* Section: Identitas & Branding Aplikasi */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-blue-50/60 via-slate-50/50 to-white dark:from-slate-800/60 dark:via-slate-900 dark:to-slate-900 border border-blue-200/70 dark:border-blue-900/50 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-blue-100 dark:border-blue-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-600 text-white shadow-sm">
+                  <Layout className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Identitas & Branding Aplikasi
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Kustomisasi nama sistem, tagline, dan logo/ikon yang tampil pada Sidebar, Header, dan Halaman Login.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Nama & Tagline Aplikasi */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Aplikasi / Judul Sistem
+                </label>
+                <input
+                  type="text"
+                  required
+                  disabled={!canEdit}
+                  value={formData.appName || ""}
+                  onChange={(e) => setFormData({ ...formData, appName: e.target.value })}
+                  placeholder="Contoh: SIM Sekolah PRO atau SIM SDI Cendekia"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Ditampilkan di sudut kiri atas Sidebar, Header Dashboard, dan tab browser.
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Tagline / Subjudul Aplikasi
+                </label>
+                <input
+                  type="text"
+                  disabled={!canEdit}
+                  value={formData.appTagline || ""}
+                  onChange={(e) => setFormData({ ...formData, appTagline: e.target.value })}
+                  placeholder="Contoh: Sistem Informasi Manajemen Sekolah Terpadu"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Keterangan ringkas di bawah nama aplikasi.
+                </p>
+              </div>
+            </div>
+
+            {/* Logo & Ikon Aplikasi */}
+            <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800 space-y-4">
+              <label className="block font-semibold text-slate-700 dark:text-slate-300">
+                Logo / Ikon Aplikasi
+              </label>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                {/* Logo Upload & URL Options */}
+                <div className="lg:col-span-7 space-y-3.5">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleLogoUpload}
+                      accept="image/*"
+                      className="hidden"
+                      disabled={!canEdit}
+                    />
+                    <button
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition-all flex items-center gap-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span>Unggah Gambar Logo (Max 2MB)</span>
+                    </button>
+
+                    {formData.appLogoUrl && (
+                      <button
+                        type="button"
+                        disabled={!canEdit}
+                        onClick={() => setFormData({ ...formData, appLogoUrl: "" })}
+                        className="px-3 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40 font-semibold text-xs transition-all flex items-center gap-1.5"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Hapus Logo Gambar</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+                      Atau Masukkan Tautan (URL) Gambar Logo:
+                    </label>
+                    <div className="relative">
+                      <LinkIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="url"
+                        disabled={!canEdit}
+                        value={formData.appLogoUrl || ""}
+                        onChange={(e) => setFormData({ ...formData, appLogoUrl: e.target.value })}
+                        placeholder="https://example.com/logo.png"
+                        className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Preset Icons Selection (Fallback if no custom image logo) */}
+                  <div className="pt-2">
+                    <label className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                      Preset Ikon (Digunakan jika tidak ada gambar logo khusus):
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { id: "graduation", label: "Topi Toga", icon: <GraduationCap className="h-4 w-4" /> },
+                        { id: "school", label: "Gedung Sekolah", icon: <School className="h-4 w-4" /> },
+                        { id: "book", label: "Buku Terbuka", icon: <BookOpen className="h-4 w-4" /> },
+                        { id: "shield", label: "Perisai", icon: <ShieldCheck className="h-4 w-4" /> },
+                        { id: "sparkles", label: "Bintang / Prestasi", icon: <Sparkles className="h-4 w-4" /> },
+                      ].map((preset) => {
+                        const isSelected = (formData.appIconPreset || "graduation") === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => setFormData({ ...formData, appIconPreset: preset.id as any })}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                              isSelected
+                                ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/30"
+                                : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100"
+                            }`}
+                          >
+                            {preset.icon}
+                            <span>{preset.label}</span>
+                            {isSelected && <Check className="h-3 w-3 ml-0.5" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Preview Card */}
+                <div className="lg:col-span-5 bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 space-y-3 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Pratinjau Tampilan (Live Preview)
+                  </span>
+
+                  {/* Sidebar Style Preview (Dark) */}
+                  <div className="p-3 rounded-xl bg-[#06241b] text-white flex items-center gap-3 border border-emerald-900/50">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+                      {formData.appLogoUrl ? (
+                        <img
+                          src={formData.appLogoUrl}
+                          alt="Logo Preview"
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="text-white">
+                          {formData.appIconPreset === "school" && <School className="h-5 w-5" />}
+                          {formData.appIconPreset === "book" && <BookOpen className="h-5 w-5" />}
+                          {formData.appIconPreset === "shield" && <ShieldCheck className="h-5 w-5" />}
+                          {formData.appIconPreset === "sparkles" && <Sparkles className="h-5 w-5" />}
+                          {(!formData.appIconPreset || formData.appIconPreset === "graduation") && <GraduationCap className="h-5 w-5" />}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-xs text-white truncate leading-tight">
+                        {formData.appName || "SIM Sekolah PRO"}
+                      </p>
+                      <p className="text-[10px] text-emerald-300/80 truncate">
+                        {formData.appTagline || "Sistem Informasi Manajemen"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Header / Light Style Preview */}
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white flex items-center gap-2.5 border border-slate-200 dark:border-slate-700">
+                    <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                      {formData.appLogoUrl ? (
+                        <img
+                          src={formData.appLogoUrl}
+                          alt="Logo Preview"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div>
+                          {formData.appIconPreset === "school" && <School className="h-4 w-4" />}
+                          {formData.appIconPreset === "book" && <BookOpen className="h-4 w-4" />}
+                          {formData.appIconPreset === "shield" && <ShieldCheck className="h-4 w-4" />}
+                          {formData.appIconPreset === "sparkles" && <Sparkles className="h-4 w-4" />}
+                          {(!formData.appIconPreset || formData.appIconPreset === "graduation") && <GraduationCap className="h-4 w-4" />}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-xs truncate leading-tight">
+                        {formData.appName || "SIM Sekolah PRO"}
+                      </p>
+                      <p className="text-[9px] text-slate-500 dark:text-slate-400 truncate">
+                        {formData.appTagline || "Sistem Informasi Manajemen"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Kustomisasi Tampilan Awal (Landing Page) */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-indigo-50/50 via-slate-50/40 to-white dark:from-slate-800/60 dark:via-slate-900 dark:to-slate-900 border border-indigo-200/70 dark:border-indigo-900/50 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-indigo-100 dark:border-indigo-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-sm">
+                  <Monitor className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Kustomisasi Tampilan Awal (Landing Page)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Atur teks sambutan, judul banner hero, deskripsi, dan tombol aksi pada halaman depan (/) aplikasi.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Badge Hero */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Teks Badge Status / Pengumuman Singkat
+                </label>
+                <input
+                  type="text"
+                  disabled={!canEdit}
+                  value={formData.landingHeroBadge || ""}
+                  onChange={(e) => setFormData({ ...formData, landingHeroBadge: e.target.value })}
+                  placeholder="Contoh: Platform Manajemen Sekolah Generasi Terbaru #1"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Pita kecil di atas judul utama dengan indikator titik hijau berdenyut.
+                </p>
+              </div>
+
+              {/* Judul Utama Hero */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Judul Utama Hero (Hero Heading)
+                </label>
+                <input
+                  type="text"
+                  disabled={!canEdit}
+                  value={formData.landingHeroTitle || ""}
+                  onChange={(e) => setFormData({ ...formData, landingHeroTitle: e.target.value })}
+                  placeholder="Contoh: Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                />
+              </div>
+
+              {/* Subjudul / Deskripsi Hero */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Deskripsi / Paragraf Sambutan
+                </label>
+                <textarea
+                  rows={3}
+                  disabled={!canEdit}
+                  value={formData.landingHeroSubtitle || ""}
+                  onChange={(e) => setFormData({ ...formData, landingHeroSubtitle: e.target.value })}
+                  placeholder="Tuliskan pengantar singkat tentang fasilitas dan sistem sekolah..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                />
+              </div>
+
+              {/* Tombol Aksi & Demo Toggle */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Teks Tombol Masuk Sistem (Login)
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!canEdit}
+                    value={formData.landingCtaText || ""}
+                    onChange={(e) => setFormData({ ...formData, landingCtaText: e.target.value })}
+                    placeholder="Buka Portal & Form Login"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Opsi Tombol Demo Dashboard Langsung
+                  </label>
+                  <label className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      disabled={!canEdit}
+                      checked={formData.landingShowDemoButton ?? true}
+                      onChange={(e) => setFormData({ ...formData, landingShowDemoButton: e.target.checked })}
+                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-800 dark:text-slate-200 font-medium">
+                      Tampilkan tombol &ldquo;Lihat Demo Dashboard Langsung&rdquo;
+                    </span>
+                  </label>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Nonaktifkan jika ingin pengunjung wajib login terlebih dahulu melalui form login.
+                  </p>
+                </div>
+              </div>
+
+              {/* Teks Footer */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Teks Hak Cipta / Footer Tampilan Awal
+                </label>
+                <input
+                  type="text"
+                  disabled={!canEdit}
+                  value={formData.landingFooterText || ""}
+                  onChange={(e) => setFormData({ ...formData, landingFooterText: e.target.value })}
+                  placeholder="SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Section 1: Identitas Sekolah */}
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -542,7 +948,7 @@ export default function PengaturanPage() {
                 className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md shadow-blue-600/20 transition-all flex items-center gap-2"
               >
                 <Save className="h-4 w-4" />
-                <span>Simpan Perubahan Profil</span>
+                <span>Simpan Perubahan Profil & Aplikasi</span>
               </button>
             </div>
           )}
