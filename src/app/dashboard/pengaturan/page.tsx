@@ -150,9 +150,14 @@ export default function PengaturanPage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile(formData);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+    try {
+      updateProfile(formData);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 4000);
+    } catch (err: any) {
+      console.error("Gagal menyimpan profil:", err);
+      alert("Terjadi kendala saat menyimpan profil: " + (err.message || err));
+    }
   };
 
   const handleReset = () => {
@@ -418,7 +423,7 @@ export default function PengaturanPage() {
 
       {/* Main Settings Form */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8">
-        <form onSubmit={handleSave} className="space-y-6 text-xs">
+        <form onSubmit={handleSave} noValidate className="space-y-6 text-xs">
           {/* Section: Identitas & Branding Aplikasi */}
           <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-blue-50/60 via-slate-50/50 to-white dark:from-slate-800/60 dark:via-slate-900 dark:to-slate-900 border border-blue-200/70 dark:border-blue-900/50 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-blue-100 dark:border-blue-900/40">
@@ -523,11 +528,11 @@ export default function PengaturanPage() {
                     <div className="relative">
                       <LinkIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                       <input
-                        type="url"
+                        type="text"
                         disabled={!canEdit}
                         value={formData.appLogoUrl || ""}
                         onChange={(e) => setFormData({ ...formData, appLogoUrl: e.target.value })}
-                        placeholder="https://example.com/logo.png"
+                        placeholder="https://example.com/logo.png atau format Data URL"
                         className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono"
                       />
                     </div>
@@ -881,7 +886,7 @@ export default function PengaturanPage() {
                     Alamat Website Resmi
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     disabled={!canEdit}
                     value={formData.website}
                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
@@ -943,13 +948,21 @@ export default function PengaturanPage() {
                 <span>Reset Database ke Default</span>
               </button>
 
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md shadow-blue-600/20 transition-all flex items-center gap-2"
-              >
-                <Save className="h-4 w-4" />
-                <span>Simpan Perubahan Profil & Aplikasi</span>
-              </button>
+              <div className="flex items-center gap-3">
+                {isSaved && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Perubahan Berhasil Disimpan!</span>
+                  </span>
+                )}
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Simpan Perubahan Profil & Aplikasi</span>
+                </button>
+              </div>
             </div>
           )}
         </form>

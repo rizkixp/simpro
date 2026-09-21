@@ -575,8 +575,25 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
       // Hydrate all states with data from Supabase
       if (data.profile) {
-        setProfile(data.profile);
-        saveState("profile", data.profile);
+        const remoteProfile = data.profile;
+        setProfile((prevProfile) => {
+          const merged: SchoolProfile = {
+            ...prevProfile,
+            ...remoteProfile,
+            appName: remoteProfile.appName || prevProfile?.appName || INITIAL_SCHOOL_PROFILE.appName,
+            appTagline: remoteProfile.appTagline || prevProfile?.appTagline || INITIAL_SCHOOL_PROFILE.appTagline,
+            appLogoUrl: remoteProfile.appLogoUrl !== undefined && remoteProfile.appLogoUrl !== "" ? remoteProfile.appLogoUrl : (prevProfile?.appLogoUrl || ""),
+            appIconPreset: remoteProfile.appIconPreset || prevProfile?.appIconPreset || INITIAL_SCHOOL_PROFILE.appIconPreset,
+            landingHeroBadge: remoteProfile.landingHeroBadge || prevProfile?.landingHeroBadge || INITIAL_SCHOOL_PROFILE.landingHeroBadge,
+            landingHeroTitle: remoteProfile.landingHeroTitle || prevProfile?.landingHeroTitle || INITIAL_SCHOOL_PROFILE.landingHeroTitle,
+            landingHeroSubtitle: remoteProfile.landingHeroSubtitle || prevProfile?.landingHeroSubtitle || INITIAL_SCHOOL_PROFILE.landingHeroSubtitle,
+            landingCtaText: remoteProfile.landingCtaText || prevProfile?.landingCtaText || INITIAL_SCHOOL_PROFILE.landingCtaText,
+            landingShowDemoButton: remoteProfile.landingShowDemoButton !== undefined ? remoteProfile.landingShowDemoButton : (prevProfile?.landingShowDemoButton !== undefined ? prevProfile.landingShowDemoButton : true),
+            landingFooterText: remoteProfile.landingFooterText || prevProfile?.landingFooterText || INITIAL_SCHOOL_PROFILE.landingFooterText,
+          };
+          saveState("profile", merged);
+          return merged;
+        });
       }
       if (data.siswa && data.siswa.length > 0) {
         setSiswaList(data.siswa);
