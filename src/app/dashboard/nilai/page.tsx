@@ -2147,47 +2147,65 @@ export default function NilaiManagementPage() {
       {/* ========================================================================= */}
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 relative my-6 max-h-[92vh] flex flex-col">
-            <button
-              onClick={() => setIsBulkModalOpen(false)}
-              className="absolute top-5 right-5 p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
+          <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 relative my-auto max-h-[94vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 mb-4 shrink-0">
-              <div>
-                <div className="flex items-center gap-2 text-amber-500 mb-1">
-                  <Zap className="h-5 w-5 fill-amber-500" />
-                  <span className="text-xs font-bold uppercase tracking-wider">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 px-5 sm:px-7 py-4 shrink-0 bg-white dark:bg-slate-900">
+              <div className="pr-4">
+                <div className="flex items-center gap-2 text-amber-500 mb-0.5">
+                  <Zap className="h-4 w-4 fill-amber-500" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">
                     Input Nilai Massal &bull; Multi-Penilaian &amp; Dual-Mode
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
                   Input Bulk Nilai &mdash; {bulkInputMode === "per-kelas" ? `Per Rombel (${bulkSelectedKelas || "Pilih Kelas"})` : `Per Siswa (${selectedBulkStudent?.nama || "Pilih Siswa"})`}
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-[11px] text-slate-500">
                   {bulkIsTengah
                     ? "Mode Sumatif Tengah Semester (STS): Hanya menginput Nilai Ujian STS (100%) tanpa catatan perkembangan."
                     : "Mode Sumatif Akhir Semester (SAS): Menginput Harian (UH 30%), STS (30%), SAS (40%), dan Catatan Capaian Belajar."}
                 </p>
               </div>
 
-              {/* Mode Switcher Button to Satuan */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsBulkModalOpen(false);
-                  handleOpenAdd();
-                }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 self-start sm:self-center cursor-pointer"
-              >
-                Ganti ke Input Satuan &rarr;
-              </button>
+              {/* Action Buttons di Header: Input Satuan, Tombol Simpan Cepat, & Tombol Tutup */}
+              <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBulkModalOpen(false);
+                    handleOpenAdd();
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer transition-colors"
+                >
+                  Input Satuan &rarr;
+                </button>
+
+                {/* Tombol Simpan di Atas Header */}
+                <button
+                  type="button"
+                  onClick={(e) => handleSaveBulk(e)}
+                  className={`px-4 py-2 rounded-xl text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                    bulkIsTengah
+                      ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-500/25"
+                      : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/25"
+                  }`}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Simpan Nilai {bulkIsTengah ? "STS" : "SAS"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer ml-1"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleSaveBulk} className="flex flex-col flex-1 min-h-0 space-y-4 text-xs overflow-hidden">
+            <form onSubmit={handleSaveBulk} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-4 space-y-4 text-xs min-h-0">
               {/* Bagian Kontrol Atas: 4 Tab Penilaian & Mode Pengisian */}
               <div className="space-y-3 shrink-0">
                 {/* 1. Baris 4 Jenis Penilaian */}
@@ -3033,9 +3051,11 @@ export default function NilaiManagementPage() {
                   </tbody>
                 </table>
               </div>
+              {/* Tutup Scrollable Content Area */}
+              </div>
 
-              {/* Step 4: Ringkasan Rata-Rata & Tombol Simpan */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
+              {/* Step 4: Pinned Sticky Bottom Footer: Ringkasan Rata-Rata & Tombol Simpan Utama */}
+              <div className="px-5 sm:px-7 py-3.5 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 z-20 shadow-lg">
                 <div className="flex flex-wrap items-center gap-5 text-xs">
                   {bulkInputMode === "per-kelas" ? (
                     bulkIsTengah ? (
@@ -3141,13 +3161,13 @@ export default function NilaiManagementPage() {
                   <button
                     type="button"
                     onClick={() => setIsBulkModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 cursor-pointer text-xs font-semibold"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className={`px-5 py-2.5 rounded-xl text-white font-bold shadow-md flex items-center gap-2 cursor-pointer ${
+                    className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95 ${
                       bulkIsTengah
                         ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-500/20"
                         : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/20"
@@ -3185,19 +3205,29 @@ export default function NilaiManagementPage() {
                 <Calculator className="h-5 w-5" />
                 <span className="text-xs font-bold uppercase tracking-wider">Input Satuan Mapel</span>
               </div>
-              {!editingId && (
+              <div className="flex items-center gap-2">
+                {!editingId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsInputModalOpen(false);
+                      handleOpenBulkAdd(formData.siswaId);
+                    }}
+                    className="text-xs font-bold text-amber-600 hover:underline flex items-center gap-1"
+                  >
+                    <Zap className="h-3.5 w-3.5 fill-amber-500" />
+                    <span>Mode Bulk &rarr;</span>
+                  </button>
+                )}
                 <button
-                  type="button"
-                  onClick={() => {
-                    setIsInputModalOpen(false);
-                    handleOpenBulkAdd(formData.siswaId);
-                  }}
-                  className="text-xs font-bold text-amber-600 hover:underline flex items-center gap-1"
+                  type="submit"
+                  form="singleForm"
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm flex items-center gap-1 cursor-pointer transition-all active:scale-95"
                 >
-                  <Zap className="h-3.5 w-3.5 fill-amber-500" />
-                  <span>Buka Mode Bulk &rarr;</span>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Simpan Nilai</span>
                 </button>
-              )}
+              </div>
             </div>
 
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -3207,7 +3237,7 @@ export default function NilaiManagementPage() {
               Nilai otomatis diproses untuk <strong>Rapor Tengah Semester (100% Ujian STS)</strong> dan <strong>Rapor Akhir Semester (30% UH + 30% Mid + 40% UAS)</strong>.
             </p>
 
-            <form onSubmit={handleSaveSingle} className="space-y-4 text-xs">
+            <form id="singleForm" onSubmit={handleSaveSingle} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Pilih Siswa *
