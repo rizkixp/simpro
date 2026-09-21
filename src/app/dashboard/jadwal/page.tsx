@@ -31,6 +31,7 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Zap,
+  Cloud,
 } from "lucide-react";
 
 type ActiveMenu = "lihat" | "tambah" | "edit" | "hapus" | "mapel";
@@ -59,6 +60,11 @@ export default function JadwalPage() {
     addMapel,
     updateMapel,
     deleteMapel,
+    isSupabaseConnected,
+    isSyncing,
+    lastSyncTime,
+    syncWithSupabase,
+    isAutoPushing,
   } = useSchoolData();
 
   // Active Menu: "lihat" | "tambah" | "edit" | "hapus" | "mapel"
@@ -989,17 +995,65 @@ export default function JadwalPage() {
               <CalendarDays className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-                Jadwal Pelajaran & KBM
-              </h1>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Jadwal Pelajaran & KBM
+                </h1>
+                {/* Cloud Status Badge */}
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                    isSyncing || isAutoPushing
+                      ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+                      : isSupabaseConnected
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                      : "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                  }`}
+                  title={isSupabaseConnected ? "Tersambung ke Supabase Cloud (Sinkronisasi Otomatis Aktif)" : "Mode Penyimpanan Lokal"}
+                >
+                  {isSyncing || isAutoPushing ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Sinkronisasi Cloud...</span>
+                    </>
+                  ) : isSupabaseConnected ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Cloud Terhubung (Supabase)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      <span>Penyimpanan Lokal</span>
+                    </>
+                  )}
+                </span>
+              </div>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Pusat pengelolaan agenda KBM sekolah: Menu Tambah, Hapus, dan Edit jadwal pelajaran per rombel kelas.
+                Pusat pengelolaan agenda KBM sekolah: Menu Tambah, Hapus, dan Edit jadwal pelajaran per rombel kelas &bull; Terhubung otomatis ke Supabase.
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await syncWithSupabase();
+                showToast("Data jadwal pelajaran berhasil disinkronkan dari Supabase Cloud!", "success");
+              } catch (e: any) {
+                showToast(e.message || "Gagal sinkronisasi data cloud.", "error");
+              }
+            }}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 rounded-xl transition-colors border border-emerald-200 dark:border-emerald-800 cursor-pointer disabled:opacity-60"
+            title="Tarik data jadwal pelajaran & mapel terbaru langsung dari Supabase Cloud"
+          >
+            <Cloud className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            <span>{isSyncing ? "Menyinkronkan..." : "Sinkron Cloud"}</span>
+          </button>
+
           {user?.role === "admin" && (
             <button
               onClick={() => setIsResetDefaultModalOpen(true)}
