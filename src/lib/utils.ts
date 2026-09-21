@@ -27,12 +27,13 @@ export function formatDateIndo(dateStr: string): string {
   }
 }
 
-export function calculateMidGrade(harian: number, uts: number): {
+export function calculateMidGrade(harianOrUts: number, uts?: number): {
   nilaiMid: number;
   predikatMid: "A" | "B" | "C" | "D";
 } {
-  // Bobot Rapor Tengah Semester: 50% Ulangan Harian, 50% Ujian Mid
-  const nilaiMid = Math.round((harian * 0.5) + (uts * 0.5));
+  // Bobot Rapor Sumatif Tengah Semester (STS): 100% Nilai Ujian STS (tanpa Ulangan Harian)
+  const examScore = typeof uts === "number" ? uts : harianOrUts;
+  const nilaiMid = Math.round(examScore);
   let predikatMid: "A" | "B" | "C" | "D" = "D";
 
   if (nilaiMid >= 88) predikatMid = "A";

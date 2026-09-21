@@ -1010,7 +1010,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       : updated.findIndex(
           (n) =>
             n.siswaId === data.siswaId &&
-            n.mapel.toLowerCase() === data.mapel.toLowerCase()
+            n.mapel.toLowerCase() === data.mapel.toLowerCase() &&
+            (n.semester || "Ganjil").toLowerCase() === (data.semester || "Ganjil").toLowerCase()
         );
 
     if (existingIndex >= 0) {
@@ -1042,7 +1043,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         : updated.findIndex(
             (n) =>
               n.siswaId === item.siswaId &&
-              n.mapel.toLowerCase() === item.mapel.toLowerCase()
+              n.mapel.toLowerCase() === item.mapel.toLowerCase() &&
+              (n.semester || "Ganjil").toLowerCase() === (item.semester || "Ganjil").toLowerCase()
           );
 
       if (existingIndex >= 0) {

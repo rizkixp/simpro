@@ -426,10 +426,10 @@ export default function DashboardOverviewPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {(studentNilaiRecords.length > 0 ? studentNilaiRecords : [
-                      { id: "1", mapel: "Pendidikan Agama Islam", kkm: 78, tugas: 90, uts: 88, uas: 92, nilaiMid: 89, nilaiAkhir: 91, predikat: "A", catatan: "Sangat baik dalam pemahaman akidah dan hafalan doa harian." },
-                      { id: "2", mapel: "Matematika", kkm: 75, tugas: 85, uts: 82, uas: 88, nilaiMid: 84, nilaiAkhir: 86, predikat: "A", catatan: "Mampu menyelesaikan soal pemecahan masalah dengan sistematis." },
-                      { id: "3", mapel: "Bahasa Arab", kkm: 75, tugas: 88, uts: 85, uas: 90, nilaiMid: 87, nilaiAkhir: 89, predikat: "A", catatan: "Kosa kata dan pelafalan makharijul huruf sangat fasih." },
-                      { id: "4", mapel: "Tahfidz Al-Qur'an", kkm: 80, tugas: 95, uts: 92, uas: 96, nilaiMid: 94, nilaiAkhir: 95, predikat: "A", catatan: "Mutqin juz 30 dengan tajwid yang sangat rapi." },
+                      { id: "1", mapel: "Pendidikan Agama Islam", kkm: 78, tugas: 90, uts: 88, uas: 92, nilaiMid: 88, nilaiAkhir: 91, predikat: "A", catatan: "Sangat baik dalam pemahaman akidah dan hafalan doa harian." },
+                      { id: "2", mapel: "Matematika", kkm: 75, tugas: 85, uts: 82, uas: 88, nilaiMid: 82, nilaiAkhir: 86, predikat: "A", catatan: "Mampu menyelesaikan soal pemecahan masalah dengan sistematis." },
+                      { id: "3", mapel: "Bahasa Arab", kkm: 75, tugas: 88, uts: 85, uas: 90, nilaiMid: 85, nilaiAkhir: 89, predikat: "A", catatan: "Kosa kata dan pelafalan makharijul huruf sangat fasih." },
+                      { id: "4", mapel: "Tahfidz Al-Qur'an", kkm: 80, tugas: 95, uts: 92, uas: 96, nilaiMid: 92, nilaiAkhir: 95, predikat: "A", catatan: "Mutqin juz 30 dengan tajwid yang sangat rapi." },
                     ]).slice(0, 4).map((rec, i) => (
                       <tr key={rec.id || i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                         <td className="px-4 py-2.5 font-bold text-slate-900 dark:text-white">{rec.mapel}</td>

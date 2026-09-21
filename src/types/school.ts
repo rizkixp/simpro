@@ -106,8 +106,8 @@ export interface NilaiSiswa {
   tugas: number; // Rata-rata Ulangan Harian / Tugas Harian
   uts: number; // Ujian Mid Semester (UTS / PTS)
   uas: number; // Ujian Akhir Semester (UAS / PAS)
-  // Komponen Rapor Tengah Semester (PTS / Mid)
-  nilaiMid?: number; // Hasil Rapor Tengah Semester: 50% UH + 50% Mid
+  // Komponen Rapor Tengah Semester (STS / Mid)
+  nilaiMid?: number; // Hasil Rapor Tengah Semester: 100% Ujian STS (tanpa UH)
   predikatMid?: "A" | "B" | "C" | "D";
   catatanMid?: string;
   // Komponen Rapor Akhir Semester (PAS / Semester)

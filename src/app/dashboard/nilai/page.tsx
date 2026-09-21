@@ -81,8 +81,15 @@ export default function NilaiManagementPage() {
   const [isManageDeleteModalOpen, setIsManageDeleteModalOpen] = useState(false);
   const [manageSiswaId, setManageSiswaId] = useState<string>("");
 
-  // Active Rapor Tab: "tengah" (PTS) | "akhir" (PAS) | "semua"
-  const [activeRaporTab, setActiveRaporTab] = useState<"tengah" | "akhir" | "semua">("tengah");
+  // Active Rapor Tab: 4 tabs (STS Ganjil, SAS Ganjil, STS Genap, SAS Genap) + Semua Rekap
+  type ActiveRaporTabType = "sts-ganjil" | "sas-ganjil" | "sts-genap" | "sas-genap" | "semua";
+  const [activeRaporTab, setActiveRaporTab] = useState<ActiveRaporTabType>("sts-ganjil");
+
+  // Derived active assessment mode & semester
+  const isTengah = activeRaporTab === "sts-ganjil" || activeRaporTab === "sts-genap";
+  const activeSemester: "Ganjil" | "Genap" =
+    activeRaporTab === "sts-genap" || activeRaporTab === "sas-genap" ? "Genap" : "Ganjil";
+  const activeAssessmentType: JenisRapor = isTengah ? "tengah" : "akhir";
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedKelas, setSelectedKelas] = useState("Semua");
@@ -95,6 +102,7 @@ export default function NilaiManagementPage() {
   // Bulk Input Modal State (All Subjects for One Student)
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkSiswaId, setBulkSiswaId] = useState<string>("");
+  const [bulkSemester, setBulkSemester] = useState<"Ganjil" | "Genap">("Ganjil");
   const [bulkRows, setBulkRows] = useState<
     {
       mapel: string;
@@ -116,22 +124,27 @@ export default function NilaiManagementPage() {
   // E-Rapor Modal Print Preview (Single Student)
   const [raporSiswa, setRaporSiswa] = useState<Siswa | null>(null);
   const [raporPrintType, setRaporPrintType] = useState<JenisRapor>("tengah");
+  const [raporPrintSemester, setRaporPrintSemester] = useState<"Ganjil" | "Genap">("Ganjil");
 
   // E-Rapor Batch (Seluruh Siswa Rombel) Modal State
   const [isBatchRaporOpen, setIsBatchRaporOpen] = useState(false);
   const [batchRaporType, setBatchRaporType] = useState<JenisRapor>("tengah");
+  const [batchRaporSemester, setBatchRaporSemester] = useState<"Ganjil" | "Genap">("Ganjil");
   const [batchRaporViewMode, setBatchRaporViewMode] = useState<"bundel" | "leger">("bundel");
   const [batchSelectedKelas, setBatchSelectedKelas] = useState<string>("Semua");
 
   // WhatsApp Share State
   const [isWaModalOpen, setIsWaModalOpen] = useState(false);
   const [waTargetSiswa, setWaTargetSiswa] = useState<Siswa | null>(null);
+  const [waRaporType, setWaRaporType] = useState<JenisRapor>("tengah");
+  const [waRaporSemester, setWaRaporSemester] = useState<"Ganjil" | "Genap">("Ganjil");
   const [isCopiedWa, setIsCopiedWa] = useState(false);
 
   // Single Form State for Grade Input / Editing
   const [formData, setFormData] = useState({
     siswaId: "",
     mapel: "Matematika",
+    semester: "Ganjil" as "Ganjil" | "Genap",
     tugas: 80, // Ulangan Harian (UH)
     uts: 80, // Ujian Mid / PTS
     uas: 85, // Ujian Akhir / PAS
@@ -151,16 +164,11 @@ export default function NilaiManagementPage() {
 
   // Grade resolution helpers with automatic calculation fallback
   const getStudentMid = (n: NilaiSiswa) => {
-    if (typeof n.nilaiMid === "number" && n.predikatMid) {
-      return {
-        nilaiMid: n.nilaiMid,
-        predikatMid: n.predikatMid,
-        catatanMid: n.catatanMid || n.catatan || "Mengikuti pembelajaran dengan baik.",
-      };
-    }
-    const calc = calculateMidGrade(n.tugas, n.uts);
+    // Nilai STS murni 100% dari Ujian STS (uts)
+    const examScore = typeof n.uts === "number" ? n.uts : (typeof n.nilaiMid === "number" ? n.nilaiMid : 0);
+    const calc = calculateMidGrade(examScore);
     return {
-      nilaiMid: calc.nilaiMid,
+      nilaiMid: examScore,
       predikatMid: calc.predikatMid,
       catatanMid: n.catatanMid || n.catatan || "Mengikuti pembelajaran dengan baik.",
     };
@@ -182,7 +190,7 @@ export default function NilaiManagementPage() {
     };
   };
 
-  // Filtered nilai based on search and selected filters
+  // Filtered nilai based on search, selected filters, and active tab semester
   const filteredNilai = baseNilaiList.filter((n) => {
     const matchSearch =
       n.siswaNama.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -195,7 +203,12 @@ export default function NilaiManagementPage() {
     const matchMapel =
       selectedMapel === "Semua" ||
       n.mapel.toLowerCase() === selectedMapel.toLowerCase();
-    return matchSearch && matchKelas && matchMapel;
+    const matchSemester =
+      activeRaporTab === "semua"
+        ? true
+        : (n.semester || "Ganjil").toLowerCase() === activeSemester.toLowerCase();
+
+    return matchSearch && matchKelas && matchMapel && matchSemester;
   });
 
   // KPI Statistics calculations
@@ -212,7 +225,7 @@ export default function NilaiManagementPage() {
       : 0;
 
   const tuntasCount = filteredNilai.filter((n) => {
-    if (activeRaporTab === "tengah") return getStudentMid(n).nilaiMid >= 75;
+    if (isTengah) return getStudentMid(n).nilaiMid >= 75;
     return getStudentAkhir(n).nilaiAkhir >= 75;
   }).length;
 
@@ -229,6 +242,7 @@ export default function NilaiManagementPage() {
     setFormData({
       siswaId: defaultSiswa?.id || "",
       mapel: defaultMapel,
+      semester: activeSemester,
       tugas: 82,
       uts: 80,
       uas: 85,
@@ -245,6 +259,7 @@ export default function NilaiManagementPage() {
     setFormData({
       siswaId: n.siswaId,
       mapel: n.mapel,
+      semester: n.semester || activeSemester,
       tugas: n.tugas,
       uts: n.uts,
       uas: n.uas,
@@ -264,9 +279,8 @@ export default function NilaiManagementPage() {
       siswaList.find((s) => s.id === formData.siswaId);
     if (!siswa) return;
 
-    // Kalkulasi nilai tengah semester (PTS): 50% UH + 50% Mid
+    // Kalkulasi nilai tengah semester (STS): 100% Nilai Ujian STS
     const { nilaiMid, predikatMid } = calculateMidGrade(
-      Number(formData.tugas),
       Number(formData.uts)
     );
 
@@ -277,6 +291,8 @@ export default function NilaiManagementPage() {
       Number(formData.uas)
     );
 
+    const targetSemester = formData.semester || activeSemester;
+
     saveNilai({
       id: editingId || undefined,
       siswaId: siswa.id,
@@ -284,7 +300,7 @@ export default function NilaiManagementPage() {
       nisn: siswa.nisn,
       kelas: siswa.kelas,
       mapel: formData.mapel,
-      semester: profile.semesterAktif,
+      semester: targetSemester,
       tahunAjaran: profile.tahunAjaranAktif,
       tugas: Number(formData.tugas),
       uts: Number(formData.uts),
@@ -301,20 +317,22 @@ export default function NilaiManagementPage() {
     setNotification({
       type: "success",
       message: editingId
-        ? `Nilai mata pelajaran "${formData.mapel}" untuk ${siswa.nama} berhasil diperbarui.`
-        : `Nilai mata pelajaran "${formData.mapel}" untuk ${siswa.nama} berhasil disimpan.`,
+        ? `Nilai mata pelajaran "${formData.mapel}" (${targetSemester}) untuk ${siswa.nama} berhasil diperbarui.`
+        : `Nilai mata pelajaran "${formData.mapel}" (${targetSemester}) untuk ${siswa.nama} berhasil disimpan.`,
     });
   };
 
   // Bulk Input Handlers (All Subjects for One Student)
-  const initBulkRowsForStudent = (targetSiswaId: string) => {
+  const initBulkRowsForStudent = (targetSiswaId: string, sem: "Ganjil" | "Genap" = activeSemester) => {
     const targetSiswa = siswaList.find((s) => s.id === targetSiswaId);
     if (!targetSiswa) return;
 
     // Subjects to show
     const subjects = mapelList;
 
-    const existingStudentNilai = nilaiList.filter((n) => n.siswaId === targetSiswaId);
+    const existingStudentNilai = nilaiList.filter(
+      (n) => n.siswaId === targetSiswaId && (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase()
+    );
 
     const rows = subjects.map((m) => {
       const existing = existingStudentNilai.find(
@@ -348,7 +366,12 @@ export default function NilaiManagementPage() {
 
   const handleBulkSiswaChange = (newSiswaId: string) => {
     setBulkSiswaId(newSiswaId);
-    initBulkRowsForStudent(newSiswaId);
+    initBulkRowsForStudent(newSiswaId, bulkSemester);
+  };
+
+  const handleBulkSemesterChange = (newSemester: "Ganjil" | "Genap") => {
+    setBulkSemester(newSemester);
+    initBulkRowsForStudent(bulkSiswaId, newSemester);
   };
 
   const handleBulkRowChange = (
@@ -364,10 +387,12 @@ export default function NilaiManagementPage() {
     setBulkRows(updated);
   };
 
-  const handleOpenBulkAdd = (preselectedSiswaId?: string) => {
+  const handleOpenBulkAdd = (preselectedSiswaId?: string, sem?: "Ganjil" | "Genap") => {
     const targetId = preselectedSiswaId || baseSiswaList[0]?.id || siswaList[0]?.id || "";
+    const targetSem = sem || activeSemester;
     setBulkSiswaId(targetId);
-    initBulkRowsForStudent(targetId);
+    setBulkSemester(targetSem);
+    initBulkRowsForStudent(targetId, targetSem);
     setIsBulkModalOpen(true);
   };
 
@@ -390,7 +415,7 @@ export default function NilaiManagementPage() {
     if (!siswa) return;
 
     const itemsToSave = bulkRows.map((row) => {
-      const { nilaiMid, predikatMid } = calculateMidGrade(Number(row.tugas), Number(row.uts));
+      const { nilaiMid, predikatMid } = calculateMidGrade(Number(row.uts));
       const { nilaiAkhir, predikat } = calculateSemesterGrade(
         Number(row.tugas),
         Number(row.uts),
@@ -404,7 +429,7 @@ export default function NilaiManagementPage() {
         nisn: siswa.nisn,
         kelas: siswa.kelas,
         mapel: row.mapel,
-        semester: profile.semesterAktif,
+        semester: bulkSemester,
         tahunAjaran: profile.tahunAjaranAktif,
         tugas: Number(row.tugas),
         uts: Number(row.uts),
@@ -422,7 +447,7 @@ export default function NilaiManagementPage() {
     setIsBulkModalOpen(false);
     setNotification({
       type: "success",
-      message: `Nilai seluruh mata pelajaran (${itemsToSave.length} mapel) untuk ${siswa.nama} berhasil disimpan.`,
+      message: `Nilai seluruh mata pelajaran (${itemsToSave.length} mapel) Semester ${bulkSemester} untuk ${siswa.nama} berhasil disimpan.`,
     });
   };
 
@@ -485,9 +510,10 @@ export default function NilaiManagementPage() {
   }, [notification]);
 
   // E-Rapor Print Modal Handlers
-  const handleOpenRapor = (siswa: Siswa, type?: JenisRapor) => {
+  const handleOpenRapor = (siswa: Siswa, type?: JenisRapor, sem?: "Ganjil" | "Genap") => {
     setRaporSiswa(siswa);
-    setRaporPrintType(type || (activeRaporTab === "akhir" ? "akhir" : "tengah"));
+    setRaporPrintType(type || activeAssessmentType);
+    setRaporPrintSemester(sem || activeSemester);
   };
 
   // Single Student Navigation in Modal
@@ -534,16 +560,18 @@ export default function NilaiManagementPage() {
   };
 
   // Generate official Islamic formatted WhatsApp message for student report
-  const generateRaporWhatsAppText = (siswa: Siswa, type: JenisRapor) => {
-    const records = nilaiList.filter((n) => n.siswaId === siswa.id);
-    const isTengah = type === "tengah";
-    const typeLabel = isTengah ? "Sumatif Tengah Semester (STS)" : "Akhir Semester (PAS)";
+  const generateRaporWhatsAppText = (siswa: Siswa, type: JenisRapor, sem: "Ganjil" | "Genap" = waRaporSemester) => {
+    const records = nilaiList.filter(
+      (n) => n.siswaId === siswa.id && (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase()
+    );
+    const isMid = type === "tengah";
+    const typeLabel = isMid ? "Sumatif Tengah Semester (STS)" : "Akhir Semester (PAS)";
     const avgScore =
       records.length > 0
         ? Math.round(
             records.reduce(
               (acc, curr) =>
-                acc + (isTengah ? getStudentMid(curr).nilaiMid : getStudentAkhir(curr).nilaiAkhir),
+                acc + (isMid ? getStudentMid(curr).nilaiMid : getStudentAkhir(curr).nilaiAkhir),
               0
             ) / records.length
           )
@@ -559,17 +587,17 @@ export default function NilaiManagementPage() {
     msg += `👤 *Nama:* ${siswa.nama}\n`;
     msg += `🆔 *NISN:* ${siswa.nisn}\n`;
     msg += `🏫 *Kelas:* ${siswa.kelas}\n`;
-    msg += `📅 *Periode:* Rapor ${typeLabel} (TA ${profile.tahunAjaranAktif})\n\n`;
+    msg += `📅 *Periode:* Rapor ${typeLabel} (Semester ${sem} - TA ${profile.tahunAjaranAktif})\n\n`;
     msg += `Alhamdulillah, berikut ringkasan capaian kompetensi belajar ananda:\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
 
     if (records.length === 0) {
-      msg += `_(Data nilai mata pelajaran belum diinputkan)_\n`;
+      msg += `_(Data nilai mata pelajaran Semester ${sem} belum diinputkan)_\n`;
     } else {
       records.forEach((r, i) => {
-        const score = isTengah ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
-        const pred = isTengah ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
-        const note = isTengah ? getStudentMid(r).catatanMid : getStudentAkhir(r).catatan;
+        const score = isMid ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
+        const pred = isMid ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
+        const note = isMid ? getStudentMid(r).catatanMid : getStudentAkhir(r).catatan;
         msg += `${i + 1}. *${r.mapel}*: ${score} (${pred})\n`;
         if (note && note !== "-") {
           msg += `   _Catatan:_ "${note}"\n`;
@@ -590,15 +618,21 @@ export default function NilaiManagementPage() {
     return msg;
   };
 
-  const handleOpenWhatsAppModal = (siswa: Siswa) => {
+  const handleOpenWhatsAppModal = (siswa: Siswa, type?: JenisRapor, sem?: "Ganjil" | "Genap") => {
     setWaTargetSiswa(siswa);
+    setWaRaporType(type || activeAssessmentType);
+    setWaRaporSemester(sem || activeSemester);
     setIsCopiedWa(false);
     setIsWaModalOpen(true);
   };
 
-  // Nilai records for selected rapor siswa
+  // Nilai records for selected rapor siswa filtered by chosen print semester
   const studentNilaiRecords = raporSiswa
-    ? nilaiList.filter((n) => n.siswaId === raporSiswa.id)
+    ? nilaiList.filter(
+        (n) =>
+          n.siswaId === raporSiswa.id &&
+          (n.semester || "Ganjil").toLowerCase() === (raporPrintSemester || "Ganjil").toLowerCase()
+      )
     : [];
 
   const studentMidAverage =
@@ -627,7 +661,7 @@ export default function NilaiManagementPage() {
   });
 
   // Live preview calculations for single form modal
-  const liveMid = calculateMidGrade(Number(formData.tugas) || 0, Number(formData.uts) || 0);
+  const liveMid = calculateMidGrade(Number(formData.uts) || 0);
   const liveAkhir = calculateSemesterGrade(
     Number(formData.tugas) || 0,
     Number(formData.uts) || 0,
@@ -642,7 +676,7 @@ export default function NilaiManagementPage() {
     bulkRows.length > 0
       ? Math.round(
           bulkRows.reduce(
-            (acc, r) => acc + calculateMidGrade(Number(r.tugas), Number(r.uts)).nilaiMid,
+            (acc, r) => acc + calculateMidGrade(Number(r.uts)).nilaiMid,
             0
           ) / bulkRows.length
         )
@@ -703,7 +737,8 @@ export default function NilaiManagementPage() {
           <button
             onClick={() => {
               setBatchRaporViewMode("bundel");
-              setBatchRaporType(activeRaporTab === "akhir" ? "akhir" : "tengah");
+              setBatchRaporType(isTengah ? "tengah" : "akhir");
+              setBatchRaporSemester(activeSemester);
               setBatchSelectedKelas(selectedKelas !== "Semua" ? selectedKelas : "Semua");
               setIsBatchRaporOpen(true);
             }}
@@ -717,7 +752,8 @@ export default function NilaiManagementPage() {
           <button
             onClick={() => {
               setBatchRaporViewMode("leger");
-              setBatchRaporType(activeRaporTab === "akhir" ? "akhir" : "tengah");
+              setBatchRaporType(isTengah ? "tengah" : "akhir");
+              setBatchRaporSemester(activeSemester);
               setBatchSelectedKelas(selectedKelas !== "Semua" ? selectedKelas : "Semua");
               setIsBatchRaporOpen(true);
             }}
@@ -794,42 +830,44 @@ export default function NilaiManagementPage() {
         </div>
       )}
 
-      {/* Rapor Type Switcher Tabs */}
+      {/* Rapor Type Switcher Tabs - 4 Tabs: STS Ganjil, SAS Ganjil, STS Genap, SAS Genap + Rekap */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 no-print">
+        {/* Tab 1: STS Ganjil */}
         <button
-          onClick={() => setActiveRaporTab("tengah")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
-            activeRaporTab === "tengah"
+          onClick={() => setActiveRaporTab("sts-ganjil")}
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            activeRaporTab === "sts-ganjil"
               ? "bg-amber-500 text-white shadow-md shadow-amber-500/20"
               : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
           }`}
         >
           <Calendar className="h-4 w-4" />
-          <span>Sumatif Tengah Semester (STS)</span>
+          <span>Sumatif Tengah Semester (STS) Ganjil</span>
           <span
             className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-              activeRaporTab === "tengah"
+              activeRaporTab === "sts-ganjil"
                 ? "bg-white/20 text-white"
                 : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
             }`}
           >
-            50% UH + 50% Mid
+            100% Ujian STS
           </span>
         </button>
 
+        {/* Tab 2: SAS Ganjil */}
         <button
-          onClick={() => setActiveRaporTab("akhir")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
-            activeRaporTab === "akhir"
+          onClick={() => setActiveRaporTab("sas-ganjil")}
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            activeRaporTab === "sas-ganjil"
               ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
               : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
           }`}
         >
           <GraduationCap className="h-4 w-4" />
-          <span>Rapor Akhir Semester (PAS)</span>
+          <span>Sumatif Akhir Semester (SAS) Ganjil</span>
           <span
             className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-              activeRaporTab === "akhir"
+              activeRaporTab === "sas-ganjil"
                 ? "bg-white/20 text-white"
                 : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
             }`}
@@ -838,9 +876,54 @@ export default function NilaiManagementPage() {
           </span>
         </button>
 
+        {/* Tab 3: STS Genap */}
+        <button
+          onClick={() => setActiveRaporTab("sts-genap")}
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            activeRaporTab === "sts-genap"
+              ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
+          }`}
+        >
+          <Calendar className="h-4 w-4" />
+          <span>Sumatif Tengah Semester (STS) Genap</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              activeRaporTab === "sts-genap"
+                ? "bg-white/20 text-white"
+                : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+            }`}
+          >
+            100% Ujian STS
+          </span>
+        </button>
+
+        {/* Tab 4: SAS Genap */}
+        <button
+          onClick={() => setActiveRaporTab("sas-genap")}
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+            activeRaporTab === "sas-genap"
+              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
+          }`}
+        >
+          <GraduationCap className="h-4 w-4" />
+          <span>Sumatif Akhir Semester (SAS) Genap</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              activeRaporTab === "sas-genap"
+                ? "bg-white/20 text-white"
+                : "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300"
+            }`}
+          >
+            30% UH + 30% Mid + 40% UAS
+          </span>
+        </button>
+
+        {/* Tab 5: Rekap Komponen Lengkap */}
         <button
           onClick={() => setActiveRaporTab("semua")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeRaporTab === "semua"
               ? "bg-slate-800 text-white dark:bg-slate-700 shadow-md"
               : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
@@ -856,18 +939,18 @@ export default function NilaiManagementPage() {
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold text-slate-400">
-              {activeRaporTab === "tengah"
-                ? "Rata-Rata Sumatif Tengah Semester (STS)"
-                : activeRaporTab === "akhir"
-                ? "Rata-Rata Rapor Akhir Semester"
-                : "Rata-Rata Nilai Keseluruhan"}
+              {isTengah
+                ? `Rata-Rata Sumatif Tengah Semester (STS) ${activeSemester}`
+                : activeRaporTab === "semua"
+                ? "Rata-Rata Nilai Keseluruhan"
+                : `Rata-Rata Sumatif Akhir Semester (SAS) ${activeSemester}`}
             </p>
             <p className="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-1">
-              {activeRaporTab === "tengah"
+              {isTengah
                 ? avgMidScore
-                : activeRaporTab === "akhir"
-                ? avgAkhirScore
-                : Math.round((avgMidScore + avgAkhirScore) / 2 || 0)}
+                : activeRaporTab === "semua"
+                ? Math.round((avgMidScore + avgAkhirScore) / 2 || 0)
+                : avgAkhirScore}
             </p>
             <span className="text-[10px] text-slate-500">
               Target KKM Standar: &ge; 75
@@ -875,7 +958,7 @@ export default function NilaiManagementPage() {
           </div>
           <div
             className={`p-3 rounded-xl ${
-              activeRaporTab === "tengah"
+              isTengah
                 ? "bg-amber-500/10 text-amber-600"
                 : "bg-blue-500/10 text-blue-600"
             }`}
@@ -887,7 +970,7 @@ export default function NilaiManagementPage() {
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold text-slate-400">
-              Ketuntasan Belajar ({activeRaporTab === "tengah" ? "STS" : "PAS"})
+              Ketuntasan Belajar ({isTengah ? `STS ${activeSemester}` : activeRaporTab === "semua" ? "Semua" : `SAS ${activeSemester}`})
             </p>
             <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
               {tuntasPercent}%
@@ -905,11 +988,11 @@ export default function NilaiManagementPage() {
           <div>
             <p className="text-[11px] font-semibold text-slate-400">Komposisi Perhitungan Rapor</p>
             <p className="text-xs font-bold text-slate-800 dark:text-slate-100 mt-1">
-              {activeRaporTab === "tengah"
-                ? "50% UH + 50% Ujian Mid (STS)"
-                : activeRaporTab === "akhir"
-                ? "30% UH + 30% Mid + 40% UAS"
-                : "Semua Komponen (UH, Mid, UAS)"}
+              {isTengah
+                ? `100% Nilai Ujian STS (Semester ${activeSemester})`
+                : activeRaporTab === "semua"
+                ? "Semua Komponen (UH, Mid, UAS)"
+                : `30% UH + 30% Mid + 40% UAS (Semester ${activeSemester})`}
             </p>
             <span className="text-[10px] text-slate-500">
               Otomatis & sesuai panduan e-rapor
@@ -1002,25 +1085,19 @@ export default function NilaiManagementPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
-              {activeRaporTab === "tengah" ? (
+              {isTengah ? (
                 <tr>
                   <th className="px-5 py-3.5">Nama Siswa</th>
                   <th className="px-3 py-3.5">Kelas</th>
                   <th className="px-4 py-3.5">Mata Pelajaran</th>
-                  <th className="px-3 py-3.5 text-center">
-                    Ulangan Harian (UH) <span className="text-amber-600 font-bold">(50%)</span>
-                  </th>
-                  <th className="px-3 py-3.5 text-center">
-                    Ujian Mid (STS) <span className="text-amber-600 font-bold">(50%)</span>
-                  </th>
                   <th className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
-                    Nilai Rapor STS
+                    Nilai Ujian STS
                   </th>
                   <th className="px-3 py-3.5 text-center">Predikat</th>
                   <th className="px-4 py-3.5">Catatan Perkembangan</th>
                   <th className="px-5 py-3.5 text-right">Aksi</th>
                 </tr>
-              ) : activeRaporTab === "akhir" ? (
+              ) : activeRaporTab !== "semua" ? (
                 <tr>
                   <th className="px-5 py-3.5">Nama Siswa</th>
                   <th className="px-3 py-3.5">Kelas</th>
@@ -1032,7 +1109,7 @@ export default function NilaiManagementPage() {
                     Ujian Mid <span className="text-blue-600 font-bold">(30%)</span>
                   </th>
                   <th className="px-3 py-3.5 text-center">
-                    Ujian Akhir (PAS) <span className="text-blue-600 font-bold">(40%)</span>
+                    Ujian Akhir (SAS) <span className="text-blue-600 font-bold">(40%)</span>
                   </th>
                   <th className="px-4 py-3.5 text-center bg-blue-500/5 dark:bg-blue-500/10">
                     Nilai Akhir Rapor
@@ -1050,7 +1127,7 @@ export default function NilaiManagementPage() {
                   <th className="px-2 py-3.5 text-center">Mid (STS)</th>
                   <th className="px-3 py-3.5 text-center bg-amber-500/5 font-bold">Rapor STS</th>
                   <th className="px-2 py-3.5 text-center">UAS</th>
-                  <th className="px-3 py-3.5 text-center bg-blue-500/5 font-bold">Rapor PAS</th>
+                  <th className="px-3 py-3.5 text-center bg-blue-500/5 font-bold">Rapor SAS</th>
                   <th className="px-3 py-3.5 text-center">Predikat Akhir</th>
                   <th className="px-5 py-3.5 text-right">Aksi</th>
                 </tr>
@@ -1059,7 +1136,7 @@ export default function NilaiManagementPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredNilai.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-5 py-10 text-center text-slate-400">
+                  <td colSpan={isTengah ? 7 : activeRaporTab !== "semua" ? 10 : 10} className="px-5 py-10 text-center text-slate-400">
                     Belum ada rekaman nilai pada kriteria ini.
                   </td>
                 </tr>
@@ -1069,7 +1146,7 @@ export default function NilaiManagementPage() {
                   const mid = getStudentMid(n);
                   const akhir = getStudentAkhir(n);
 
-                  if (activeRaporTab === "tengah") {
+                  if (isTengah) {
                     return (
                       <tr key={n.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="px-5 py-3.5">
@@ -1082,8 +1159,6 @@ export default function NilaiManagementPage() {
                         <td className="px-4 py-3.5 font-medium text-slate-900 dark:text-white">
                           {n.mapel}
                         </td>
-                        <td className="px-3 py-3.5 text-center font-mono font-medium">{n.tugas}</td>
-                        <td className="px-3 py-3.5 text-center font-mono font-medium">{n.uts}</td>
                         <td className="px-4 py-3.5 text-center bg-amber-500/5 dark:bg-amber-500/10">
                           <span className="font-bold text-sm text-amber-600 dark:text-amber-400 font-mono">
                             {mid.nilaiMid}
@@ -1109,7 +1184,7 @@ export default function NilaiManagementPage() {
                           {canEdit && (
                             <>
                               <button
-                                onClick={() => handleOpenBulkAdd(n.siswaId)}
+                                onClick={() => handleOpenBulkAdd(n.siswaId, activeSemester)}
                                 title="Input / Edit Seluruh Mapel Siswa Ini"
                                 className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1"
                               >
@@ -1159,7 +1234,7 @@ export default function NilaiManagementPage() {
                           {siswaObj && (
                             <>
                               <button
-                                onClick={() => handleOpenRapor(siswaObj, "tengah")}
+                                onClick={() => handleOpenRapor(siswaObj, "tengah", activeSemester)}
                                 className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <FileText className="h-3.5 w-3.5" />
@@ -1167,8 +1242,7 @@ export default function NilaiManagementPage() {
                               </button>
                               <button
                                 onClick={() => {
-                                  setRaporPrintType("tengah");
-                                  handleOpenWhatsAppModal(siswaObj);
+                                  handleOpenWhatsAppModal(siswaObj, "tengah", activeSemester);
                                 }}
                                 title="Kirim Rapor STS via WhatsApp ke Wali"
                                 className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
@@ -1182,7 +1256,7 @@ export default function NilaiManagementPage() {
                     );
                   }
 
-                  if (activeRaporTab === "akhir") {
+                  if (!isTengah && activeRaporTab !== "semua") {
                     return (
                       <tr key={n.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="px-5 py-3.5">
@@ -1223,7 +1297,7 @@ export default function NilaiManagementPage() {
                           {canEdit && (
                             <>
                               <button
-                                onClick={() => handleOpenBulkAdd(n.siswaId)}
+                                onClick={() => handleOpenBulkAdd(n.siswaId, activeSemester)}
                                 title="Input / Edit Seluruh Mapel Siswa Ini"
                                 className="px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
@@ -1273,18 +1347,17 @@ export default function NilaiManagementPage() {
                           {siswaObj && (
                             <>
                               <button
-                                onClick={() => handleOpenRapor(siswaObj, "akhir")}
+                                onClick={() => handleOpenRapor(siswaObj, "akhir", activeSemester)}
                                 className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <FileText className="h-3.5 w-3.5" />
-                                <span>Rapor PAS</span>
+                                <span>Rapor SAS</span>
                               </button>
                               <button
                                 onClick={() => {
-                                  setRaporPrintType("akhir");
-                                  handleOpenWhatsAppModal(siswaObj);
+                                  handleOpenWhatsAppModal(siswaObj, "akhir", activeSemester);
                                 }}
-                                title="Kirim Rapor PAS via WhatsApp ke Wali"
+                                title="Kirim Rapor SAS via WhatsApp ke Wali"
                                 className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
                               >
                                 <MessageCircle className="h-3.5 w-3.5" />
@@ -1327,7 +1400,7 @@ export default function NilaiManagementPage() {
                         {canEdit && (
                           <>
                             <button
-                              onClick={() => handleOpenBulkAdd(n.siswaId)}
+                              onClick={() => handleOpenBulkAdd(n.siswaId, n.semester || "Ganjil")}
                               title="Input / Edit Seluruh Mapel Siswa Ini"
                               className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                             >
@@ -1377,19 +1450,18 @@ export default function NilaiManagementPage() {
                         {siswaObj && (
                           <>
                             <button
-                              onClick={() => handleOpenRapor(siswaObj, "akhir")}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1"
+                              onClick={() => handleOpenRapor(siswaObj, "akhir", n.semester || "Ganjil")}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 font-medium text-xs hover:bg-indigo-100 transition-colors inline-flex items-center gap-1 cursor-pointer"
                             >
                               <FileText className="h-3.5 w-3.5" />
                               <span>Cetak</span>
                             </button>
                             <button
                               onClick={() => {
-                                setRaporPrintType("akhir");
-                                handleOpenWhatsAppModal(siswaObj);
+                                handleOpenWhatsAppModal(siswaObj, "akhir", n.semester || "Ganjil");
                               }}
                               title="Kirim Rapor via WhatsApp ke Wali"
-                              className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center"
+                              className="p-1 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 hover:bg-green-100 transition-colors inline-flex items-center cursor-pointer"
                             >
                               <MessageCircle className="h-3.5 w-3.5" />
                             </button>
@@ -1449,7 +1521,7 @@ export default function NilaiManagementPage() {
             </div>
 
             <form onSubmit={handleSaveBulk} className="space-y-4 text-xs">
-              {/* Step 1: Pilih Siswa */}
+              {/* Step 1: Pilih Siswa & Semester */}
               <div className="p-4 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="w-full md:w-1/2">
                   <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
@@ -1467,6 +1539,21 @@ export default function NilaiManagementPage() {
                         {s.nama} &bull; Kelas {s.kelas} &bull; NISN: {s.nisn}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="w-full md:w-1/4">
+                  <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-amber-600" />
+                    <span>Semester Target *</span>
+                  </label>
+                  <select
+                    value={bulkSemester}
+                    onChange={(e) => handleBulkSemesterChange(e.target.value as "Ganjil" | "Genap")}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                  >
+                    <option value="Ganjil">Semester Ganjil</option>
+                    <option value="Genap">Semester Genap</option>
                   </select>
                 </div>
 
@@ -1841,7 +1928,7 @@ export default function NilaiManagementPage() {
               {editingId ? "Perbarui Rekaman Nilai Siswa" : "Input Nilai Komponen Siswa"}
             </h3>
             <p className="text-xs text-slate-500 mb-5">
-              Nilai otomatis diproses untuk <strong>Rapor Tengah Semester (50% UH + 50% Mid)</strong> dan <strong>Rapor Akhir Semester (30% UH + 30% Mid + 40% UAS)</strong>.
+              Nilai otomatis diproses untuk <strong>Rapor Tengah Semester (100% Ujian STS)</strong> dan <strong>Rapor Akhir Semester (30% UH + 30% Mid + 40% UAS)</strong>.
             </p>
 
             <form onSubmit={handleSaveSingle} className="space-y-4 text-xs">
@@ -1864,21 +1951,39 @@ export default function NilaiManagementPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Mata Pelajaran *
-                </label>
-                <select
-                  value={formData.mapel}
-                  onChange={(e) => setFormData({ ...formData, mapel: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
-                >
-                  {(teacherScope.isTeacher ? teacherScope.scopedMapelList : mapelList).map((m) => (
-                    <option key={m.id} value={m.nama}>
-                      {m.nama} (KKM: {m.kkm})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Mata Pelajaran *
+                  </label>
+                  <select
+                    value={formData.mapel}
+                    onChange={(e) => setFormData({ ...formData, mapel: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    {(teacherScope.isTeacher ? teacherScope.scopedMapelList : mapelList).map((m) => (
+                      <option key={m.id} value={m.nama}>
+                        {m.nama} (KKM: {m.kkm})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Semester *
+                  </label>
+                  <select
+                    value={formData.semester}
+                    onChange={(e) =>
+                      setFormData({ ...formData, semester: e.target.value as "Ganjil" | "Genap" })
+                    }
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
+                  >
+                    <option value="Ganjil">Semester Ganjil</option>
+                    <option value="Genap">Semester Genap</option>
+                  </select>
+                </div>
               </div>
 
               {/* Komponen Nilai Inputs */}
@@ -1902,7 +2007,7 @@ export default function NilaiManagementPage() {
                       onChange={(e) => setFormData({ ...formData, tugas: Number(e.target.value) })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-mono text-center font-bold"
                     />
-                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">STS 50% &bull; PAS 30%</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">PAS 30% (Khusus Rapor Akhir)</span>
                   </div>
 
                   <div>
@@ -1918,7 +2023,7 @@ export default function NilaiManagementPage() {
                       onChange={(e) => setFormData({ ...formData, uts: Number(e.target.value) })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-mono text-center font-bold"
                     />
-                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">STS 50% &bull; PAS 30%</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 text-center">STS 100% &bull; PAS 30%</span>
                   </div>
 
                   <div>
@@ -1953,7 +2058,7 @@ export default function NilaiManagementPage() {
                       </span>
                     </div>
                     <p className="text-[9px] text-amber-600 dark:text-amber-400 mt-0.5">
-                      50% ({formData.tugas}) + 50% ({formData.uts})
+                      100% Ujian STS ({formData.uts})
                     </p>
                   </div>
 
@@ -2077,11 +2182,35 @@ export default function NilaiManagementPage() {
                   </button>
                 </div>
 
-                {/* Switcher PTS / PAS */}
+                {/* Switcher Semester */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setRaporPrintSemester("Ganjil")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      raporPrintSemester === "Ganjil"
+                        ? "bg-slate-800 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Ganjil
+                  </button>
+                  <button
+                    onClick={() => setRaporPrintSemester("Genap")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      raporPrintSemester === "Genap"
+                        ? "bg-slate-800 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Genap
+                  </button>
+                </div>
+
+                {/* Switcher STS / SAS */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                   <button
                     onClick={() => setRaporPrintType("tengah")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                       raporPrintType === "tengah"
                         ? "bg-amber-500 text-white shadow"
                         : "text-slate-600 hover:text-slate-900"
@@ -2092,14 +2221,14 @@ export default function NilaiManagementPage() {
                   </button>
                   <button
                     onClick={() => setRaporPrintType("akhir")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                       raporPrintType === "akhir"
                         ? "bg-blue-600 text-white shadow"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
-                    <span>Rapor PAS</span>
+                    <span>Rapor SAS</span>
                   </button>
                 </div>
               </div>
@@ -2228,15 +2357,15 @@ export default function NilaiManagementPage() {
               <h3 className="text-base font-extrabold underline tracking-wider uppercase text-slate-900">
                 {raporPrintType === "tengah"
                   ? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
-                  : "LAPORAN CAPAIAN HASIL BELAJAR AKHIR SEMESTER (PAS)"}
+                  : "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"}
               </h3>
               <p className="text-xs text-slate-600 mt-1 font-medium">
-                Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {profile.semesterAktif}
+                Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {raporPrintSemester || profile.semesterAktif}
               </p>
               <div className="mt-2 inline-block px-3 py-1 rounded-full bg-slate-100 text-[10px] text-slate-700 font-medium">
                 {raporPrintType === "tengah"
-                  ? "Komposisi Penilaian STS: 50% Nilai Ulangan Harian (UH) + 50% Nilai Ujian Mid (STS)"
-                  : "Komposisi Penilaian PAS: 30% Nilai Harian + 30% Ujian Mid + 40% Ujian Akhir Semester"}
+                  ? "Komposisi Penilaian STS: 100% Nilai Ujian Sumatif Tengah Semester (STS)"
+                  : "Komposisi Penilaian SAS: 30% Nilai Harian + 30% Ujian Mid + 40% Ujian Akhir Semester"}
               </div>
             </div>
 
@@ -2261,9 +2390,7 @@ export default function NilaiManagementPage() {
                     <th className="border border-slate-300 px-3 py-2 text-center w-10">No</th>
                     <th className="border border-slate-300 px-3 py-2">Mata Pelajaran</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">KKM</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-24">Ulangan Harian (50%)</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-24">Ujian Mid (50%)</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-20 bg-amber-50">Nilai STS</th>
+                    <th className="border border-slate-300 px-2 py-2 text-center w-24 bg-amber-50">Nilai Ujian STS</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">Predikat</th>
                     <th className="border border-slate-300 px-3 py-2">Catatan Perkembangan Belajar</th>
                   </tr>
@@ -2271,7 +2398,7 @@ export default function NilaiManagementPage() {
                 <tbody>
                   {studentNilaiRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="border border-slate-300 px-3 py-6 text-center text-slate-400">
+                      <td colSpan={6} className="border border-slate-300 px-3 py-6 text-center text-slate-400">
                         Belum ada nilai mata pelajaran yang diinputkan untuk siswa ini.
                       </td>
                     </tr>
@@ -2288,8 +2415,6 @@ export default function NilaiManagementPage() {
                           <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
                           <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
                           <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
                           <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
                             {mid.nilaiMid}
                           </td>
@@ -2306,7 +2431,7 @@ export default function NilaiManagementPage() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-50 font-semibold">
-                    <td colSpan={5} className="border border-slate-300 px-3 py-2 text-right">
+                    <td colSpan={3} className="border border-slate-300 px-3 py-2 text-right">
                       Rata-Rata Nilai Sumatif Tengah Semester (STS):
                     </td>
                     <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-800 text-sm font-mono bg-amber-50">
@@ -2499,7 +2624,33 @@ export default function NilaiManagementPage() {
                   </button>
                 </div>
 
-                {/* Switcher PTS / PAS */}
+                {/* Switcher Semester */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setBatchRaporSemester("Ganjil")}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      batchRaporSemester === "Ganjil"
+                        ? "bg-slate-800 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Ganjil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBatchRaporSemester("Genap")}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      batchRaporSemester === "Genap"
+                        ? "bg-slate-800 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Genap
+                  </button>
+                </div>
+
+                {/* Switcher STS / SAS */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                   <button
                     type="button"
@@ -2523,7 +2674,7 @@ export default function NilaiManagementPage() {
                     }`}
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
-                    <span>Rapor PAS</span>
+                    <span>Rapor SAS</span>
                   </button>
                 </div>
 
@@ -2599,7 +2750,11 @@ export default function NilaiManagementPage() {
                   </div>
                 ) : (
                   batchStudents.map((siswa) => {
-                    const studentRecords = nilaiList.filter((n) => n.siswaId === siswa.id);
+                    const studentRecords = nilaiList.filter(
+                      (n) =>
+                        n.siswaId === siswa.id &&
+                        (n.semester || "Ganjil").toLowerCase() === (batchRaporSemester || "Ganjil").toLowerCase()
+                    );
                     const midAvg =
                       studentRecords.length > 0
                         ? Math.round(
@@ -2664,10 +2819,10 @@ export default function NilaiManagementPage() {
                           <h3 className="text-sm font-extrabold underline tracking-wider uppercase text-slate-900">
                             {batchRaporType === "tengah"
                               ? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
-                              : "LAPORAN CAPAIAN HASIL BELAJAR AKHIR SEMESTER (PAS)"}
+                              : "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"}
                           </h3>
                           <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
-                            Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {profile.semesterAktif}
+                            Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {batchRaporSemester || profile.semesterAktif}
                           </p>
                         </div>
 
@@ -2691,9 +2846,7 @@ export default function NilaiManagementPage() {
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-8">No</th>
                                 <th className="border border-slate-300 px-2 py-1.5">Mata Pelajaran</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20">UH (50%)</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20">Mid (50%)</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16 bg-amber-50">Nilai STS</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20 bg-amber-50">Nilai Ujian STS</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
                                 <th className="border border-slate-300 px-2 py-1.5">Catatan Perkembangan</th>
                               </tr>
@@ -2701,7 +2854,7 @@ export default function NilaiManagementPage() {
                             <tbody>
                               {studentRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={8} className="border border-slate-300 px-3 py-4 text-center text-slate-400">
+                                  <td colSpan={6} className="border border-slate-300 px-3 py-4 text-center text-slate-400">
                                     Belum ada nilai yang diinputkan untuk siswa ini.
                                   </td>
                                 </tr>
@@ -2718,8 +2871,6 @@ export default function NilaiManagementPage() {
                                       <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
                                       <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
                                       <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
                                       <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
                                         {mid.nilaiMid}
                                       </td>
@@ -2736,7 +2887,7 @@ export default function NilaiManagementPage() {
                             </tbody>
                             <tfoot>
                               <tr className="bg-slate-50 font-semibold text-[11px]">
-                                <td colSpan={5} className="border border-slate-300 px-3 py-1.5 text-right">
+                                <td colSpan={3} className="border border-slate-300 px-3 py-1.5 text-right">
                                   Rata-Rata Nilai Rapor STS:
                                 </td>
                                 <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 font-mono bg-amber-50">
@@ -2864,10 +3015,10 @@ export default function NilaiManagementPage() {
                     NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi} &bull; {profile.alamat}
                   </p>
                   <h3 className="text-base font-extrabold uppercase mt-2 text-indigo-950">
-                    BUKU LEGER NILAI HASIL BELAJAR {batchRaporType === "tengah" ? "SUMATIF TENGAH SEMESTER (STS)" : "AKHIR SEMESTER (PAS)"}
+                    BUKU LEGER NILAI HASIL BELAJAR {batchRaporType === "tengah" ? "SUMATIF TENGAH SEMESTER (STS)" : "SUMATIF AKHIR SEMESTER (SAS)"}
                   </h3>
                   <p className="text-xs text-slate-600 font-medium">
-                    Kelas: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}</strong> &bull; Semester: <strong>{profile.semesterAktif}</strong> &bull; Tahun Ajaran: <strong>{profile.tahunAjaranAktif}</strong>
+                    Kelas: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}</strong> &bull; Semester: <strong>{batchRaporSemester || profile.semesterAktif}</strong> &bull; Tahun Ajaran: <strong>{profile.tahunAjaranAktif}</strong>
                   </p>
                 </div>
 
@@ -2875,7 +3026,11 @@ export default function NilaiManagementPage() {
                 {(() => {
                   const rankedStudents = batchStudents
                     .map((s) => {
-                      const records = nilaiList.filter((n) => n.siswaId === s.id);
+                      const records = nilaiList.filter(
+                        (n) =>
+                          n.siswaId === s.id &&
+                          (n.semester || "Ganjil").toLowerCase() === (batchRaporSemester || "Ganjil").toLowerCase()
+                      );
                       let total = 0;
                       let count = 0;
                       const scoresByMapel: Record<string, number> = {};
@@ -3056,41 +3211,70 @@ export default function NilaiManagementPage() {
               </div>
             </div>
 
-            {/* Option Switcher (PTS vs PAS) */}
-            <div className="flex items-center justify-between gap-3 mb-3">
+            {/* Option Switcher (Semester & STS vs SAS) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Pilih Format Laporan Rapor:
+                Pilih Periode & Format Rapor:
               </span>
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setRaporPrintType("tengah")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    raporPrintType === "tengah"
-                      ? "bg-amber-500 text-white shadow-sm"
-                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                  }`}
-                >
-                  Rapor STS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRaporPrintType("akhir")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    raporPrintType === "akhir"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
-                  }`}
-                >
-                  Rapor PAS
-                </button>
+              <div className="flex items-center gap-2">
+                {/* Semester Switcher */}
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setWaRaporSemester("Ganjil")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      waRaporSemester === "Ganjil"
+                        ? "bg-slate-800 text-white shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    Ganjil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWaRaporSemester("Genap")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      waRaporSemester === "Genap"
+                        ? "bg-slate-800 text-white shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    Genap
+                  </button>
+                </div>
+
+                {/* STS vs SAS */}
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setWaRaporType("tengah")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      waRaporType === "tengah"
+                        ? "bg-amber-500 text-white shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    Rapor STS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWaRaporType("akhir")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      waRaporType === "akhir"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    Rapor SAS
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* WhatsApp Text Preview (WhatsApp Bubble Aesthetic) */}
             <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-[#f0f9f3] dark:bg-slate-800/90 p-4 mb-5 max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 shadow-inner">
               <pre className="whitespace-pre-wrap font-sans">
-                {generateRaporWhatsAppText(waTargetSiswa, raporPrintType)}
+                {generateRaporWhatsAppText(waTargetSiswa, waRaporType, waRaporSemester)}
               </pre>
             </div>
 
@@ -3099,7 +3283,7 @@ export default function NilaiManagementPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const text = generateRaporWhatsAppText(waTargetSiswa, raporPrintType);
+                  const text = generateRaporWhatsAppText(waTargetSiswa, waRaporType, waRaporSemester);
                   navigator.clipboard.writeText(text);
                   setIsCopiedWa(true);
                   setTimeout(() => setIsCopiedWa(false), 2500);
@@ -3132,7 +3316,7 @@ export default function NilaiManagementPage() {
                   href={`https://api.whatsapp.com/send?phone=${formatWhatsAppPhone(
                     waTargetSiswa.noHpWali
                   )}&text=${encodeURIComponent(
-                    generateRaporWhatsAppText(waTargetSiswa, raporPrintType)
+                    generateRaporWhatsAppText(waTargetSiswa, waRaporType, waRaporSemester)
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
