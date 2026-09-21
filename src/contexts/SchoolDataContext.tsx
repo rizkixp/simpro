@@ -72,7 +72,7 @@ import {
 
 interface SchoolDataContextType {
   profile: SchoolProfile;
-  updateProfile: (profile: SchoolProfile) => void;
+  updateProfile: (profile: SchoolProfile) => Promise<boolean> | void;
   siswaList: Siswa[];
   addSiswa: (siswa: Omit<Siswa, "id">) => void;
   importSiswaList: (siswaList: Omit<Siswa, "id">[]) => void;
@@ -87,6 +87,9 @@ interface SchoolDataContextType {
   updateKelas: (id: string, kelas: Partial<Kelas>) => void;
   deleteKelas: (id: string, targetKelasForStudents?: string) => void;
   mapelList: MataPelajaran[];
+  addMapel: (mapel: Omit<MataPelajaran, "id">) => void;
+  updateMapel: (id: string, mapel: Partial<MataPelajaran>) => void;
+  deleteMapel: (id: string) => void;
   jadwalList: JadwalPelajaran[];
   addJadwal: (jadwal: Omit<JadwalPelajaran, "id">) => void;
   bulkAddJadwal: (items: Omit<JadwalPelajaran, "id">[]) => void;
@@ -321,6 +324,68 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const [lastAutoPushTime, setLastAutoPushTime] = useState<Date | null>(null);
   const [autoPushStatus, setAutoPushStatus] = useState<"idle" | "pushing" | "success" | "error">("idle");
   const autoPushTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reference holding the latest live in-memory state to avoid stale React closures in timers/intervals
+  const latestDataRef = useRef({
+    profile,
+    siswaList,
+    guruList,
+    kelasList,
+    mapelList,
+    jadwalList,
+    presensiList,
+    nilaiList,
+    jenisTagihanList,
+    sppList,
+    tabunganList,
+    transaksiTabunganList,
+    pesertaTransportList,
+    sppTransportRecords,
+    transaksiSPPTransportList,
+    pengumumanList,
+    lmsMateriList,
+    lmsTugasList,
+    lmsSubmissionList,
+    lmsKuisList,
+    lmsKuisAttemptList,
+    lmsForumList,
+    lmsMeetingList,
+    lmsBankSoalList,
+    lmsJadwalMateriList,
+    tahfidzList,
+    mutabaahList,
+  });
+
+  // Keep latestDataRef fresh on every render cycle
+  latestDataRef.current = {
+    profile,
+    siswaList,
+    guruList,
+    kelasList,
+    mapelList,
+    jadwalList,
+    presensiList,
+    nilaiList,
+    jenisTagihanList,
+    sppList,
+    tabunganList,
+    transaksiTabunganList,
+    pesertaTransportList,
+    sppTransportRecords,
+    transaksiSPPTransportList,
+    pengumumanList,
+    lmsMateriList,
+    lmsTugasList,
+    lmsSubmissionList,
+    lmsKuisList,
+    lmsKuisAttemptList,
+    lmsForumList,
+    lmsMeetingList,
+    lmsBankSoalList,
+    lmsJadwalMateriList,
+    tahfidzList,
+    mutabaahList,
+  };
 
   // Load from LocalStorage on client mount
   useEffect(() => {
@@ -561,17 +626,18 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
     setIsSyncing(true);
     try {
+      const current = latestDataRef.current;
       const res = await SupabaseSchoolService.seedInitialDataToSupabase({
-        profile: profile || INITIAL_SCHOOL_PROFILE,
-        siswa: siswaList.length > 0 ? siswaList : INITIAL_SISWA,
-        guru: guruList.length > 0 ? guruList : INITIAL_GURU,
-        kelas: kelasList.length > 0 ? kelasList : INITIAL_KELAS,
-        mapel: mapelList.length > 0 ? mapelList : INITIAL_MAPEL,
-        jadwal: jadwalList.length > 0 ? jadwalList : INITIAL_JADWAL,
-        presensi: presensiList.length > 0 ? presensiList : INITIAL_PRESENSI,
-        nilai: nilaiList.length > 0 ? nilaiList : INITIAL_NILAI,
-        jenisTagihan: jenisTagihanList.length > 0 ? jenisTagihanList : INITIAL_JENIS_TAGIHAN,
-        tagihan: sppList.map((s) => ({
+        profile: current.profile || INITIAL_SCHOOL_PROFILE,
+        siswa: current.siswaList || [],
+        guru: current.guruList || [],
+        kelas: current.kelasList || [],
+        mapel: current.mapelList || [],
+        jadwal: current.jadwalList || [],
+        presensi: current.presensiList || [],
+        nilai: current.nilaiList || [],
+        jenisTagihan: current.jenisTagihanList || [],
+        tagihan: (current.sppList || []).map((s) => ({
           id: s.id,
           siswaId: s.siswaId,
           siswaNama: s.siswaNama,
@@ -589,23 +655,23 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           bulan: s.bulan,
           tahun: s.tahun,
         })),
-        tabungan: tabunganList.length > 0 ? tabunganList : INITIAL_TABUNGAN,
-        transaksiTabungan: transaksiTabunganList.length > 0 ? transaksiTabunganList : INITIAL_TRANSAKSI_TABUNGAN,
-        pesertaTransport: pesertaTransportList.length > 0 ? pesertaTransportList : INITIAL_PESERTA_TRANSPORT,
-        sppTransportRecords: sppTransportRecords.length > 0 ? sppTransportRecords : INITIAL_SPP_TRANSPORT_RECORDS,
-        transaksiSPPTransport: transaksiSPPTransportList.length > 0 ? transaksiSPPTransportList : INITIAL_TRANSAKSI_SPP_TRANSPORT,
-        pengumuman: pengumumanList.length > 0 ? pengumumanList : INITIAL_PENGUMUMAN,
-        lmsMateri: lmsMateriList.length > 0 ? lmsMateriList : INITIAL_LMS_MATERI,
-        lmsTugas: lmsTugasList.length > 0 ? lmsTugasList : INITIAL_LMS_TUGAS,
-        lmsSubmissions: lmsSubmissionList.length > 0 ? lmsSubmissionList : INITIAL_LMS_SUBMISSIONS,
-        lmsKuis: lmsKuisList.length > 0 ? lmsKuisList : INITIAL_LMS_KUIS,
-        lmsAttempts: lmsKuisAttemptList.length > 0 ? lmsKuisAttemptList : INITIAL_LMS_ATTEMPTS,
-        lmsForum: lmsForumList.length > 0 ? lmsForumList : INITIAL_LMS_FORUM,
-        lmsMeetings: lmsMeetingList.length > 0 ? lmsMeetingList : INITIAL_LMS_MEETINGS,
-        lmsBankSoal: lmsBankSoalList.length > 0 ? lmsBankSoalList : INITIAL_LMS_BANK_SOAL,
-        lmsJadwalMateri: lmsJadwalMateriList.length > 0 ? lmsJadwalMateriList : INITIAL_LMS_JADWAL_MATERI,
-        tahfidz: tahfidzList.length > 0 ? tahfidzList : INITIAL_TAHFIDZ_RECORDS,
-        mutabaah: mutabaahList.length > 0 ? mutabaahList : INITIAL_MUTABAAH_RECORDS,
+        tabungan: current.tabunganList || [],
+        transaksiTabungan: current.transaksiTabunganList || [],
+        pesertaTransport: current.pesertaTransportList || [],
+        sppTransportRecords: current.sppTransportRecords || [],
+        transaksiSPPTransport: current.transaksiSPPTransportList || [],
+        pengumuman: current.pengumumanList || [],
+        lmsMateri: current.lmsMateriList || [],
+        lmsTugas: current.lmsTugasList || [],
+        lmsSubmissions: current.lmsSubmissionList || [],
+        lmsKuis: current.lmsKuisList || [],
+        lmsAttempts: current.lmsKuisAttemptList || [],
+        lmsForum: current.lmsForumList || [],
+        lmsMeetings: current.lmsMeetingList || [],
+        lmsBankSoal: current.lmsBankSoalList || [],
+        lmsJadwalMateri: current.lmsJadwalMateriList || [],
+        tahfidz: current.tahfidzList || [],
+        mutabaah: current.mutabaahList || [],
       });
 
       if (res.success) {
@@ -665,120 +731,146 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           const merged: SchoolProfile = {
             ...prevProfile,
             ...remoteProfile,
-            appName: remoteProfile.appName || prevProfile?.appName || INITIAL_SCHOOL_PROFILE.appName,
-            appTagline: remoteProfile.appTagline || prevProfile?.appTagline || INITIAL_SCHOOL_PROFILE.appTagline,
-            appLogoUrl: remoteProfile.appLogoUrl !== undefined && remoteProfile.appLogoUrl !== "" ? remoteProfile.appLogoUrl : (prevProfile?.appLogoUrl || ""),
-            appIconPreset: remoteProfile.appIconPreset || prevProfile?.appIconPreset || INITIAL_SCHOOL_PROFILE.appIconPreset,
-            landingHeroBadge: remoteProfile.landingHeroBadge || prevProfile?.landingHeroBadge || INITIAL_SCHOOL_PROFILE.landingHeroBadge,
-            landingHeroTitle: remoteProfile.landingHeroTitle || prevProfile?.landingHeroTitle || INITIAL_SCHOOL_PROFILE.landingHeroTitle,
-            landingHeroSubtitle: remoteProfile.landingHeroSubtitle || prevProfile?.landingHeroSubtitle || INITIAL_SCHOOL_PROFILE.landingHeroSubtitle,
-            landingCtaText: remoteProfile.landingCtaText || prevProfile?.landingCtaText || INITIAL_SCHOOL_PROFILE.landingCtaText,
+            appName: remoteProfile.appName !== undefined ? remoteProfile.appName : (prevProfile?.appName ?? INITIAL_SCHOOL_PROFILE.appName),
+            appTagline: remoteProfile.appTagline !== undefined ? remoteProfile.appTagline : (prevProfile?.appTagline ?? INITIAL_SCHOOL_PROFILE.appTagline),
+            appLogoUrl: remoteProfile.appLogoUrl !== undefined ? remoteProfile.appLogoUrl : (prevProfile?.appLogoUrl ?? ""),
+            appIconPreset: remoteProfile.appIconPreset !== undefined ? remoteProfile.appIconPreset : (prevProfile?.appIconPreset ?? INITIAL_SCHOOL_PROFILE.appIconPreset),
+            landingHeroBadge: remoteProfile.landingHeroBadge !== undefined ? remoteProfile.landingHeroBadge : (prevProfile?.landingHeroBadge ?? INITIAL_SCHOOL_PROFILE.landingHeroBadge),
+            landingHeroTitle: remoteProfile.landingHeroTitle !== undefined ? remoteProfile.landingHeroTitle : (prevProfile?.landingHeroTitle ?? INITIAL_SCHOOL_PROFILE.landingHeroTitle),
+            landingHeroSubtitle: remoteProfile.landingHeroSubtitle !== undefined ? remoteProfile.landingHeroSubtitle : (prevProfile?.landingHeroSubtitle ?? INITIAL_SCHOOL_PROFILE.landingHeroSubtitle),
+            landingCtaText: remoteProfile.landingCtaText !== undefined ? remoteProfile.landingCtaText : (prevProfile?.landingCtaText ?? INITIAL_SCHOOL_PROFILE.landingCtaText),
             landingShowDemoButton: remoteProfile.landingShowDemoButton !== undefined ? remoteProfile.landingShowDemoButton : (prevProfile?.landingShowDemoButton !== undefined ? prevProfile.landingShowDemoButton : true),
-            landingFooterText: remoteProfile.landingFooterText || prevProfile?.landingFooterText || INITIAL_SCHOOL_PROFILE.landingFooterText,
+            landingFooterText: remoteProfile.landingFooterText !== undefined ? remoteProfile.landingFooterText : (prevProfile?.landingFooterText ?? INITIAL_SCHOOL_PROFILE.landingFooterText),
           };
-          saveState("profile", merged);
+          latestDataRef.current.profile = merged;
+          saveState("profile", merged, true);
           return merged;
         });
       }
-      if (data.siswa && data.siswa.length > 0) {
+      if (Array.isArray(data.siswa)) {
         setSiswaList(data.siswa);
-        saveState("siswa", data.siswa);
+        latestDataRef.current.siswaList = data.siswa;
+        saveState("siswa", data.siswa, true);
       }
-      if (data.guru && data.guru.length > 0) {
+      if (Array.isArray(data.guru)) {
         setGuruList(data.guru);
-        saveState("guru", data.guru);
+        latestDataRef.current.guruList = data.guru;
+        saveState("guru", data.guru, true);
       }
-      if (data.kelas && data.kelas.length > 0) {
+      if (Array.isArray(data.kelas)) {
         setKelasList(data.kelas);
-        saveState("kelas", data.kelas);
+        latestDataRef.current.kelasList = data.kelas;
+        saveState("kelas", data.kelas, true);
       }
-      if (data.mapel && data.mapel.length > 0) {
+      if (Array.isArray(data.mapel)) {
         setMapelList(data.mapel);
-        saveState("mapel", data.mapel);
+        latestDataRef.current.mapelList = data.mapel;
+        saveState("mapel", data.mapel, true);
       }
-      if (data.jadwal && data.jadwal.length > 0) {
+      if (Array.isArray(data.jadwal)) {
         setJadwalList(data.jadwal);
-        saveState("jadwal", data.jadwal);
+        latestDataRef.current.jadwalList = data.jadwal;
+        saveState("jadwal", data.jadwal, true);
       }
-      if (data.presensi && data.presensi.length > 0) {
+      if (Array.isArray(data.presensi)) {
         setPresensiList(data.presensi);
-        saveState("presensi", data.presensi);
+        latestDataRef.current.presensiList = data.presensi;
+        saveState("presensi", data.presensi, true);
       }
-      if (data.nilai && data.nilai.length > 0) {
+      if (Array.isArray(data.nilai)) {
         setNilaiList(data.nilai);
-        saveState("nilai", data.nilai);
+        latestDataRef.current.nilaiList = data.nilai;
+        saveState("nilai", data.nilai, true);
       }
-      if (data.jenisTagihan && data.jenisTagihan.length > 0) {
+      if (Array.isArray(data.jenisTagihan)) {
         setJenisTagihanList(data.jenisTagihan);
-        saveState("jenis_tagihan", data.jenisTagihan);
+        latestDataRef.current.jenisTagihanList = data.jenisTagihan;
+        saveState("jenis_tagihan", data.jenisTagihan, true);
       }
-      if (data.tabungan && data.tabungan.length > 0) {
+      if (Array.isArray(data.tabungan)) {
         setTabunganList(data.tabungan);
-        saveState("tabungan", data.tabungan);
+        latestDataRef.current.tabunganList = data.tabungan;
+        saveState("tabungan", data.tabungan, true);
       }
-      if (data.transaksiTabungan && data.transaksiTabungan.length > 0) {
+      if (Array.isArray(data.transaksiTabungan)) {
         setTransaksiTabunganList(data.transaksiTabungan);
-        saveState("transaksi_tabungan", data.transaksiTabungan);
+        latestDataRef.current.transaksiTabunganList = data.transaksiTabungan;
+        saveState("transaksi_tabungan", data.transaksiTabungan, true);
       }
-      if (data.pesertaTransport && data.pesertaTransport.length > 0) {
+      if (Array.isArray(data.pesertaTransport)) {
         setPesertaTransportList(data.pesertaTransport);
-        saveState("peserta_transport", data.pesertaTransport);
+        latestDataRef.current.pesertaTransportList = data.pesertaTransport;
+        saveState("peserta_transport", data.pesertaTransport, true);
       }
-      if (data.sppTransportRecords && data.sppTransportRecords.length > 0) {
+      if (Array.isArray(data.sppTransportRecords)) {
         setSppTransportRecords(data.sppTransportRecords);
-        saveState("spp_transport_records", data.sppTransportRecords);
+        latestDataRef.current.sppTransportRecords = data.sppTransportRecords;
+        saveState("spp_transport_records", data.sppTransportRecords, true);
       }
-      if (data.transaksiSPPTransport && data.transaksiSPPTransport.length > 0) {
+      if (Array.isArray(data.transaksiSPPTransport)) {
         setTransaksiSPPTransportList(data.transaksiSPPTransport);
-        saveState("transaksi_spp_transport", data.transaksiSPPTransport);
+        latestDataRef.current.transaksiSPPTransportList = data.transaksiSPPTransport;
+        saveState("transaksi_spp_transport", data.transaksiSPPTransport, true);
       }
-      if (data.pengumuman && data.pengumuman.length > 0) {
+      if (Array.isArray(data.pengumuman)) {
         setPengumumanList(data.pengumuman);
-        saveState("pengumuman", data.pengumuman);
+        latestDataRef.current.pengumumanList = data.pengumuman;
+        saveState("pengumuman", data.pengumuman, true);
       }
-      if (data.lmsMateri && data.lmsMateri.length > 0) {
+      if (Array.isArray(data.lmsMateri)) {
         setLmsMateriList(data.lmsMateri);
-        saveState("lms_materi", data.lmsMateri);
+        latestDataRef.current.lmsMateriList = data.lmsMateri;
+        saveState("lms_materi", data.lmsMateri, true);
       }
-      if (data.lmsTugas && data.lmsTugas.length > 0) {
+      if (Array.isArray(data.lmsTugas)) {
         setLmsTugasList(data.lmsTugas);
-        saveState("lms_tugas", data.lmsTugas);
+        latestDataRef.current.lmsTugasList = data.lmsTugas;
+        saveState("lms_tugas", data.lmsTugas, true);
       }
-      if (data.lmsSubmissions && data.lmsSubmissions.length > 0) {
+      if (Array.isArray(data.lmsSubmissions)) {
         setLmsSubmissionList(data.lmsSubmissions);
-        saveState("lms_submissions", data.lmsSubmissions);
+        latestDataRef.current.lmsSubmissionList = data.lmsSubmissions;
+        saveState("lms_submissions", data.lmsSubmissions, true);
       }
-      if (data.lmsKuis && data.lmsKuis.length > 0) {
+      if (Array.isArray(data.lmsKuis)) {
         setLmsKuisList(data.lmsKuis);
-        saveState("lms_kuis", data.lmsKuis);
+        latestDataRef.current.lmsKuisList = data.lmsKuis;
+        saveState("lms_kuis", data.lmsKuis, true);
       }
-      if (data.lmsAttempts && data.lmsAttempts.length > 0) {
+      if (Array.isArray(data.lmsAttempts)) {
         setLmsKuisAttemptList(data.lmsAttempts);
-        saveState("lms_attempts", data.lmsAttempts);
+        latestDataRef.current.lmsKuisAttemptList = data.lmsAttempts;
+        saveState("lms_attempts", data.lmsAttempts, true);
       }
-      if (data.lmsForum && data.lmsForum.length > 0) {
+      if (Array.isArray(data.lmsForum)) {
         setLmsForumList(data.lmsForum);
-        saveState("lms_forum", data.lmsForum);
+        latestDataRef.current.lmsForumList = data.lmsForum;
+        saveState("lms_forum", data.lmsForum, true);
       }
-      if (data.lmsMeetings && data.lmsMeetings.length > 0) {
+      if (Array.isArray(data.lmsMeetings)) {
         setLmsMeetingList(data.lmsMeetings);
-        saveState("lms_meetings", data.lmsMeetings);
+        latestDataRef.current.lmsMeetingList = data.lmsMeetings;
+        saveState("lms_meetings", data.lmsMeetings, true);
       }
-      if (data.lmsBankSoal && data.lmsBankSoal.length > 0) {
+      if (Array.isArray(data.lmsBankSoal)) {
         setLmsBankSoalList(data.lmsBankSoal);
-        saveState("lms_bank_soal", data.lmsBankSoal);
+        latestDataRef.current.lmsBankSoalList = data.lmsBankSoal;
+        saveState("lms_bank_soal", data.lmsBankSoal, true);
       }
-      if (data.lmsJadwalMateri && data.lmsJadwalMateri.length > 0) {
+      if (Array.isArray(data.lmsJadwalMateri)) {
         setLmsJadwalMateriList(data.lmsJadwalMateri);
-        saveState("lms_jadwal_materi", data.lmsJadwalMateri);
+        latestDataRef.current.lmsJadwalMateriList = data.lmsJadwalMateri;
+        saveState("lms_jadwal_materi", data.lmsJadwalMateri, true);
       }
-      if (data.tahfidz && data.tahfidz.length > 0) {
+      if (Array.isArray(data.tahfidz)) {
         setTahfidzList(data.tahfidz);
-        saveState("tahfidz", data.tahfidz);
+        latestDataRef.current.tahfidzList = data.tahfidz;
+        saveState("tahfidz", data.tahfidz, true);
       }
-      if (data.mutabaah && data.mutabaah.length > 0) {
+      if (Array.isArray(data.mutabaah)) {
         setMutabaahList(data.mutabaah);
-        saveState("mutabaah", data.mutabaah);
+        latestDataRef.current.mutabaahList = data.mutabaah;
+        saveState("mutabaah", data.mutabaah, true);
       }
 
       setIsSupabaseConnected(true);
@@ -793,21 +885,41 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   // Sync to LocalStorage
-  const saveState = (key: string, value: unknown) => {
+  const saveState = (key: string, value: unknown, skipAutoPush: boolean = false) => {
     try {
       localStorage.setItem(`sim_data_${key}`, JSON.stringify(value));
-      if (isAutoPushEnabled && key !== "auto_push_db_enabled") {
-        triggerAutoPush(`saveState-${key}`);
+    } catch (e: any) {
+      console.warn(`Failed to persist ${key} to localStorage:`, e?.message || e);
+      // Quota exceeded fallback: if saving profile, strip massive appLogoUrl if it was causing the overflow
+      if (key === "profile" && value && typeof value === "object") {
+        try {
+          const safeCopy = { ...(value as any), appLogoUrl: "" };
+          localStorage.setItem(`sim_data_${key}`, JSON.stringify(safeCopy));
+        } catch {}
       }
-    } catch (e) {
-      console.warn(`Failed to persist ${key}`, e);
+    }
+    if (!skipAutoPush && isAutoPushEnabled && key !== "auto_push_db_enabled") {
+      triggerAutoPush(`saveState-${key}`);
     }
   };
 
-  const updateProfile = (newProfile: SchoolProfile) => {
+  const updateProfile = async (newProfile: SchoolProfile): Promise<boolean> => {
+    latestDataRef.current.profile = newProfile;
     setProfile(newProfile);
     saveState("profile", newProfile);
-    persistSupabase(() => SupabaseSchoolService.updateProfile(newProfile));
+    try {
+      const ok = await SupabaseSchoolService.updateProfile(newProfile);
+      if (ok) {
+        setLastSyncTime(new Date());
+        setLastAutoPushTime(new Date());
+        setAutoPushStatus("success");
+        setIsSupabaseConnected(true);
+      }
+      return ok;
+    } catch (err) {
+      console.warn("[updateProfile] Error updating profile to Supabase:", err);
+      return false;
+    }
   };
 
   // Siswa Actions
@@ -820,6 +932,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(siswaData.nama)}`,
     };
     const updated = [newSiswa, ...siswaList];
+    latestDataRef.current.siswaList = updated;
     setSiswaList(updated);
     saveState("siswa", updated);
     persistSupabase(() => SupabaseSchoolService.upsertSiswa(newSiswa));
@@ -836,6 +949,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }));
     setSiswaList((prev) => {
       const updated = [...created, ...prev];
+      latestDataRef.current.siswaList = updated;
       saveState("siswa", updated);
       persistSupabase(() => SupabaseSchoolService.bulkUpsertSiswa(created));
       return updated;
@@ -844,6 +958,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const updateSiswa = (id: string, updatedData: Partial<Siswa>) => {
     const updated = siswaList.map((s) => (s.id === id ? { ...s, ...updatedData } : s));
+    latestDataRef.current.siswaList = updated;
     setSiswaList(updated);
     saveState("siswa", updated);
     const target = updated.find((s) => s.id === id);
@@ -854,6 +969,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const deleteSiswa = (id: string) => {
     const updated = siswaList.filter((s) => s.id !== id);
+    latestDataRef.current.siswaList = updated;
     setSiswaList(updated);
     saveState("siswa", updated);
     persistSupabase(() => SupabaseSchoolService.deleteSiswa(id));
@@ -869,6 +985,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(guruData.nama)}`,
     };
     const updated = [newGuru, ...guruList];
+    latestDataRef.current.guruList = updated;
     setGuruList(updated);
     saveState("guru", updated);
     persistSupabase(() => SupabaseSchoolService.upsertGuru(newGuru));
@@ -876,6 +993,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const updateGuru = (id: string, updatedData: Partial<Guru>) => {
     const updated = guruList.map((g) => (g.id === id ? { ...g, ...updatedData } : g));
+    latestDataRef.current.guruList = updated;
     setGuruList(updated);
     saveState("guru", updated);
     const target = updated.find((g) => g.id === id);
@@ -886,6 +1004,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const deleteGuru = (id: string) => {
     const updated = guruList.filter((g) => g.id !== id);
+    latestDataRef.current.guruList = updated;
     setGuruList(updated);
     saveState("guru", updated);
     persistSupabase(() => SupabaseSchoolService.deleteGuru(id));
@@ -899,6 +1018,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       jumlahSiswa: 0,
     };
     const updated = [...kelasList, newKelas];
+    latestDataRef.current.kelasList = updated;
     setKelasList(updated);
     saveState("kelas", updated);
     persistSupabase(() => SupabaseSchoolService.upsertKelas(newKelas));
@@ -908,6 +1028,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       const updatedGuru = guruList.map((g) =>
         g.id === newKelas.waliKelasId ? { ...g, kelasWali: newKelas.nama } : g
       );
+      latestDataRef.current.guruList = updatedGuru;
       setGuruList(updatedGuru);
       saveState("guru", updatedGuru);
     }
@@ -923,6 +1044,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const newWaliId = updatedData.waliKelasId;
 
     const updated = kelasList.map((k) => (k.id === id ? { ...k, ...updatedData } : k));
+    latestDataRef.current.kelasList = updated;
     setKelasList(updated);
     saveState("kelas", updated);
     const targetKelas = updated.find((k) => k.id === id);
@@ -935,24 +1057,28 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       const updatedSiswa = siswaList.map((s) =>
         s.kelas === oldNama ? { ...s, kelas: newNama } : s
       );
+      latestDataRef.current.siswaList = updatedSiswa;
       setSiswaList(updatedSiswa);
       saveState("siswa", updatedSiswa);
 
       const updatedJadwal = jadwalList.map((j) =>
         j.kelas === oldNama ? { ...j, kelas: newNama } : j
       );
+      latestDataRef.current.jadwalList = updatedJadwal;
       setJadwalList(updatedJadwal);
       saveState("jadwal", updatedJadwal);
 
       const updatedPresensi = presensiList.map((p) =>
         p.kelas === oldNama ? { ...p, kelas: newNama } : p
       );
+      latestDataRef.current.presensiList = updatedPresensi;
       setPresensiList(updatedPresensi);
       saveState("presensi", updatedPresensi);
 
       const updatedNilai = nilaiList.map((n) =>
         n.kelas === oldNama ? { ...n, kelas: newNama } : n
       );
+      latestDataRef.current.nilaiList = updatedNilai;
       setNilaiList(updatedNilai);
       saveState("nilai", updatedNilai);
     }
@@ -969,6 +1095,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         }
         return g;
       });
+      latestDataRef.current.guruList = updatedGuru;
       setGuruList(updatedGuru);
       saveState("guru", updatedGuru);
     }
@@ -982,6 +1109,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
     // Remove from kelasList
     const updatedKelasList = kelasList.filter((k) => k.id !== id);
+    latestDataRef.current.kelasList = updatedKelasList;
     setKelasList(updatedKelasList);
     saveState("kelas", updatedKelasList);
     persistSupabase(() => SupabaseSchoolService.deleteKelas(id));
@@ -990,11 +1118,13 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updatedSiswa = siswaList.map((s) =>
       s.kelas === kelasToDelete.nama ? { ...s, kelas: targetNama } : s
     );
+    latestDataRef.current.siswaList = updatedSiswa;
     setSiswaList(updatedSiswa);
     saveState("siswa", updatedSiswa);
 
     // Reassign schedule belonging to this class
     const updatedJadwal = jadwalList.filter((j) => j.kelas !== kelasToDelete.nama);
+    latestDataRef.current.jadwalList = updatedJadwal;
     setJadwalList(updatedJadwal);
     saveState("jadwal", updatedJadwal);
 
@@ -1008,9 +1138,96 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
             })()
           : g
       );
+      latestDataRef.current.guruList = updatedGuru;
       setGuruList(updatedGuru);
       saveState("guru", updatedGuru);
     }
+  };
+
+  // Mata Pelajaran Actions
+  const addMapel = (mapelData: Omit<MataPelajaran, "id">) => {
+    const rawKode = mapelData.kode?.trim() || mapelData.nama.substring(0, 3).toUpperCase();
+    const newMapel: MataPelajaran = {
+      ...mapelData,
+      id: `mpl-${Date.now()}`,
+      kode: rawKode.toUpperCase(),
+      nama: mapelData.nama.trim(),
+      kategori: mapelData.kategori || "Wajib",
+      kkm: Number(mapelData.kkm) || 75,
+    };
+    const updated = [...mapelList, newMapel];
+    latestDataRef.current.mapelList = updated;
+    setMapelList(updated);
+    saveState("mapel", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertMapel(newMapel));
+  };
+
+  const updateMapel = (id: string, updatedData: Partial<MataPelajaran>) => {
+    const oldMapel = mapelList.find((m) => m.id === id);
+    if (!oldMapel) return;
+
+    const oldNama = oldMapel.nama.trim();
+    const newNama = updatedData.nama !== undefined ? updatedData.nama.trim() : oldNama;
+
+    const targetMapel: MataPelajaran = {
+      ...oldMapel,
+      ...updatedData,
+      nama: newNama,
+      kode: updatedData.kode !== undefined ? updatedData.kode.trim().toUpperCase() : oldMapel.kode,
+      kkm: updatedData.kkm !== undefined ? Number(updatedData.kkm) : oldMapel.kkm,
+    };
+
+    const updated = mapelList.map((m) => (m.id === id ? targetMapel : m));
+    latestDataRef.current.mapelList = updated;
+    setMapelList(updated);
+    saveState("mapel", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertMapel(targetMapel));
+
+    // If mapel name changed, cascade update to Jadwal, Nilai, and Guru
+    if (oldNama !== newNama) {
+      // 1. Cascade update Jadwal Pelajaran
+      const updatedJadwal = jadwalList.map((j) =>
+        j.mapel.trim().toLowerCase() === oldNama.toLowerCase() ? { ...j, mapel: newNama } : j
+      );
+      latestDataRef.current.jadwalList = updatedJadwal;
+      setJadwalList(updatedJadwal);
+      saveState("jadwal", updatedJadwal);
+
+      // 2. Cascade update Nilai Siswa
+      const updatedNilai = nilaiList.map((n) =>
+        n.mapel.trim().toLowerCase() === oldNama.toLowerCase() ? { ...n, mapel: newNama } : n
+      );
+      latestDataRef.current.nilaiList = updatedNilai;
+      setNilaiList(updatedNilai);
+      saveState("nilai", updatedNilai);
+
+      // 3. Cascade update Guru mataPelajaran array
+      const updatedGuru = guruList.map((g) => {
+        if (g.mataPelajaran.some((mp) => mp.trim().toLowerCase() === oldNama.toLowerCase())) {
+          return {
+            ...g,
+            mataPelajaran: g.mataPelajaran.map((mp) =>
+              mp.trim().toLowerCase() === oldNama.toLowerCase() ? newNama : mp
+            ),
+          };
+        }
+        return g;
+      });
+      latestDataRef.current.guruList = updatedGuru;
+      setGuruList(updatedGuru);
+      saveState("guru", updatedGuru);
+    }
+  };
+
+  const deleteMapel = (id: string) => {
+    const mapelToDelete = mapelList.find((m) => m.id === id);
+    if (!mapelToDelete) return;
+
+    const updated = mapelList.filter((m) => m.id !== id);
+    latestDataRef.current.mapelList = updated;
+    setMapelList(updated);
+    saveState("mapel", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteMapel(id));
   };
 
   // Jadwal Actions
@@ -1020,6 +1237,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `jdw-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     };
     const updated = [...jadwalList, newJadwal];
+    latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
     saveState("jadwal", updated);
     persistSupabase(() => SupabaseSchoolService.upsertJadwal(newJadwal));
@@ -1031,6 +1249,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `jdw-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
     }));
     const updated = [...jadwalList, ...newItems];
+    latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
     saveState("jadwal", updated);
     persistSupabase(() => SupabaseSchoolService.bulkUpsertJadwal(newItems));
@@ -1038,6 +1257,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const updateJadwal = (id: string, updatedData: Partial<JadwalPelajaran>) => {
     const updated = jadwalList.map((j) => (j.id === id ? { ...j, ...updatedData } : j));
+    latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
     saveState("jadwal", updated);
     const target = updated.find((j) => j.id === id);
@@ -1048,6 +1268,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const deleteJadwal = (id: string) => {
     const updated = jadwalList.filter((j) => j.id !== id);
+    latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
     saveState("jadwal", updated);
     persistSupabase(() => SupabaseSchoolService.deleteJadwal(id));
@@ -1056,12 +1277,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const bulkDeleteJadwal = (ids: string[]) => {
     const idSet = new Set(ids);
     const updated = jadwalList.filter((j) => !idSet.has(j.id));
+    latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
     saveState("jadwal", updated);
     persistSupabase(() => SupabaseSchoolService.bulkDeleteJadwal(ids));
   };
 
   const resetJadwalToDefault = () => {
+    latestDataRef.current.jadwalList = INITIAL_JADWAL;
     setJadwalList(INITIAL_JADWAL);
     saveState("jadwal", INITIAL_JADWAL);
   };
@@ -2457,6 +2680,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         updateKelas,
         deleteKelas,
         mapelList,
+        addMapel,
+        updateMapel,
+        deleteMapel,
         jadwalList,
         addJadwal,
         bulkAddJadwal,

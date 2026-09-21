@@ -133,6 +133,25 @@ async function pushDatabase() {
     successCount++;
   }
 
+  // Also push extended_config row to guarantee 100% cloud persistence
+  const extObj = {
+    appName: INITIAL_SCHOOL_PROFILE.appName,
+    appTagline: INITIAL_SCHOOL_PROFILE.appTagline,
+    appLogoUrl: INITIAL_SCHOOL_PROFILE.appLogoUrl,
+    appIconPreset: INITIAL_SCHOOL_PROFILE.appIconPreset,
+    landingHeroBadge: INITIAL_SCHOOL_PROFILE.landingHeroBadge,
+    landingHeroTitle: INITIAL_SCHOOL_PROFILE.landingHeroTitle,
+    landingHeroSubtitle: INITIAL_SCHOOL_PROFILE.landingHeroSubtitle,
+    landingCtaText: INITIAL_SCHOOL_PROFILE.landingCtaText,
+    landingShowDemoButton: INITIAL_SCHOOL_PROFILE.landingShowDemoButton,
+    landingFooterText: INITIAL_SCHOOL_PROFILE.landingFooterText,
+  };
+  await supabase.from("school_profile").upsert({
+    id: "extended_config",
+    nama_sekolah: JSON.stringify(extObj),
+    updated_at: new Date().toISOString(),
+  });
+
   // 2. Users
   await pushTable(
     "users",

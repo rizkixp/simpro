@@ -58,41 +58,43 @@ export default function PengaturanPage() {
   } = useSchoolData();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isInitialMount = useRef(true);
 
   const [formData, setFormData] = useState<SchoolProfile>({
     ...profile,
-    appName: profile?.appName || "SIM Sekolah PRO",
-    appTagline: profile?.appTagline || "Sistem Informasi Manajemen Sekolah Terpadu",
-    appLogoUrl: profile?.appLogoUrl || "",
-    appIconPreset: profile?.appIconPreset || "graduation",
-    landingHeroBadge: profile?.landingHeroBadge || "Platform Manajemen Sekolah Generasi Terbaru #1",
-    landingHeroTitle: profile?.landingHeroTitle || "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
-    landingHeroSubtitle: profile?.landingHeroSubtitle || "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
-    landingCtaText: profile?.landingCtaText || "Buka Portal & Form Login",
+    appName: profile?.appName ?? "SIM Sekolah PRO",
+    appTagline: profile?.appTagline ?? "Sistem Informasi Manajemen Sekolah Terpadu",
+    appLogoUrl: profile?.appLogoUrl ?? "",
+    appIconPreset: profile?.appIconPreset ?? "graduation",
+    landingHeroBadge: profile?.landingHeroBadge ?? "Platform Manajemen Sekolah Generasi Terbaru #1",
+    landingHeroTitle: profile?.landingHeroTitle ?? "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
+    landingHeroSubtitle: profile?.landingHeroSubtitle ?? "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
+    landingCtaText: profile?.landingCtaText ?? "Buka Portal & Form Login",
     landingShowDemoButton: profile?.landingShowDemoButton !== undefined ? profile.landingShowDemoButton : true,
-    landingFooterText: profile?.landingFooterText || "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
+    landingFooterText: profile?.landingFooterText ?? "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
   });
 
   useEffect(() => {
-    if (profile) {
-      setFormData((prev) => ({
-        ...prev,
+    if (profile && isInitialMount.current) {
+      isInitialMount.current = false;
+      setFormData({
         ...profile,
-        appName: profile.appName || prev.appName || "SIM Sekolah PRO",
-        appTagline: profile.appTagline || prev.appTagline || "Sistem Informasi Manajemen Sekolah Terpadu",
-        appLogoUrl: profile.appLogoUrl !== undefined ? profile.appLogoUrl : prev.appLogoUrl,
-        appIconPreset: profile.appIconPreset || prev.appIconPreset || "graduation",
-        landingHeroBadge: profile.landingHeroBadge || prev.landingHeroBadge || "Platform Manajemen Sekolah Generasi Terbaru #1",
-        landingHeroTitle: profile.landingHeroTitle || prev.landingHeroTitle || "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
-        landingHeroSubtitle: profile.landingHeroSubtitle || prev.landingHeroSubtitle || "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
-        landingCtaText: profile.landingCtaText || prev.landingCtaText || "Buka Portal & Form Login",
-        landingShowDemoButton: profile.landingShowDemoButton !== undefined ? profile.landingShowDemoButton : (prev.landingShowDemoButton !== undefined ? prev.landingShowDemoButton : true),
-        landingFooterText: profile.landingFooterText || prev.landingFooterText || "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
-      }));
+        appName: profile.appName ?? "SIM Sekolah PRO",
+        appTagline: profile.appTagline ?? "Sistem Informasi Manajemen Sekolah Terpadu",
+        appLogoUrl: profile.appLogoUrl ?? "",
+        appIconPreset: profile.appIconPreset ?? "graduation",
+        landingHeroBadge: profile.landingHeroBadge ?? "Platform Manajemen Sekolah Generasi Terbaru #1",
+        landingHeroTitle: profile.landingHeroTitle ?? "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
+        landingHeroSubtitle: profile.landingHeroSubtitle ?? "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
+        landingCtaText: profile.landingCtaText ?? "Buka Portal & Form Login",
+        landingShowDemoButton: profile.landingShowDemoButton !== undefined ? profile.landingShowDemoButton : true,
+        landingFooterText: profile.landingFooterText ?? "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
+      });
     }
   }, [profile]);
 
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [testingHealth, setTestingHealth] = useState(false);
   const [healthResult, setHealthResult] = useState<any>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -101,15 +103,46 @@ export default function PengaturanPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert("Ukuran file logo maksimal 2MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ukuran file logo maksimal 5MB.");
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const base64Url = event.target?.result as string;
-      setFormData((prev) => ({ ...prev, appLogoUrl: base64Url }));
+      const resultStr = event.target?.result as string;
+      if (!resultStr) return;
+
+      const img = new Image();
+      img.onload = () => {
+        // Compress and resize logo to max 400x400 so it stays ~30KB (avoiding localStorage quota issues)
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        const maxDim = 400;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/png", 0.85);
+          setFormData((prev) => ({ ...prev, appLogoUrl: compressed }));
+        } else {
+          setFormData((prev) => ({ ...prev, appLogoUrl: resultStr }));
+        }
+      };
+      img.onerror = () => {
+        setFormData((prev) => ({ ...prev, appLogoUrl: resultStr }));
+      };
+      img.src = resultStr;
     };
     reader.readAsDataURL(file);
   };
@@ -176,15 +209,18 @@ export default function PengaturanPage() {
     setTimeout(() => setSyncStatusMsg(null), 4000);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     try {
-      updateProfile(formData);
+      await updateProfile(formData);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 4000);
     } catch (err: any) {
       console.error("Gagal menyimpan profil:", err);
       alert("Terjadi kendala saat menyimpan profil: " + (err.message || err));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -991,7 +1027,7 @@ export default function PengaturanPage() {
                   <input
                     type="text"
                     disabled={!canEdit}
-                    value={formData.telepon}
+                    value={formData.telepon ?? ""}
                     onChange={(e) => setFormData({ ...formData, telepon: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono"
                   />
@@ -1004,7 +1040,7 @@ export default function PengaturanPage() {
                   <input
                     type="email"
                     disabled={!canEdit}
-                    value={formData.email}
+                    value={formData.email ?? ""}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
                   />
@@ -1017,7 +1053,7 @@ export default function PengaturanPage() {
                   <input
                     type="text"
                     disabled={!canEdit}
-                    value={formData.website}
+                    value={formData.website ?? ""}
                     onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
                   />
@@ -1086,10 +1122,11 @@ export default function PengaturanPage() {
                 )}
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer"
+                  disabled={isSaving}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
                 >
-                  <Save className="h-4 w-4" />
-                  <span>Simpan Perubahan Profil & Aplikasi</span>
+                  {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  <span>{isSaving ? "Menyimpan ke Cloud & Lokal..." : "Simpan Perubahan Profil & Aplikasi"}</span>
                 </button>
               </div>
             </div>

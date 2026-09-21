@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope } from "@/hooks/useTeacherScope";
-import { JadwalPelajaran } from "@/types/school";
+import { JadwalPelajaran, MataPelajaran } from "@/types/school";
 import {
   CalendarDays,
   Printer,
@@ -33,7 +33,7 @@ import {
   Zap,
 } from "lucide-react";
 
-type ActiveMenu = "lihat" | "tambah" | "edit" | "hapus";
+type ActiveMenu = "lihat" | "tambah" | "edit" | "hapus" | "mapel";
 
 export interface MapelGuruRow {
   id: string;
@@ -56,9 +56,12 @@ export default function JadwalPage() {
     deleteJadwal,
     bulkDeleteJadwal,
     resetJadwalToDefault,
+    addMapel,
+    updateMapel,
+    deleteMapel,
   } = useSchoolData();
 
-  // Active Menu: "lihat" | "tambah" | "edit" | "hapus"
+  // Active Menu: "lihat" | "tambah" | "edit" | "hapus" | "mapel"
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>("lihat");
 
   // Filters & View State
@@ -86,6 +89,22 @@ export default function JadwalPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [targetJadwal, setTargetJadwal] = useState<JadwalPelajaran | null>(null);
+
+  // Modals State for Mata Pelajaran
+  const [isAddMapelModalOpen, setIsAddMapelModalOpen] = useState(false);
+  const [isEditMapelModalOpen, setIsEditMapelModalOpen] = useState(false);
+  const [isDeleteMapelModalOpen, setIsDeleteMapelModalOpen] = useState(false);
+  const [targetMapel, setTargetMapel] = useState<MataPelajaran | null>(null);
+
+  // Form Fields State for Mata Pelajaran
+  const [mapelFormNama, setMapelFormNama] = useState("");
+  const [mapelFormKode, setMapelFormKode] = useState("");
+  const [mapelFormKategori, setMapelFormKategori] = useState<MataPelajaran["kategori"]>("Wajib");
+  const [mapelFormKkm, setMapelFormKkm] = useState<number>(75);
+
+  // Search & Filter State for Mata Pelajaran
+  const [mapelSearchTerm, setMapelSearchTerm] = useState("");
+  const [mapelFilterKategori, setMapelFilterKategori] = useState<string>("Semua");
 
   // Form Fields State (shared between dedicated Tambah menu & Edit modal)
   const [formHari, setFormHari] = useState<JadwalPelajaran["hari"]>("Senin");
@@ -630,8 +649,8 @@ export default function JadwalPage() {
 
     updateJadwal(targetJadwal.id, {
       hari: formHari,
-      jamMulai: formJamMulai || targetJadwal.jamMulai || "-",
-      jamSelesai: formJamSelesai || targetJadwal.jamSelesai || "-",
+      jamMulai: formJamMulai ? formJamMulai : "-",
+      jamSelesai: formJamSelesai ? formJamSelesai : "-",
       kelas: formKelas,
       mapel: formMapel,
       guruNama: formGuruNama,
@@ -650,6 +669,100 @@ export default function JadwalPage() {
     setIsDeleteModalOpen(false);
     showToast(`Jadwal ${targetJadwal.mapel} (${targetJadwal.kelas}) berhasil dihapus.`, "success");
     setTargetJadwal(null);
+  };
+
+  // ================= MATA PELAJARAN HANDLERS =================
+  const handleOpenAddMapel = () => {
+    setTargetMapel(null);
+    setMapelFormNama("");
+    setMapelFormKode("");
+    setMapelFormKategori("Wajib");
+    setMapelFormKkm(75);
+    setIsAddMapelModalOpen(true);
+  };
+
+  const handleOpenEditMapel = (m: MataPelajaran) => {
+    setTargetMapel(m);
+    setMapelFormNama(m.nama);
+    setMapelFormKode(m.kode);
+    setMapelFormKategori(m.kategori);
+    setMapelFormKkm(m.kkm);
+    setIsEditMapelModalOpen(true);
+  };
+
+  const handleOpenDeleteMapel = (m: MataPelajaran) => {
+    setTargetMapel(m);
+    setIsDeleteMapelModalOpen(true);
+  };
+
+  const handleSaveAddMapel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mapelFormNama.trim()) {
+      showToast("Mohon masukkan nama mata pelajaran.", "error");
+      return;
+    }
+    const isDuplicate = mapelList.some(
+      (m) => m.nama.trim().toLowerCase() === mapelFormNama.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      showToast(`Mata pelajaran "${mapelFormNama}" sudah terdaftar sebelumnya.`, "error");
+      return;
+    }
+
+    const generatedKode = mapelFormKode.trim()
+      ? mapelFormKode.trim().toUpperCase()
+      : mapelFormNama.trim().replace(/[^a-zA-Z]/g, "").substring(0, 3).toUpperCase() || "MPL";
+
+    addMapel({
+      nama: mapelFormNama.trim(),
+      kode: generatedKode,
+      kategori: mapelFormKategori,
+      kkm: Number(mapelFormKkm) || 75,
+    });
+
+    setIsAddMapelModalOpen(false);
+    showToast(`Mata pelajaran "${mapelFormNama.trim()}" berhasil ditambahkan!`, "success");
+  };
+
+  const handleSaveEditMapel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetMapel) return;
+    if (!mapelFormNama.trim()) {
+      showToast("Mohon masukkan nama mata pelajaran.", "error");
+      return;
+    }
+
+    const isDuplicate = mapelList.some(
+      (m) => m.id !== targetMapel.id && m.nama.trim().toLowerCase() === mapelFormNama.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      showToast(`Mata pelajaran "${mapelFormNama}" sudah digunakan oleh mata pelajaran lain.`, "error");
+      return;
+    }
+
+    const generatedKode = mapelFormKode.trim()
+      ? mapelFormKode.trim().toUpperCase()
+      : targetMapel.kode;
+
+    updateMapel(targetMapel.id, {
+      nama: mapelFormNama.trim(),
+      kode: generatedKode,
+      kategori: mapelFormKategori,
+      kkm: Number(mapelFormKkm) || 75,
+    });
+
+    setIsEditMapelModalOpen(false);
+    showToast(`Mata pelajaran "${mapelFormNama.trim()}" berhasil diperbarui!`, "success");
+    setTargetMapel(null);
+  };
+
+  const handleConfirmDeleteMapel = () => {
+    if (!targetMapel) return;
+    const deletedName = targetMapel.nama;
+    deleteMapel(targetMapel.id);
+    setIsDeleteMapelModalOpen(false);
+    showToast(`Mata pelajaran "${deletedName}" berhasil dihapus.`, "success");
+    setTargetMapel(null);
   };
 
   // Bulk Delete Actions
@@ -816,6 +929,18 @@ export default function JadwalPage() {
     );
   };
 
+  // Filtered Mata Pelajaran for Menu 5 (Kelola Mapel)
+  const filteredMapelList = useMemo(() => {
+    return mapelList.filter((m) => {
+      const matchSearch =
+        m.nama.toLowerCase().includes(mapelSearchTerm.toLowerCase()) ||
+        m.kode.toLowerCase().includes(mapelSearchTerm.toLowerCase());
+      const matchKategori =
+        mapelFilterKategori === "Semua" || m.kategori === mapelFilterKategori;
+      return matchSearch && matchKategori;
+    });
+  }, [mapelList, mapelSearchTerm, mapelFilterKategori]);
+
   // Statistics
   const stats = useMemo(() => {
     const relevantJadwal = teacherScope.isTeacher
@@ -923,19 +1048,19 @@ export default function JadwalPage() {
 
       {/* ================= DEDICATED MENU BAR (TABBED NAVIGATION) ================= */}
       <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm no-print">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           {/* Menu 1: Lihat Jadwal */}
           <button
             type="button"
             onClick={() => setActiveMenu("lihat")}
-            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeMenu === "lihat"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             }`}
           >
             <CalendarDays className="w-4 h-4" />
-            <span>1. Lihat Jadwal ({stats.total})</span>
+            <span>1. Lihat ({stats.total})</span>
           </button>
 
           {/* Menu 2: Tambah Jadwal */}
@@ -945,7 +1070,7 @@ export default function JadwalPage() {
               initForm();
               setActiveMenu("tambah");
             }}
-            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeMenu === "tambah"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -959,7 +1084,7 @@ export default function JadwalPage() {
           <button
             type="button"
             onClick={() => setActiveMenu("edit")}
-            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeMenu === "edit"
                 ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -973,14 +1098,28 @@ export default function JadwalPage() {
           <button
             type="button"
             onClick={() => setActiveMenu("hapus")}
-            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
               activeMenu === "hapus"
                 ? "bg-rose-600 text-white shadow-md shadow-rose-500/20"
                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             }`}
           >
             <Trash2 className="w-4 h-4" />
-            <span>4. Hapus Jadwal {selectedIdsToDelete.length > 0 && `(${selectedIdsToDelete.length})`}</span>
+            <span>4. Hapus {selectedIdsToDelete.length > 0 && `(${selectedIdsToDelete.length})`}</span>
+          </button>
+
+          {/* Menu 5: Kelola Mata Pelajaran */}
+          <button
+            type="button"
+            onClick={() => setActiveMenu("mapel")}
+            className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all col-span-2 sm:col-span-1 ${
+              activeMenu === "mapel"
+                ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
+                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>5. Kelola Mapel ({mapelList.length})</span>
           </button>
         </div>
       </div>
@@ -1533,6 +1672,15 @@ export default function JadwalPage() {
                   )}
                   <button
                     type="button"
+                    onClick={handleOpenAddMapel}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 transition-all flex items-center gap-1.5"
+                    title="Tambah nama mata pelajaran baru ke master"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Mapel Baru</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleAddRow}
                     className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-all flex items-center gap-1.5 shadow-sm"
                   >
@@ -1941,6 +2089,270 @@ export default function JadwalPage() {
           </div>
         </div>
       )}
+
+      {/* ===================================================================== */}
+      {/* MENU 5: KELOLA MATA PELAJARAN (TAMBAH, EDIT, HAPUS MAPEL)              */}
+      {/* ===================================================================== */}
+      {activeMenu === "mapel" && (
+        <div className="space-y-6">
+          {/* Top Banner / Action Bar */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 rounded-xl">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Kelola Master Mata Pelajaran
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Tambah, perbarui, dan hapus nama mata pelajaran. Perubahan nama otomatis memperbarui jadwal KBM, nilai siswa, dan guru pengampu.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenAddMapel}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-2 shadow-sm shadow-emerald-500/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Mapel Baru</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Filter Pills / Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+              <div
+                onClick={() => setMapelFilterKategori("Semua")}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  mapelFilterKategori === "Semua"
+                    ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200"
+                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                }`}
+              >
+                <span className="text-[11px] font-medium block">Total Mata Pelajaran</span>
+                <span className="text-lg font-extrabold">{mapelList.length} Mapel</span>
+              </div>
+
+              <div
+                onClick={() => setMapelFilterKategori("Wajib")}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  mapelFilterKategori === "Wajib"
+                    ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-200"
+                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                }`}
+              >
+                <span className="text-[11px] font-medium block">Kelompok Wajib</span>
+                <span className="text-lg font-extrabold">
+                  {mapelList.filter((m) => m.kategori === "Wajib").length} Mapel
+                </span>
+              </div>
+
+              <div
+                onClick={() => setMapelFilterKategori("Peminatan")}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  mapelFilterKategori === "Peminatan"
+                    ? "bg-purple-50/70 dark:bg-purple-950/30 border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-200"
+                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                }`}
+              >
+                <span className="text-[11px] font-medium block">Kelompok Peminatan</span>
+                <span className="text-lg font-extrabold">
+                  {mapelList.filter((m) => m.kategori === "Peminatan").length} Mapel
+                </span>
+              </div>
+
+              <div
+                onClick={() => setMapelFilterKategori("Muatan Lokal")}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  mapelFilterKategori === "Muatan Lokal"
+                    ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200"
+                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                }`}
+              >
+                <span className="text-[11px] font-medium block">Muatan Lokal</span>
+                <span className="text-lg font-extrabold">
+                  {mapelList.filter((m) => m.kategori === "Muatan Lokal").length} Mapel
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={mapelSearchTerm}
+                onChange={(e) => setMapelSearchTerm(e.target.value)}
+                placeholder="Cari nama atau kode mapel..."
+                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              {mapelSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setMapelSearchTerm("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                Kategori:
+              </span>
+              <select
+                value={mapelFilterKategori}
+                onChange={(e) => setMapelFilterKategori(e.target.value)}
+                className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="Semua">Semua Kategori</option>
+                <option value="Wajib">Wajib</option>
+                <option value="Peminatan">Peminatan</option>
+                <option value="Muatan Lokal">Muatan Lokal</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table / List */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/50 text-[13px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-4 w-12 text-center">No</th>
+                    <th className="py-3 px-4 w-24">Kode</th>
+                    <th className="py-3 px-4">Nama Mata Pelajaran</th>
+                    <th className="py-3 px-4">Kategori</th>
+                    <th className="py-3 px-4 text-center">KKM</th>
+                    <th className="py-3 px-4">Terjadwal di KBM</th>
+                    <th className="py-3 px-4">Guru Pengampu</th>
+                    <th className="py-3 px-4 text-center w-28">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {filteredMapelList.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <BookOpen className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-slate-600 opacity-60" />
+                        <p className="text-sm font-semibold">Tidak ada mata pelajaran yang ditemukan</p>
+                        <p className="text-xs mt-1">Coba sesuaikan kata kunci pencarian atau filter kategori</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredMapelList.map((m, idx) => {
+                      const countJadwal = jadwalList.filter(
+                        (j) => j.mapel.trim().toLowerCase() === m.nama.trim().toLowerCase()
+                      ).length;
+                      const assignedTeachers = guruList.filter((g) =>
+                        g.mataPelajaran.some(
+                          (sub) => sub.trim().toLowerCase() === m.nama.trim().toLowerCase()
+                        )
+                      );
+
+                      return (
+                        <tr
+                          key={m.id}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="py-3 px-4 text-center text-xs font-semibold text-slate-400">
+                            {idx + 1}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              {m.kode}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-slate-900 dark:text-white text-sm">
+                              {m.nama}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                                m.kategori === "Wajib"
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                                  : m.kategori === "Peminatan"
+                                  ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              }`}
+                            >
+                              {m.kategori}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="font-semibold text-xs px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              {m.kkm}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {countJadwal > 0 ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                                <CalendarDays className="w-3.5 h-3.5" />
+                                <span>{countJadwal} Sesi Terjadwal</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">
+                                Belum Terjadwal
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            {assignedTeachers.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 max-w-xs">
+                                {assignedTeachers.map((g) => (
+                                  <span
+                                    key={g.id}
+                                    className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px]"
+                                  >
+                                    {g.nama}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">
+                                Belum Ditautkan
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditMapel(m)}
+                                className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+                                title="Edit Nama / Kategori Mata Pelajaran"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDeleteMapel(m)}
+                                className="p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                                title="Hapus Mata Pelajaran"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       </div> {/* End of no-print screen UI */}
 
       {/* ================= MODAL: EDIT JADWAL ================= */}
@@ -2330,6 +2742,225 @@ export default function JadwalPage() {
                 className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-sm"
               >
                 Ya, Reset Jadwal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: TAMBAH / EDIT MATA PELAJARAN ================= */}
+      {(isAddMapelModalOpen || isEditMapelModalOpen) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-emerald-50/50 dark:bg-emerald-950/40">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 rounded-xl">
+                  {isEditMapelModalOpen ? <Edit2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    {isEditMapelModalOpen ? "Edit Mata Pelajaran" : "Tambah Mata Pelajaran Baru"}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {isEditMapelModalOpen
+                      ? "Perbarui nama, kode, kategori, atau KKM mata pelajaran."
+                      : "Daftarkan mata pelajaran baru ke dalam kurikulum sekolah."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddMapelModalOpen(false);
+                  setIsEditMapelModalOpen(false);
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={isEditMapelModalOpen ? handleSaveEditMapel : handleSaveAddMapel} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Mata Pelajaran <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Matematika Wajib, Fisika, dsb."
+                  value={mapelFormNama}
+                  onChange={(e) => setMapelFormNama(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Kode Singkatan <span className="text-[10px] text-slate-400 font-normal">(Opsional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: MTK"
+                    value={mapelFormKode}
+                    onChange={(e) => setMapelFormKode(e.target.value.toUpperCase())}
+                    maxLength={8}
+                    className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold uppercase rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Standar KKM <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    max={100}
+                    value={mapelFormKkm}
+                    onChange={(e) => setMapelFormKkm(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Kategori Kelompok <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["Wajib", "Peminatan", "Muatan Lokal"] as const).map((kat) => (
+                    <button
+                      key={kat}
+                      type="button"
+                      onClick={() => setMapelFormKategori(kat)}
+                      className={`py-2 px-2.5 text-center text-xs font-semibold rounded-xl border transition-all ${
+                        mapelFormKategori === kat
+                          ? kat === "Wajib"
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                            : kat === "Peminatan"
+                            ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                            : "bg-amber-600 text-white border-amber-600 shadow-sm"
+                          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60"
+                      }`}
+                    >
+                      {kat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {isEditMapelModalOpen && targetMapel && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-900/50 text-xs text-blue-800 dark:text-blue-300 space-y-1">
+                  <p className="font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>Sinkronisasi Otomatis:</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    Jika nama diubah, semua agenda KBM di jadwal pelajaran, riwayat nilai siswa, dan data pengajar terkait akan otomatis ikut diperbarui.
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddMapelModalOpen(false);
+                    setIsEditMapelModalOpen(false);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm"
+                >
+                  {isEditMapelModalOpen ? "Simpan Perubahan" : "Tambah Mata Pelajaran"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: KONFIRMASI HAPUS MATA PELAJARAN ================= */}
+      {isDeleteMapelModalOpen && targetMapel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400 rounded-xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Hapus Mata Pelajaran?
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Mata pelajaran ini akan dihapus dari master kurikulum sekolah.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1.5">
+              <p className="font-bold text-slate-900 dark:text-white text-sm">
+                {targetMapel.nama} ({targetMapel.kode})
+              </p>
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span>Kelompok Kategori:</span>
+                <span className="font-semibold">{targetMapel.kategori}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                <span>Standar KKM:</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  {targetMapel.kkm}
+                </span>
+              </div>
+            </div>
+
+            {/* Warning if mapel is actively used */}
+            {(() => {
+              const activeCount = jadwalList.filter(
+                (j) => j.mapel.trim().toLowerCase() === targetMapel.nama.trim().toLowerCase()
+              ).length;
+              if (activeCount > 0) {
+                return (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Peringatan KBM Aktif</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed">
+                      Mata pelajaran ini saat ini dipakai oleh <strong>{activeCount} sesi jadwal KBM</strong>. Jika dihapus dari kurikulum, jadwal KBM yang sudah ada tetap tercatat namun tidak akan muncul lagi di daftar pilihan baru.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteMapelModalOpen(false);
+                  setTargetMapel(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteMapel}
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-sm"
+              >
+                Ya, Hapus Mapel
               </button>
             </div>
           </div>

@@ -118,37 +118,100 @@ export const SupabaseSchoolService = {
     if (!client) return null;
     const { data, error } = await client
       .from("school_profile")
-      .select("*")
-      .eq("id", "default_profile")
-      .maybeSingle();
-    if (error || !data) return null;
+      .select("*");
+    if (error || !data || data.length === 0) return null;
+
+    const defaultRow = data.find((r: any) => r.id === "default_profile") || data[0];
+    const extRow = data.find((r: any) => r.id === "extended_config");
+
+    let extData: any = {};
+    if (extRow && extRow.nama_sekolah) {
+      try {
+        extData = JSON.parse(extRow.nama_sekolah);
+      } catch (e) {
+        console.warn("[getProfile] Gagal parse extended_config:", e);
+      }
+    }
+
     return {
-      namaSekolah: data.nama_sekolah,
-      npsn: data.npsn || "",
-      akreditasi: data.akreditasi || "",
-      alamat: data.alamat || "",
-      telepon: data.telepon || "",
-      email: data.email || "",
-      website: data.website || "",
-      kepalaSekolah: data.kepala_sekolah || "",
-      tahunAjaranAktif: data.tahun_ajaran_aktif || "2025/2026",
-      semesterAktif: data.semester_aktif || "Ganjil",
-      appName: data.app_name || undefined,
-      appTagline: data.app_tagline || undefined,
-      appLogoUrl: data.app_logo_url || undefined,
-      appIconPreset: data.app_icon_preset || undefined,
-      landingHeroBadge: data.landing_hero_badge || undefined,
-      landingHeroTitle: data.landing_hero_title || undefined,
-      landingHeroSubtitle: data.landing_hero_subtitle || undefined,
-      landingCtaText: data.landing_cta_text || undefined,
-      landingShowDemoButton: data.landing_show_demo_button !== undefined ? data.landing_show_demo_button : undefined,
-      landingFooterText: data.landing_footer_text || undefined,
+      namaSekolah: defaultRow.nama_sekolah ?? "",
+      npsn: defaultRow.npsn ?? "",
+      akreditasi: defaultRow.akreditasi ?? "",
+      alamat: defaultRow.alamat ?? "",
+      telepon: defaultRow.telepon ?? "",
+      email: defaultRow.email ?? "",
+      website: defaultRow.website ?? "",
+      kepalaSekolah: defaultRow.kepala_sekolah ?? "",
+      tahunAjaranAktif: defaultRow.tahun_ajaran_aktif || "2025/2026",
+      semesterAktif: defaultRow.semester_aktif || "Ganjil",
+      appName:
+        defaultRow.app_name !== undefined && defaultRow.app_name !== null
+          ? defaultRow.app_name
+          : extData.appName !== undefined
+          ? extData.appName
+          : "",
+      appTagline:
+        defaultRow.app_tagline !== undefined && defaultRow.app_tagline !== null
+          ? defaultRow.app_tagline
+          : extData.appTagline !== undefined
+          ? extData.appTagline
+          : "",
+      appLogoUrl:
+        defaultRow.app_logo_url !== undefined && defaultRow.app_logo_url !== null
+          ? defaultRow.app_logo_url
+          : extData.appLogoUrl !== undefined
+          ? extData.appLogoUrl
+          : "",
+      appIconPreset:
+        defaultRow.app_icon_preset !== undefined && defaultRow.app_icon_preset !== null
+          ? defaultRow.app_icon_preset
+          : extData.appIconPreset !== undefined
+          ? extData.appIconPreset
+          : "graduation",
+      landingHeroBadge:
+        defaultRow.landing_hero_badge !== undefined && defaultRow.landing_hero_badge !== null
+          ? defaultRow.landing_hero_badge
+          : extData.landingHeroBadge !== undefined
+          ? extData.landingHeroBadge
+          : "",
+      landingHeroTitle:
+        defaultRow.landing_hero_title !== undefined && defaultRow.landing_hero_title !== null
+          ? defaultRow.landing_hero_title
+          : extData.landingHeroTitle !== undefined
+          ? extData.landingHeroTitle
+          : "",
+      landingHeroSubtitle:
+        defaultRow.landing_hero_subtitle !== undefined && defaultRow.landing_hero_subtitle !== null
+          ? defaultRow.landing_hero_subtitle
+          : extData.landingHeroSubtitle !== undefined
+          ? extData.landingHeroSubtitle
+          : "",
+      landingCtaText:
+        defaultRow.landing_cta_text !== undefined && defaultRow.landing_cta_text !== null
+          ? defaultRow.landing_cta_text
+          : extData.landingCtaText !== undefined
+          ? extData.landingCtaText
+          : "",
+      landingShowDemoButton:
+        defaultRow.landing_show_demo_button !== undefined && defaultRow.landing_show_demo_button !== null
+          ? defaultRow.landing_show_demo_button
+          : extData.landingShowDemoButton !== undefined
+          ? extData.landingShowDemoButton
+          : true,
+      landingFooterText:
+        defaultRow.landing_footer_text !== undefined && defaultRow.landing_footer_text !== null
+          ? defaultRow.landing_footer_text
+          : extData.landingFooterText !== undefined
+          ? extData.landingFooterText
+          : "",
     };
   },
 
   async updateProfile(profile: SchoolProfile): Promise<boolean> {
     const client = getSupabaseBrowserClient();
     if (!client) return false;
+
+    const nowIso = new Date().toISOString();
 
     const basePayload: any = {
       id: "default_profile",
@@ -162,7 +225,7 @@ export const SupabaseSchoolService = {
       kepala_sekolah: profile.kepalaSekolah,
       tahun_ajaran_aktif: profile.tahunAjaranAktif,
       semester_aktif: profile.semesterAktif,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso,
     };
 
     const extendedPayload = {
@@ -179,13 +242,38 @@ export const SupabaseSchoolService = {
       ...(profile.landingFooterText !== undefined ? { landing_footer_text: profile.landingFooterText } : {}),
     };
 
-    // Try upserting extended fields first
+    // 1. Try upserting extended fields to default_profile
     const { error: extError } = await client.from("school_profile").upsert(extendedPayload);
-    if (!extError) return true;
 
-    // Fallback to base columns if extended columns are not yet in Supabase schema
-    const { error: baseError } = await client.from("school_profile").upsert(basePayload);
-    return !baseError;
+    // If extendedPayload failed because columns don't exist in Supabase schema, fallback to basePayload
+    if (extError) {
+      await client.from("school_profile").upsert(basePayload);
+    }
+
+    // 2. ALSO save extended properties to 'extended_config' row as JSON in nama_sekolah
+    // This guarantees 100% persistence in Supabase even when the database table lacks new columns
+    const extObj = {
+      appName: profile.appName,
+      appTagline: profile.appTagline,
+      appLogoUrl: profile.appLogoUrl,
+      appIconPreset: profile.appIconPreset,
+      landingHeroBadge: profile.landingHeroBadge,
+      landingHeroTitle: profile.landingHeroTitle,
+      landingHeroSubtitle: profile.landingHeroSubtitle,
+      landingCtaText: profile.landingCtaText,
+      landingShowDemoButton: profile.landingShowDemoButton,
+      landingFooterText: profile.landingFooterText,
+    };
+
+    const extConfigRow = {
+      id: "extended_config",
+      nama_sekolah: JSON.stringify(extObj),
+      updated_at: nowIso,
+    };
+
+    await client.from("school_profile").upsert(extConfigRow);
+
+    return true;
   },
 
   // ==================== USERS ====================
@@ -1653,26 +1741,86 @@ export const SupabaseSchoolService = {
       }
 
       // 3. Siswa
+      try {
+        const { data: existingSiswa } = await client.from("siswa").select("id");
+        if (existingSiswa && existingSiswa.length > 0) {
+          const currentIds = new Set(mockData.siswa.map((s) => s.id));
+          const toDeleteIds = existingSiswa.filter((es: any) => !currentIds.has(es.id)).map((es: any) => es.id);
+          if (toDeleteIds.length > 0) {
+            await client.from("siswa").delete().in("id", toDeleteIds);
+          }
+        }
+      } catch (err) {
+        console.warn("Clean orphan siswa warning:", err);
+      }
       if (mockData.siswa.length > 0) {
         await this.bulkUpsertSiswa(mockData.siswa);
       }
 
       // 4. Guru
+      try {
+        const { data: existingGuru } = await client.from("guru").select("id");
+        if (existingGuru && existingGuru.length > 0) {
+          const currentIds = new Set(mockData.guru.map((g) => g.id));
+          const toDeleteIds = existingGuru.filter((eg: any) => !currentIds.has(eg.id)).map((eg: any) => eg.id);
+          if (toDeleteIds.length > 0) {
+            await client.from("guru").delete().in("id", toDeleteIds);
+          }
+        }
+      } catch (err) {
+        console.warn("Clean orphan guru warning:", err);
+      }
       for (const g of mockData.guru) {
         await this.upsertGuru(g);
       }
 
       // 5. Kelas
+      try {
+        const { data: existingKelas } = await client.from("kelas").select("id");
+        if (existingKelas && existingKelas.length > 0) {
+          const currentIds = new Set(mockData.kelas.map((k) => k.id));
+          const toDeleteIds = existingKelas.filter((ek: any) => !currentIds.has(ek.id)).map((ek: any) => ek.id);
+          if (toDeleteIds.length > 0) {
+            await client.from("kelas").delete().in("id", toDeleteIds);
+          }
+        }
+      } catch (err) {
+        console.warn("Clean orphan kelas warning:", err);
+      }
       for (const k of mockData.kelas) {
         await this.upsertKelas(k);
       }
 
       // 6. Mapel
+      try {
+        const { data: existingMapel } = await client.from("mata_pelajaran").select("id");
+        if (existingMapel && existingMapel.length > 0) {
+          const currentIds = new Set(mockData.mapel.map((m) => m.id));
+          const toDeleteIds = existingMapel.filter((em: any) => !currentIds.has(em.id)).map((em: any) => em.id);
+          if (toDeleteIds.length > 0) {
+            await client.from("mata_pelajaran").delete().in("id", toDeleteIds);
+          }
+        }
+      } catch (err) {
+        console.warn("Clean orphan mapel warning:", err);
+      }
       for (const m of mockData.mapel) {
         await this.upsertMapel(m);
       }
 
       // 7. Jadwal
+      try {
+        const { data: existingJadwal } = await client.from("jadwal_pelajaran").select("id");
+        if (existingJadwal && existingJadwal.length > 0) {
+          const currentIds = new Set(mockData.jadwal.map((j) => j.id));
+          const toDeleteIds = existingJadwal.filter((ej: any) => !currentIds.has(ej.id)).map((ej: any) => ej.id);
+          if (toDeleteIds.length > 0) {
+            await client.from("jadwal_pelajaran").delete().in("id", toDeleteIds);
+          }
+        }
+      } catch (err) {
+        console.warn("Clean orphan jadwal warning:", err);
+      }
       if (mockData.jadwal.length > 0) {
         await this.bulkUpsertJadwal(mockData.jadwal);
       }
