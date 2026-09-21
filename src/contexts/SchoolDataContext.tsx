@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import {
   Siswa,
   Guru,
@@ -262,6 +262,14 @@ interface SchoolDataContextType {
   syncWithSupabase: () => Promise<void>;
   seedDatabaseToCloud: () => Promise<boolean>;
   testSupabaseHealth: () => Promise<SupabaseHealthStatus>;
+
+  // Automatic Push Database Engine
+  isAutoPushEnabled: boolean;
+  toggleAutoPush: (enabled?: boolean) => void;
+  isAutoPushing: boolean;
+  lastAutoPushTime: Date | null;
+  autoPushStatus: "idle" | "pushing" | "success" | "error";
+  forceAutoPushNow: () => Promise<boolean>;
 }
 
 
@@ -306,6 +314,13 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
+
+  // Automatic Push Database States
+  const [isAutoPushEnabled, setIsAutoPushEnabled] = useState<boolean>(true);
+  const [isAutoPushing, setIsAutoPushing] = useState<boolean>(false);
+  const [lastAutoPushTime, setLastAutoPushTime] = useState<Date | null>(null);
+  const [autoPushStatus, setAutoPushStatus] = useState<"idle" | "pushing" | "success" | "error">("idle");
+  const autoPushTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load from LocalStorage on client mount
   useEffect(() => {
@@ -443,6 +458,11 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         }
       });
       setMutabaahList(mergedMutabaah);
+
+      const savedAutoPush = localStorage.getItem("sim_auto_push_db_enabled");
+      if (savedAutoPush !== null) {
+        setIsAutoPushEnabled(savedAutoPush === "true");
+      }
     } catch (e) {
       console.warn("Could not read from local storage", e);
     }
@@ -453,6 +473,68 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
+  // Automatic Push Engine & Helpers
+  const triggerAutoPush = (reason: string = "mutation") => {
+    if (!isAutoPushEnabled || !SupabaseSchoolService.isConfigured()) return;
+    if (autoPushTimerRef.current) clearTimeout(autoPushTimerRef.current);
+    autoPushTimerRef.current = setTimeout(async () => {
+      setIsAutoPushing(true);
+      setAutoPushStatus("pushing");
+      try {
+        const ok = await seedDatabaseToCloud();
+        setIsAutoPushing(false);
+        if (ok) {
+          setLastAutoPushTime(new Date());
+          setAutoPushStatus("success");
+        } else {
+          setAutoPushStatus("error");
+        }
+      } catch (err) {
+        console.warn("[AutoPush Database] Error during auto-push:", err);
+        setIsAutoPushing(false);
+        setAutoPushStatus("error");
+      }
+    }, 1500);
+  };
+
+  const forceAutoPushNow = async (): Promise<boolean> => {
+    setIsAutoPushing(true);
+    setAutoPushStatus("pushing");
+    try {
+      const ok = await seedDatabaseToCloud();
+      setIsAutoPushing(false);
+      if (ok) {
+        setLastAutoPushTime(new Date());
+        setAutoPushStatus("success");
+      } else {
+        setAutoPushStatus("error");
+      }
+      return ok;
+    } catch (err) {
+      console.error("[AutoPush Database] Force auto-push failed:", err);
+      setIsAutoPushing(false);
+      setAutoPushStatus("error");
+      return false;
+    }
+  };
+
+  const toggleAutoPush = (enabled?: boolean) => {
+    const nextVal = enabled !== undefined ? enabled : !isAutoPushEnabled;
+    setIsAutoPushEnabled(nextVal);
+    saveState("auto_push_db_enabled", nextVal);
+    if (nextVal) {
+      triggerAutoPush("manual-enable");
+    }
+  };
+
+  // 60-second periodic background push fallback when auto-push is enabled
+  useEffect(() => {
+    if (!isAutoPushEnabled || !SupabaseSchoolService.isConfigured()) return;
+    const interval = setInterval(() => {
+      triggerAutoPush("periodic-interval");
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isAutoPushEnabled]);
 
   // Helper for background Supabase persistence without blocking UI
   const persistSupabase = (action: () => Promise<boolean | any>) => {
@@ -460,6 +542,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       action().catch((err) => {
         console.warn("[Supabase] Background persistence warning:", err);
       });
+      if (isAutoPushEnabled) {
+        triggerAutoPush("action-mutation");
+      }
     }
   };
 
@@ -711,6 +796,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const saveState = (key: string, value: unknown) => {
     try {
       localStorage.setItem(`sim_data_${key}`, JSON.stringify(value));
+      if (isAutoPushEnabled && key !== "auto_push_db_enabled") {
+        triggerAutoPush(`saveState-${key}`);
+      }
     } catch (e) {
       console.warn(`Failed to persist ${key}`, e);
     }
@@ -1015,6 +1103,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
     setPresensiList(updated);
     saveState("presensi", updated);
+    const targetRec = updated.find((p) => p.siswaId === siswaId && p.tanggal === targetDate);
+    if (targetRec) {
+      persistSupabase(() => SupabaseSchoolService.upsertPresensi(targetRec));
+    }
   };
 
   // Nilai Actions
@@ -1111,6 +1203,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [...jenisTagihanList, newJenis];
     setJenisTagihanList(updated);
     saveState("jenis_tagihan", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertJenisTagihan(newJenis));
   };
 
   const updateJenisTagihan = (id: string, data: Partial<JenisTagihan>) => {
@@ -1123,6 +1216,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = jenisTagihanList.map((j) => (j.id === id ? { ...j, ...data } : j));
     setJenisTagihanList(updated);
     saveState("jenis_tagihan", updated);
+    const target = updated.find((j) => j.id === id);
+    if (target) {
+      persistSupabase(() => SupabaseSchoolService.upsertJenisTagihan(target));
+    }
 
     // If name changed, cascade update existing bills in sppList
     if (oldNama !== newNama) {
@@ -1141,6 +1238,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = jenisTagihanList.filter((j) => j.id !== id);
     setJenisTagihanList(updated);
     saveState("jenis_tagihan", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteJenisTagihan(id));
 
     // Cascade update existing bills with deleted category to fallbackNama
     const updatedBills = sppList.map((b) =>
@@ -1159,6 +1257,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [newTagihan, ...sppList];
     setSppList(updated);
     saveState("spp", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertTagihan(newTagihan));
   };
 
   const bulkAddTagihan = (
@@ -1189,6 +1288,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = [...newBills, ...sppList];
     setSppList(updated);
     saveState("spp", updated);
+    persistSupabase(() => SupabaseSchoolService.bulkUpsertTagihan(newBills));
   };
 
   const bayarSPP = (id: string, metode: MetodePembayaranTagihan) => {
@@ -1209,6 +1309,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     );
     setSppList(updated);
     saveState("spp", updated);
+    const target = updated.find((s) => s.id === id);
+    if (target) {
+      persistSupabase(() => SupabaseSchoolService.upsertTagihan(target));
+    }
   };
 
   const bayarTagihanDariTabungan = (
@@ -2453,6 +2557,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         syncWithSupabase,
         seedDatabaseToCloud,
         testSupabaseHealth,
+
+        // Automatic Push Database Engine
+        isAutoPushEnabled,
+        toggleAutoPush,
+        isAutoPushing,
+        lastAutoPushTime,
+        autoPushStatus,
+        forceAutoPushNow,
       }}
 
 

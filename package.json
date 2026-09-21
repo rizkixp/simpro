@@ -6,7 +6,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:push": "npx tsx scripts/push-database.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
