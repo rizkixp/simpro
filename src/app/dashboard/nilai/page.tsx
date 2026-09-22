@@ -180,6 +180,7 @@ export default function NilaiManagementPage() {
     npsnAkreditasi: string;
     alamatKontak: string;
     garisKop: "double" | "single";
+    ukuranFontKop?: "sm" | "md" | "lg";
     tempatRapor: string;
     tanggalRapor: string;
   }
@@ -192,6 +193,7 @@ export default function NilaiManagementPage() {
     npsnAkreditasi: `NPSN: ${profile?.npsn || "20104567"} • Akreditasi: ${profile?.akreditasi || "A"}`,
     alamatKontak: `${profile?.alamat || "Jl. Pendidikan No. 45"} • Telp: ${profile?.telepon || "(021) 7890123"} • Website: ${profile?.website || "www.smartschool.sch.id"}`,
     garisKop: "double",
+    ukuranFontKop: "md",
     tempatRapor: "Jakarta",
     tanggalRapor: formatDateIndo(new Date().toISOString().split("T")[0]),
   });
@@ -415,40 +417,40 @@ export default function NilaiManagementPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Nama Yayasan / Lembaga Penyelenggara (Baris 1)
+                  Nama Yayasan / Instansi (Baris 1)
                 </label>
                 <input
                   type="text"
                   value={raporConfig.yayasanNama}
                   onChange={(e) => updateRaporConfig({ yayasanNama: e.target.value })}
                   placeholder="Contoh: YAYASAN PENDIDIKAN ISLAM ..."
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-medium"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm"
                 />
               </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Nama Satuan Pendidikan (Baris 2 / Utama)
+                  Nama Satuan Pendidikan / Sekolah (Baris 2)
                 </label>
                 <input
                   type="text"
                   value={raporConfig.namaSekolah}
                   onChange={(e) => updateRaporConfig({ namaSekolah: e.target.value })}
                   placeholder="Contoh: SD ISLAM TERPADU ..."
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm"
                 />
               </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  NPSN & Akreditasi (Baris 3)
+                  NPSN & Akreditasi / Info Lembaga (Baris 3)
                 </label>
                 <input
                   type="text"
                   value={raporConfig.npsnAkreditasi}
                   onChange={(e) => updateRaporConfig({ npsnAkreditasi: e.target.value })}
-                  placeholder="Contoh: NPSN: 20104567 • Akreditasi: A"
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                  placeholder="Contoh: NPSN: 20104567 • AKREDITASI: A"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm"
                 />
               </div>
 
@@ -461,37 +463,80 @@ export default function NilaiManagementPage() {
                   value={raporConfig.alamatKontak}
                   onChange={(e) => updateRaporConfig({ alamatKontak: e.target.value })}
                   placeholder="Contoh: Jl. Merdeka No. 12 • Telp: (021) 123456"
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs sm:text-sm"
                 />
               </div>
 
-              <div className="md:col-span-2 flex items-center gap-4 pt-1">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
-                  Garis Pembatas Kop:
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateRaporConfig({ garisKop: "double" })}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer border ${
-                      raporConfig.garisKop === "double"
-                        ? "bg-amber-500 text-white border-amber-600 font-bold"
-                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
-                    }`}
-                  >
-                    Garis Ganda (Resmi)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateRaporConfig({ garisKop: "single" })}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer border ${
-                      raporConfig.garisKop === "single"
-                        ? "bg-amber-500 text-white border-amber-600 font-bold"
-                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
-                    }`}
-                  >
-                    Garis Tunggal Tebal
-                  </button>
+              <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Garis Pembatas Kop:
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ garisKop: "double" })}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer border ${
+                        raporConfig.garisKop === "double"
+                          ? "bg-amber-500 text-white border-amber-600 font-bold shadow-sm"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
+                      }`}
+                    >
+                      Garis Ganda (Resmi)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ garisKop: "single" })}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer border ${
+                        raporConfig.garisKop === "single"
+                          ? "bg-amber-500 text-white border-amber-600 font-bold shadow-sm"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
+                      }`}
+                    >
+                      Garis Tunggal Tebal
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    Ukuran Font Baris 1, 2, 3:
+                  </span>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ ukuranFontKop: "sm" })}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border ${
+                        (raporConfig.ukuranFontKop || "md") === "sm"
+                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
+                      }`}
+                    >
+                      Sedang (14px)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ ukuranFontKop: "md" })}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border ${
+                        (raporConfig.ukuranFontKop || "md") === "md"
+                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
+                      }`}
+                    >
+                      Besar (16px)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ ukuranFontKop: "lg" })}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border ${
+                        raporConfig.ukuranFontKop === "lg"
+                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
+                      }`}
+                    >
+                      Ekstra Besar (18px)
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -557,6 +602,14 @@ export default function NilaiManagementPage() {
 
   const renderOfficialLetterhead = (isSmall = false) => {
     const isDouble = raporConfig.garisKop === "double";
+    const fontMode = raporConfig.ukuranFontKop || "md";
+    const headerTitleSize =
+      fontMode === "sm"
+        ? isSmall ? "text-xs sm:text-sm" : "text-sm sm:text-base"
+        : fontMode === "lg"
+        ? isSmall ? "text-base sm:text-lg" : "text-lg sm:text-xl"
+        : isSmall ? "text-sm sm:text-base" : "text-base sm:text-lg";
+
     return (
       <div
         className={`text-center pb-3 mb-4 ${
@@ -584,21 +637,23 @@ export default function NilaiManagementPage() {
           {/* Bagian Tulisan Tengah Kop Surat */}
           <div className="flex-1 text-center">
             {raporConfig.yayasanNama && (
-              <p className="text-[11px] sm:text-xs font-bold tracking-wider uppercase text-slate-800">
+              <p className={`${headerTitleSize} font-bold tracking-wide uppercase text-slate-900 leading-tight`}>
                 {raporConfig.yayasanNama}
               </p>
             )}
-            <h2 className={`${isSmall ? "text-lg" : "text-xl"} font-extrabold uppercase tracking-wide text-slate-900 leading-tight`}>
+            <h2 className={`${headerTitleSize} font-bold uppercase tracking-wide text-slate-900 leading-tight mt-0.5`}>
               {raporConfig.namaSekolah || profile.namaSekolah}
             </h2>
-            <p className="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
-              {raporConfig.npsnAkreditasi ||
-                `NPSN: ${profile.npsn} • Akreditasi: ${profile.akreditasi}`}
-            </p>
-            <p className="text-[10px] sm:text-[11px] text-slate-600 max-w-xl mx-auto mt-0.5">
-              {raporConfig.alamatKontak ||
-                `${profile.alamat} • Telp: ${profile.telepon} • Website: ${profile.website}`}
-            </p>
+            {raporConfig.npsnAkreditasi && (
+              <p className={`${headerTitleSize} font-bold uppercase tracking-wide text-slate-900 leading-tight mt-0.5`}>
+                {raporConfig.npsnAkreditasi}
+              </p>
+            )}
+            {raporConfig.alamatKontak && (
+              <p className="text-[10px] sm:text-[11px] text-slate-600 max-w-xl mx-auto mt-1 leading-normal">
+                {raporConfig.alamatKontak}
+              </p>
+            )}
           </div>
 
           {/* Logo Kanan */}
