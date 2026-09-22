@@ -218,59 +218,72 @@ export function useTeacherScope(): TeacherScope {
     const scheduledSubjects = jadwalList
       .filter((j) => {
         if (!teacherProfile && !user?.name) return false;
-        const tName = (teacherProfile?.nama || user?.name || "").toLowerCase();
-        const jName = (j.guruNama || "").toLowerCase();
-        return tName.includes(jName) || jName.includes(tName);
+        const tName = normalizeTeacherName(teacherProfile?.nama || user?.name || "");
+        const jName = normalizeTeacherName(j.guruNama || "");
+        if (!jName || !tName || jName.length < 3 || tName.length < 3) return false;
+        return tName === jName || tName.includes(jName) || jName.includes(tName);
       })
       .map((j) => j.mapel);
 
     const candidateSubjectNames = rawSubjects.length > 0 ? rawSubjects : scheduledSubjects;
 
-    // Match candidateSubjectNames with mapelList
-    const matchedMapel = mapelList.filter((m) => {
-      const mLower = m.nama.toLowerCase();
-      return candidateSubjectNames.some((c) => {
-        const cLower = c.toLowerCase();
-        return cLower.includes(mLower) || mLower.includes(cLower);
+    // Check if teacher is a general class teacher / homeroom teacher who manages all subjects
+    const isGeneralTeacher =
+      candidateSubjectNames.length === 0 ||
+      candidateSubjectNames.some((c) => {
+        const s = (c || "").toLowerCase().trim();
+        return (
+          s === "umum" ||
+          s === "semua" ||
+          s === "semua mapel" ||
+          s === "semua mata pelajaran" ||
+          s === "tematik" ||
+          s === "guru kelas" ||
+          s === "wali kelas" ||
+          s === "wali" ||
+          s.includes("guru kelas") ||
+          s.includes("wali kelas")
+        );
       });
-    });
 
-    // Unmatched candidates can be synthesized as MataPelajaran entries
-    const unmatchedCandidates = candidateSubjectNames.filter((c) => {
-      const cLower = c.toLowerCase();
-      return !matchedMapel.some((m) => {
-        const mLower = m.nama.toLowerCase();
-        return cLower.includes(mLower) || mLower.includes(cLower);
+    let scopedMapelList: MataPelajaran[];
+
+    if (isGeneralTeacher) {
+      // General class teachers / homeroom teachers have access to all registered subjects
+      scopedMapelList = mapelList.length > 0 ? mapelList : [];
+    } else {
+      // Specific subject teacher
+      const matchedMapel = mapelList.filter((m) => {
+        const mLower = m.nama.toLowerCase().trim();
+        return candidateSubjectNames.some((c) => {
+          const cLower = c.toLowerCase().trim();
+          return cLower === mLower || cLower.includes(mLower) || mLower.includes(cLower);
+        });
       });
-    });
 
-    const synthesizedMapel: MataPelajaran[] = unmatchedCandidates.map((c, idx) => ({
-      id: `mpl-synth-${idx + 1}`,
-      kode: c.substring(0, 3).toUpperCase(),
-      nama: c,
-      kategori: "Wajib",
-      kkm: 75,
-    }));
-
-    let scopedMapelList = [...matchedMapel, ...synthesizedMapel];
-
-    // Fallback if none matched
-    if (scopedMapelList.length === 0) {
-      scopedMapelList = mapelList.length > 0 ? [mapelList[0]] : [];
+      if (matchedMapel.length > 0) {
+        scopedMapelList = matchedMapel;
+      } else {
+        // If candidate subjects did not match any registered subject, fallback to all registered subjects
+        scopedMapelList = mapelList.length > 0 ? mapelList : [];
+      }
     }
 
     const assignedSubjects = scopedMapelList.map((m) => m.nama);
 
     const isSubjectAccessible = (mapelName: string): boolean => {
       if (!mapelName) return false;
+      if (isGeneralTeacher) return true;
       const target = mapelName.trim().toLowerCase();
+      if (target === "semua" || target === "all") return true;
       return assignedSubjects.some((subj) => {
         const s = subj.trim().toLowerCase();
-        return s.includes(target) || target.includes(s);
+        return s === target || s.includes(target) || target.includes(s);
       });
     };
 
     const filterBySubject = <T extends { mapel?: string }>(items: T[]): T[] => {
+      if (isGeneralTeacher) return items;
       return items.filter((item) => item.mapel && isSubjectAccessible(item.mapel));
     };
 

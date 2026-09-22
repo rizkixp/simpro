@@ -404,7 +404,7 @@ export default function NilaiManagementPage() {
       tab === "sts-genap" || tab === "sas-genap" ? "Genap" : "Ganjil";
 
     const classStudents = baseSiswaList.filter(
-      (s) => s.kelas.toLowerCase() === targetKelas.toLowerCase()
+      (s) => isClassMatch(s.kelas, targetKelas)
     );
 
     const mapelObj = mapelList.find(
@@ -461,18 +461,17 @@ export default function NilaiManagementPage() {
       siswaList.find((s) => s.id === targetSiswaId);
     if (!targetSiswa) return;
 
-    // Filter mapel jika akun merupakan guru mata pelajaran
-    const subjects = teacherScope.isTeacher && teacherScope.assignedSubjects.length > 0
-      ? mapelList.filter((m) =>
-          teacherScope.assignedSubjects.some((as) => as.toLowerCase() === m.nama.toLowerCase())
-        )
-      : mapelList;
+    // Filter mapel jika akun merupakan guru mata pelajaran (fallback ke mapelList jika guru kelas / umum)
+    const subjects = (teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
+      ? teacherScope.scopedMapelList
+      : mapelList) || mapelList;
+    const finalSubjects = subjects.length > 0 ? subjects : mapelList;
 
     const existingStudentNilai = nilaiList.filter(
       (n) => n.siswaId === targetSiswaId && (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase()
     );
 
-    const rows = subjects.map((m) => {
+    const rows = finalSubjects.map((m) => {
       const existing = existingStudentNilai.find(
         (n) => n.mapel.toLowerCase() === m.nama.toLowerCase()
       );
@@ -593,13 +592,13 @@ export default function NilaiManagementPage() {
         : availableKelas[0] || (kelasList[0]?.nama || "");
     setBulkSelectedKelas(initialKelas);
 
-    const availableMapel = teacherScope.isTeacher && teacherScope.assignedSubjects.length > 0
-      ? teacherScope.assignedSubjects
+    const availableMapel = teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
+      ? teacherScope.scopedMapelList.map((m) => m.nama)
       : mapelList.map((m) => m.nama);
     const initialMapel =
       selectedMapel !== "Semua" && availableMapel.includes(selectedMapel)
         ? selectedMapel
-        : availableMapel[0] || (mapelList[0]?.nama || "");
+        : availableMapel[0] || (mapelList[0]?.nama || "Matematika");
     setBulkSelectedMapel(initialMapel);
 
     // Tentukan mode awal (jika dipanggil dari tombol baris siswa, mode per-siswa; jika dari header, mode per-kelas)
@@ -1120,12 +1119,12 @@ export default function NilaiManagementPage() {
                 </span>
               </p>
               <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
-                Mata Pelajaran Diampu: <strong>{teacherScope.assignedSubjects.join(", ")}</strong> &bull; Peserta didik binaan: <strong>{teacherScope.assignedClass}</strong> ({baseSiswaList.length} siswa).
+                Mata Pelajaran Diampu: <strong>{teacherScope.assignedSubjects.length > 4 ? `Semua Mata Pelajaran (${teacherScope.assignedSubjects.length} Mapel)` : teacherScope.assignedSubjects.join(", ")}</strong> &bull; Peserta didik binaan: <strong>{teacherScope.assignedClass}</strong> ({baseSiswaList.length} siswa).
               </p>
             </div>
           </div>
           <span className="text-[11px] font-bold px-3 py-1 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 rounded-xl border border-amber-200 dark:border-amber-700/50 self-start sm:self-center shrink-0">
-            Akses Terkunci: {teacherScope.assignedClass} &bull; {teacherScope.assignedSubjects.join(", ")}
+            Akses Terkunci: {teacherScope.assignedClass} &bull; {teacherScope.assignedSubjects.length > 4 ? "Semua Mapel" : teacherScope.assignedSubjects.join(", ")}
           </span>
         </div>
       )}
@@ -2328,12 +2327,8 @@ export default function NilaiManagementPage() {
                         onChange={(e) => handleBulkMapelChange(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
                       >
-                        {(teacherScope.isTeacher && teacherScope.assignedSubjects.length > 0
-                          ? mapelList.filter((m) =>
-                              teacherScope.assignedSubjects.some(
-                                (as) => as.toLowerCase() === m.nama.toLowerCase()
-                              )
-                            )
+                        {(teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
+                          ? teacherScope.scopedMapelList
                           : mapelList
                         ).map((m) => (
                           <option key={m.id} value={m.nama}>
