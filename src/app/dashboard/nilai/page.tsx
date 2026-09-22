@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTeacherScope } from "@/hooks/useTeacherScope";
+import { useTeacherScope, isClassMatch } from "@/hooks/useTeacherScope";
 import { NilaiSiswa, Siswa, JenisRapor } from "@/types/school";
 import {
   calculateGrade,
@@ -232,8 +232,8 @@ export default function NilaiManagementPage() {
       n.mapel.toLowerCase().includes(searchTerm.toLowerCase());
     const matchKelas =
       teacherScope.isTeacher
-        ? true
-        : selectedKelas === "Semua" || n.kelas === selectedKelas;
+        ? (teacherScope.assignedClass ? isClassMatch(n.kelas, teacherScope.assignedClass) : true)
+        : selectedKelas === "Semua" || isClassMatch(n.kelas, selectedKelas);
     const matchMapel =
       selectedMapel === "Semua" ||
       n.mapel.toLowerCase() === selectedMapel.toLowerCase();
@@ -253,8 +253,8 @@ export default function NilaiManagementPage() {
       s.kelas.toLowerCase().includes(searchTerm.toLowerCase());
     const matchKelas =
       teacherScope.isTeacher
-        ? true
-        : selectedKelas === "Semua" || s.kelas === selectedKelas;
+        ? (teacherScope.assignedClass ? isClassMatch(s.kelas, teacherScope.assignedClass) : true)
+        : selectedKelas === "Semua" || isClassMatch(s.kelas, selectedKelas);
     return matchSearch && matchKelas;
   });
 
@@ -960,10 +960,10 @@ export default function NilaiManagementPage() {
   // Students included in Batch Rapor
   const batchStudents = baseSiswaList.filter((s) => {
     if (teacherScope.isTeacher && teacherScope.assignedClass) {
-      return s.kelas.toLowerCase() === teacherScope.assignedClass.toLowerCase();
+      return isClassMatch(s.kelas, teacherScope.assignedClass);
     }
     if (batchSelectedKelas === "Semua") return true;
-    return s.kelas.toLowerCase() === batchSelectedKelas.toLowerCase();
+    return isClassMatch(s.kelas, batchSelectedKelas);
   });
 
   // Live preview calculations for single form modal
@@ -3794,7 +3794,7 @@ export default function NilaiManagementPage() {
             {/* Signature Area */}
             {(() => {
               const matchedKelasObj = kelasList.find(
-                (k) => k.nama.toLowerCase() === raporSiswa.kelas.toLowerCase()
+                (k) => isClassMatch(k.nama, raporSiswa.kelas)
               );
               const matchedWaliGuru = matchedKelasObj
                 ? guruList.find((g) => g.id === matchedKelasObj.waliKelasId)
@@ -4035,7 +4035,7 @@ export default function NilaiManagementPage() {
                         : 0;
 
                     const matchedKelasObj = kelasList.find(
-                      (k) => k.nama.toLowerCase() === siswa.kelas.toLowerCase()
+                      (k) => isClassMatch(k.nama, siswa.kelas)
                     );
                     const matchedWaliGuru = matchedKelasObj
                       ? guruList.find((g) => g.id === matchedKelasObj.waliKelasId)
