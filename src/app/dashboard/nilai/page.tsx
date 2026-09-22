@@ -4922,7 +4922,7 @@ export default function NilaiManagementPage() {
                       <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
                       <div className="h-16" />
                       <p className="font-bold underline">
-                        {raporSiswa.namaWali ? `( ${raporSiswa.namaWali} )` : "( ................................................ )"}
+                        {raporSiswa.namaWali || "................................................"}
                       </p>
                     </div>
                   </div>
@@ -5669,7 +5669,7 @@ export default function NilaiManagementPage() {
                               <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
                               <div className="h-14" />
                               <p className="font-bold underline">
-                                {siswa.namaWali ? `( ${siswa.namaWali} )` : "( ................................................ )"}
+                                {siswa.namaWali || "................................................"}
                               </p>
                             </div>
                           </div>
