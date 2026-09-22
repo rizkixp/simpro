@@ -4480,11 +4480,9 @@ export default function NilaiManagementPage() {
             <div className="grid grid-cols-2 gap-4 text-xs mb-5 py-2 border-0 border-none bg-transparent">
               <div>
                 <p className="text-slate-600">Nama Peserta Didik: <strong className="text-slate-900">{raporSiswa.nama}</strong></p>
-                <p className="text-slate-600 mt-1">NISN: <strong className="text-slate-900 font-mono">{raporSiswa.nisn}</strong></p>
               </div>
               <div>
                 <p className="text-slate-600">Kelas: <strong className="text-slate-900">{raporSiswa.kelas}</strong></p>
-                <p className="text-slate-600 mt-1">Status Kesiswaan: <strong className="text-slate-900">{raporSiswa.status}</strong></p>
               </div>
             </div>
 
@@ -5259,11 +5257,9 @@ export default function NilaiManagementPage() {
                         <div className="grid grid-cols-2 gap-3 text-xs mb-4 py-2 border-0 border-none bg-transparent">
                           <div>
                             <p className="text-slate-600">Nama Peserta Didik: <strong className="text-slate-900">{siswa.nama}</strong></p>
-                            <p className="text-slate-600 mt-0.5">NISN: <strong className="text-slate-900 font-mono">{siswa.nisn}</strong></p>
                           </div>
                           <div>
                             <p className="text-slate-600">Kelas: <strong className="text-slate-900">{siswa.kelas}</strong></p>
-                            <p className="text-slate-600 mt-0.5">Status: <strong className="text-slate-900">{siswa.status}</strong></p>
                           </div>
                         </div>
 
