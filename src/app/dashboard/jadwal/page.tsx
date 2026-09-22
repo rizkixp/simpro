@@ -3498,7 +3498,7 @@ export default function JadwalPage() {
           {/* Bottom Action Footer (No Print) */}
           <div className="mt-8 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 no-print">
             <div className="text-xs text-slate-500 font-medium">
-              Pratinjau Jadwal: <strong>{printFilteredClasses.length} Rombel Kelas</strong> &bull; Mode: <strong>{printFormatMode === "matrix" ? "Matriks 5 Hari" : "Tabel Rincian"}</strong>
+              Pratinjau Jadwal: <strong>{classesForPrint.length} Rombel Kelas</strong> &bull; Mode: <strong>{printFormatMode === "matrix" ? "Matriks 5 Hari" : "Tabel Rincian"}</strong>
             </div>
             <div className="flex items-center gap-2">
               <button
