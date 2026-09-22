@@ -3808,14 +3808,9 @@ export default function NilaiManagementPage() {
               const waliNip = matchedWaliGuru?.nip || "198506122010012015";
 
               return (
-                <div className="grid grid-cols-3 text-center text-xs pt-6 border-t border-slate-200">
+                <div className="grid grid-cols-2 text-center text-xs pt-6 border-t border-slate-200">
                   <div>
-                    <p className="text-slate-500">Orang Tua / Wali Murid,</p>
-                    <div className="h-16" />
-                    <p className="font-bold underline">{raporSiswa.namaWali}</p>
-                  </div>
-
-                  <div>
+                    <p className="text-slate-500">Mengetahui,</p>
                     <p className="text-slate-500">Wali Kelas {raporSiswa.kelas},</p>
                     <div className="h-16" />
                     <p className="font-bold underline">{waliNama}</p>
@@ -4244,13 +4239,9 @@ export default function NilaiManagementPage() {
                         )}
 
                         {/* Signature Area */}
-                        <div className="grid grid-cols-3 text-center text-xs pt-4 border-t border-slate-200">
+                        <div className="grid grid-cols-2 text-center text-xs pt-4 border-t border-slate-200">
                           <div>
-                            <p className="text-slate-500">Orang Tua / Wali Murid,</p>
-                            <div className="h-14" />
-                            <p className="font-bold underline">{siswa.namaWali}</p>
-                          </div>
-                          <div>
+                            <p className="text-slate-500">Mengetahui,</p>
                             <p className="text-slate-500">Wali Kelas {siswa.kelas},</p>
                             <div className="h-14" />
                             <p className="font-bold underline">{waliNama}</p>
