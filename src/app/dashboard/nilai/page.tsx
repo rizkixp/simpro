@@ -181,6 +181,10 @@ export default function NilaiManagementPage() {
     alamatKontak: string;
     garisKop: "double" | "single";
     ukuranFontKop?: "sm" | "md" | "lg";
+    fontSizeBaris1?: number;
+    fontSizeBaris2?: number;
+    fontSizeBaris3?: number;
+    fontSizeBaris4?: number;
     ukuranLogoKop?: "sm" | "md" | "lg" | "xl";
     tempatRapor: string;
     tanggalRapor: string;
@@ -195,6 +199,10 @@ export default function NilaiManagementPage() {
     alamatKontak: `${profile?.alamat || "Jl. Pendidikan No. 45"} • Telp: ${profile?.telepon || "(021) 7890123"} • Website: ${profile?.website || "www.smartschool.sch.id"}`,
     garisKop: "double",
     ukuranFontKop: "md",
+    fontSizeBaris1: 16,
+    fontSizeBaris2: 16,
+    fontSizeBaris3: 16,
+    fontSizeBaris4: 11,
     ukuranLogoKop: "lg",
     tempatRapor: "Jakarta",
     tanggalRapor: formatDateIndo(new Date().toISOString().split("T")[0]),
@@ -214,6 +222,10 @@ export default function NilaiManagementPage() {
           ...prev,
           ...parsed,
           ukuranFontKop: parsed.ukuranFontKop || prev.ukuranFontKop || "md",
+          fontSizeBaris1: parsed.fontSizeBaris1 || prev.fontSizeBaris1 || 16,
+          fontSizeBaris2: parsed.fontSizeBaris2 || prev.fontSizeBaris2 || 16,
+          fontSizeBaris3: parsed.fontSizeBaris3 || prev.fontSizeBaris3 || 16,
+          fontSizeBaris4: parsed.fontSizeBaris4 || prev.fontSizeBaris4 || 11,
           ukuranLogoKop: parsed.ukuranLogoKop || prev.ukuranLogoKop || "lg",
           namaSekolah: parsed.namaSekolah || profile?.namaSekolah || prev.namaSekolah,
         }));
@@ -452,10 +464,41 @@ export default function NilaiManagementPage() {
 
             {/* Kop Text Inputs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              {/* Baris 1 */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Nama Yayasan / Instansi (Baris 1)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300">
+                    Nama Yayasan / Instansi (Baris 1)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-500 font-medium">Font:</span>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris1: Math.max(10, (raporConfig.fontSizeBaris1 || 16) - 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perkecil Font Baris 1"
+                    >
+                      -
+                    </button>
+                    <select
+                      value={raporConfig.fontSizeBaris1 || 16}
+                      onChange={(e) => updateRaporConfig({ fontSizeBaris1: Number(e.target.value) })}
+                      className="text-[11px] font-bold px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 cursor-pointer"
+                    >
+                      {[11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24].map((sz) => (
+                        <option key={sz} value={sz}>{sz}px</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris1: Math.min(28, (raporConfig.fontSizeBaris1 || 16) + 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perbesar Font Baris 1"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={raporConfig.yayasanNama}
@@ -465,10 +508,41 @@ export default function NilaiManagementPage() {
                 />
               </div>
 
+              {/* Baris 2 */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Nama Satuan Pendidikan / Sekolah (Baris 2)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300">
+                    Nama Satuan Pendidikan / Sekolah (Baris 2)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-500 font-medium">Font:</span>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris2: Math.max(10, (raporConfig.fontSizeBaris2 || 16) - 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perkecil Font Baris 2"
+                    >
+                      -
+                    </button>
+                    <select
+                      value={raporConfig.fontSizeBaris2 || 16}
+                      onChange={(e) => updateRaporConfig({ fontSizeBaris2: Number(e.target.value) })}
+                      className="text-[11px] font-bold px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 cursor-pointer"
+                    >
+                      {[11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24].map((sz) => (
+                        <option key={sz} value={sz}>{sz}px</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris2: Math.min(28, (raporConfig.fontSizeBaris2 || 16) + 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perbesar Font Baris 2"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={raporConfig.namaSekolah}
@@ -478,10 +552,41 @@ export default function NilaiManagementPage() {
                 />
               </div>
 
+              {/* Baris 3 */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  NPSN & Akreditasi / Info Lembaga (Baris 3)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300">
+                    NPSN & Akreditasi / Info Lembaga (Baris 3)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-500 font-medium">Font:</span>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris3: Math.max(10, (raporConfig.fontSizeBaris3 || 16) - 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perkecil Font Baris 3"
+                    >
+                      -
+                    </button>
+                    <select
+                      value={raporConfig.fontSizeBaris3 || 16}
+                      onChange={(e) => updateRaporConfig({ fontSizeBaris3: Number(e.target.value) })}
+                      className="text-[11px] font-bold px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 cursor-pointer"
+                    >
+                      {[11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24].map((sz) => (
+                        <option key={sz} value={sz}>{sz}px</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris3: Math.min(28, (raporConfig.fontSizeBaris3 || 16) + 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perbesar Font Baris 3"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={raporConfig.npsnAkreditasi}
@@ -491,10 +596,41 @@ export default function NilaiManagementPage() {
                 />
               </div>
 
+              {/* Baris 4 */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Alamat, Kontak & Web (Baris 4)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300">
+                    Alamat, Kontak & Web (Baris 4)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-500 font-medium">Font:</span>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris4: Math.max(9, (raporConfig.fontSizeBaris4 || 11) - 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perkecil Font Baris 4"
+                    >
+                      -
+                    </button>
+                    <select
+                      value={raporConfig.fontSizeBaris4 || 11}
+                      onChange={(e) => updateRaporConfig({ fontSizeBaris4: Number(e.target.value) })}
+                      className="text-[11px] font-bold px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 cursor-pointer"
+                    >
+                      {[9, 10, 11, 12, 13, 14, 15].map((sz) => (
+                        <option key={sz} value={sz}>{sz}px</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeBaris4: Math.min(18, (raporConfig.fontSizeBaris4 || 11) + 1) })}
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold flex items-center justify-center text-xs cursor-pointer"
+                      title="Perbesar Font Baris 4"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={raporConfig.alamatKontak}
@@ -535,44 +671,40 @@ export default function NilaiManagementPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    Ukuran Font Baris 1, 2, 3:
+                {/* Quick Presets untuk Menyamakan Baris 1, 2, 3 Sekaligus */}
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+                    Samakan Font Baris 1, 2, 3:
                   </span>
                   <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => updateRaporConfig({ ukuranFontKop: "sm" })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border ${
-                        (raporConfig.ukuranFontKop || "md") === "sm"
-                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
-                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
-                      }`}
-                    >
-                      Sedang (14px)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateRaporConfig({ ukuranFontKop: "md" })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border ${
-                        (raporConfig.ukuranFontKop || "md") === "md"
-                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
-                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
-                      }`}
-                    >
-                      Besar (16px)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateRaporConfig({ ukuranFontKop: "lg" })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border ${
-                        raporConfig.ukuranFontKop === "lg"
-                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
-                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
-                      }`}
-                    >
-                      Ekstra Besar (18px)
-                    </button>
+                    {[
+                      { label: "14px", size: 14 },
+                      { label: "16px (Default)", size: 16 },
+                      { label: "18px", size: 18 },
+                      { label: "20px", size: 20 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.size}
+                        type="button"
+                        onClick={() =>
+                          updateRaporConfig({
+                            fontSizeBaris1: preset.size,
+                            fontSizeBaris2: preset.size,
+                            fontSizeBaris3: preset.size,
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border transition-all ${
+                          raporConfig.fontSizeBaris1 === preset.size &&
+                          raporConfig.fontSizeBaris2 === preset.size &&
+                          raporConfig.fontSizeBaris3 === preset.size
+                            ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                            : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 hover:bg-slate-50"
+                        }`}
+                        title={`Ubah ukuran Baris 1, 2, dan 3 serentak ke ${preset.size}px`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -639,13 +771,20 @@ export default function NilaiManagementPage() {
 
   const renderOfficialLetterhead = (isSmall = false) => {
     const isDouble = raporConfig.garisKop === "double";
-    const fontMode = raporConfig.ukuranFontKop || "md";
-    const headerTitleSize =
-      fontMode === "sm"
-        ? isSmall ? "text-xs sm:text-sm" : "text-sm sm:text-base"
-        : fontMode === "lg"
-        ? isSmall ? "text-base sm:text-lg" : "text-lg sm:text-xl"
-        : isSmall ? "text-sm sm:text-base" : "text-base sm:text-lg";
+
+    // Ukuran Font Khusus Masing-masing Baris Kop
+    const fSize1 = isSmall
+      ? Math.max(10, Math.round((raporConfig.fontSizeBaris1 || 16) * 0.88))
+      : (raporConfig.fontSizeBaris1 || 16);
+    const fSize2 = isSmall
+      ? Math.max(10, Math.round((raporConfig.fontSizeBaris2 || 16) * 0.88))
+      : (raporConfig.fontSizeBaris2 || 16);
+    const fSize3 = isSmall
+      ? Math.max(10, Math.round((raporConfig.fontSizeBaris3 || 16) * 0.88))
+      : (raporConfig.fontSizeBaris3 || 16);
+    const fSize4 = isSmall
+      ? Math.max(9, Math.round((raporConfig.fontSizeBaris4 || 11) * 0.9))
+      : (raporConfig.fontSizeBaris4 || 11);
 
     const logoSize = raporConfig.ukuranLogoKop || "lg";
     const logoBoxClass =
@@ -684,20 +823,32 @@ export default function NilaiManagementPage() {
           {/* Bagian Tulisan Tengah Kop Surat */}
           <div className="flex-1 text-center px-2">
             {raporConfig.yayasanNama && (
-              <p className={`${headerTitleSize} font-bold tracking-wide uppercase text-slate-900 leading-tight`}>
+              <p
+                style={{ fontSize: `${fSize1}px` }}
+                className="font-bold tracking-wide uppercase text-slate-900 leading-tight"
+              >
                 {raporConfig.yayasanNama}
               </p>
             )}
-            <h2 className={`${headerTitleSize} font-bold uppercase tracking-wide text-slate-900 leading-tight mt-0.5`}>
+            <h2
+              style={{ fontSize: `${fSize2}px` }}
+              className="font-bold uppercase tracking-wide text-slate-900 leading-tight mt-0.5"
+            >
               {raporConfig.namaSekolah || profile.namaSekolah}
             </h2>
             {raporConfig.npsnAkreditasi && (
-              <p className={`${headerTitleSize} font-bold uppercase tracking-wide text-slate-900 leading-tight mt-0.5`}>
+              <p
+                style={{ fontSize: `${fSize3}px` }}
+                className="font-bold uppercase tracking-wide text-slate-900 leading-tight mt-0.5"
+              >
                 {raporConfig.npsnAkreditasi}
               </p>
             )}
             {raporConfig.alamatKontak && (
-              <p className="text-[10px] sm:text-[11px] text-slate-600 max-w-xl mx-auto mt-1 leading-normal">
+              <p
+                style={{ fontSize: `${fSize4}px` }}
+                className="text-slate-600 max-w-xl mx-auto mt-1 leading-normal"
+              >
                 {raporConfig.alamatKontak}
               </p>
             )}
