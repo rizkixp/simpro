@@ -78,6 +78,7 @@ interface SchoolDataContextType {
   importSiswaList: (siswaList: Omit<Siswa, "id">[]) => void;
   updateSiswa: (id: string, siswa: Partial<Siswa>) => void;
   deleteSiswa: (id: string) => void;
+  bulkDeleteSiswa: (ids: string[]) => void;
   guruList: Guru[];
   addGuru: (guru: Omit<Guru, "id">) => void;
   updateGuru: (id: string, guru: Partial<Guru>) => void;
@@ -983,6 +984,16 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     setSiswaList(updated);
     saveState("siswa", updated);
     persistSupabase(() => SupabaseSchoolService.deleteSiswa(id));
+  };
+
+  const bulkDeleteSiswa = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    const updated = siswaList.filter((s) => !idSet.has(s.id));
+    latestDataRef.current.siswaList = updated;
+    setSiswaList(updated);
+    saveState("siswa", updated);
+    persistSupabase(() => SupabaseSchoolService.bulkDeleteSiswa(ids));
   };
 
   // Guru Actions
@@ -2681,6 +2692,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         importSiswaList,
         updateSiswa,
         deleteSiswa,
+        bulkDeleteSiswa,
         guruList,
         addGuru,
         updateGuru,

@@ -398,6 +398,13 @@ export const SupabaseSchoolService = {
     return !error;
   },
 
+  async bulkDeleteSiswa(ids: string[]): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client || ids.length === 0) return false;
+    const { error } = await client.from("siswa").delete().in("id", ids);
+    return !error;
+  },
+
   // ==================== GURU ====================
   async getGuruList(): Promise<Guru[] | null> {
     const client = getSupabaseBrowserClient();

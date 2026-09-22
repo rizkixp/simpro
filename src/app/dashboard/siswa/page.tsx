@@ -39,7 +39,7 @@ import {
 export default function SiswaManagementPage() {
   const { user } = useAuth();
   const teacherScope = useTeacherScope();
-  const { siswaList, addSiswa, importSiswaList, updateSiswa, deleteSiswa, kelasList, profile } = useSchoolData();
+  const { siswaList, addSiswa, importSiswaList, updateSiswa, deleteSiswa, bulkDeleteSiswa, kelasList, profile } = useSchoolData();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedKelas, setSelectedKelas] = useState("Semua");
@@ -47,6 +47,7 @@ export default function SiswaManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addMode, setAddMode] = useState<"manual" | "import">("manual");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Smart ID Card (Kartu Pelajar Digital) State
   const [isIdCardModalOpen, setIsIdCardModalOpen] = useState(false);
@@ -113,6 +114,52 @@ export default function SiswaManagementPage() {
     const matchKelas = teacherScope.isTeacher || selectedKelas === "Semua" || s.kelas === selectedKelas;
     return matchSearch && matchKelas;
   });
+
+  // Multi-select & Bulk Action Helpers
+  const isAllSelected = filteredSiswa.length > 0 && filteredSiswa.every((s) => selectedIds.includes(s.id));
+  const isSomeSelected = filteredSiswa.some((s) => selectedIds.includes(s.id)) && !isAllSelected;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      const filteredIdSet = new Set(filteredSiswa.map((s) => s.id));
+      setSelectedIds((prev) => prev.filter((id) => !filteredIdSet.has(id)));
+    } else {
+      const filteredIds = filteredSiswa.map((s) => s.id);
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleBulkDelete = () => {
+    if (!canEdit) {
+      alert("Akses ditolak: Hanya Administrator yang berwenang menghapus data siswa.");
+      return;
+    }
+    if (selectedIds.length === 0) return;
+
+    const count = selectedIds.length;
+    if (
+      confirm(
+        `Apakah Anda yakin ingin menghapus ${count} data siswa yang dipilih secara permanen? Data yang telah dihapus tidak dapat dikembalikan.`
+      )
+    ) {
+      bulkDeleteSiswa(selectedIds);
+      setSelectedIds([]);
+      setImportNotice({
+        type: "success",
+        text: `Berhasil menghapus ${count} data siswa terpilih!`,
+      });
+    }
+  };
 
   const handleOpenAdd = () => {
     if (!canEdit) {
@@ -651,11 +698,72 @@ export default function SiswaManagementPage() {
             </select>
           )}
 
+          <button
+            type="button"
+            onClick={handleToggleSelectAll}
+            disabled={filteredSiswa.length === 0}
+            className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
+              isAllSelected
+                ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/20"
+                : "bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+            }`}
+            title={isAllSelected ? "Batalkan pilihan semua" : "Pilih semua siswa yang tampil"}
+          >
+            <Check className="h-3.5 w-3.5" />
+            <span>{isAllSelected ? "Batal Pilih" : "Pilih Semua"}</span>
+          </button>
+
           <span className="text-xs text-slate-500 ml-auto md:ml-2">
             Total: <strong>{filteredSiswa.length}</strong> siswa
+            {selectedIds.length > 0 && (
+              <span className="ml-1 text-blue-600 dark:text-blue-400 font-semibold">
+                ({selectedIds.length} dipilih)
+              </span>
+            )}
           </span>
         </div>
       </div>
+
+      {/* Bulk Action Toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-blue-50/90 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-xs">
+              {selectedIds.length}
+            </span>
+            <div>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">
+                {selectedIds.length} siswa dipilih
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Pilih aksi yang ingin diterapkan pada data siswa terpilih.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClearSelection}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span>Batalkan Pilihan</span>
+            </button>
+
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-600/30 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Hapus {selectedIds.length} Siswa Terpilih</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Table Card */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -663,6 +771,18 @@ export default function SiswaManagementPage() {
           <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
+                <th className="w-12 px-4 py-3.5 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = isSomeSelected;
+                    }}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    title={isAllSelected ? "Batalkan pilihan semua" : "Pilih semua siswa"}
+                  />
+                </th>
                 <th className="px-5 py-3.5">Foto & Siswa</th>
                 <th className="px-4 py-3.5">NISN</th>
                 <th className="px-4 py-3.5">Kelas</th>
@@ -676,13 +796,30 @@ export default function SiswaManagementPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredSiswa.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-slate-400">
+                  <td colSpan={9} className="px-5 py-10 text-center text-slate-400">
                     Tidak ada data siswa yang cocok dengan pencarian.
                   </td>
                 </tr>
               ) : (
-                filteredSiswa.map((siswa) => (
-                  <tr key={siswa.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                filteredSiswa.map((siswa) => {
+                  const isSelected = selectedIds.includes(siswa.id);
+                  return (
+                  <tr
+                    key={siswa.id}
+                    className={`transition-colors ${
+                      isSelected
+                        ? "bg-blue-50/70 dark:bg-blue-950/40"
+                        : "hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
+                    }`}
+                  >
+                    <td className="w-12 px-4 py-3.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelectOne(siswa.id)}
+                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-5 py-3.5 flex items-center gap-3">
                       <img
                         src={siswa.avatar}
@@ -744,7 +881,8 @@ export default function SiswaManagementPage() {
                       )}
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
