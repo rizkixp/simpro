@@ -439,6 +439,15 @@ export const INITIAL_PRESENSI: PresensiRecord[] = [
   { id: "prs-06", siswaId: "sis-006", siswaNama: "Nabila Aulia Rahmah", kelas: "XI IPS 1", tanggal: "2026-09-18", status: "Hadir" },
   { id: "prs-07", siswaId: "sis-007", siswaNama: "Muhammad Kevin Ardiansyah", kelas: "XII MIPA 1", tanggal: "2026-09-18", status: "Hadir" },
   { id: "prs-08", siswaId: "sis-008", siswaNama: "Tiara Safitri", kelas: "XII MIPA 1", tanggal: "2026-09-18", status: "Hadir" },
+  // Riwayat presensi tambahan untuk sampel rekapitulasi ketidakhadiran di cetak rapor
+  { id: "prs-09", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", kelas: "X MIPA 1", tanggal: "2026-09-10", status: "Sakit", keterangan: "Flu dan demam ringan" },
+  { id: "prs-10", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", kelas: "X MIPA 1", tanggal: "2026-09-11", status: "Izin", keterangan: "Acara keluarga di luar kota" },
+  { id: "prs-11", siswaId: "sis-002", siswaNama: "Anisa Zahra Humaira", kelas: "X MIPA 1", tanggal: "2026-09-12", status: "Sakit", keterangan: "Sakit perut" },
+  { id: "prs-12", siswaId: "sis-003", siswaNama: "Bima Arya Putra", kelas: "X MIPA 1", tanggal: "2026-09-08", status: "Alpa", keterangan: "Tanpa keterangan" },
+  { id: "prs-13", siswaId: "sis-003", siswaNama: "Bima Arya Putra", kelas: "X MIPA 1", tanggal: "2026-09-09", status: "Sakit", keterangan: "Istirahat dokter" },
+  { id: "prs-14", siswaId: "sis-004", siswaNama: "Dewi Lestari Kusuma", kelas: "X MIPA 2", tanggal: "2026-09-15", status: "Izin", keterangan: "Lomba olimpiade sains" },
+  { id: "prs-15", siswaId: "sis-005", siswaNama: "Fajar Nugraha", kelas: "XI IPS 1", tanggal: "2026-09-17", status: "Sakit", keterangan: "Rawat inap" },
+  { id: "prs-16", siswaId: "sis-006", siswaNama: "Nabila Aulia Rahmah", kelas: "XI IPS 1", tanggal: "2026-09-16", status: "Izin", keterangan: "Keperluan keluarga" },
 ];
 
 export const INITIAL_NILAI: NilaiSiswa[] = [

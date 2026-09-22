@@ -65,6 +65,7 @@ export default function NilaiManagementPage() {
     profile,
     kelasList,
     guruList,
+    presensiList,
   } = useSchoolData();
 
   // Notification feedback state
@@ -928,6 +929,20 @@ export default function NilaiManagementPage() {
     };
   };
 
+  // Attendance resolution helper for student report card (presensi: Sakit, Izin, Alpa)
+  const getStudentAttendance = (studentId: string, studentName?: string) => {
+    const records = (presensiList || []).filter(
+      (p) =>
+        p.siswaId === studentId ||
+        (p.siswaNama && studentName && p.siswaNama.trim().toLowerCase() === studentName.trim().toLowerCase())
+    );
+    const sakit = records.filter((p) => p.status === "Sakit").length;
+    const izin = records.filter((p) => p.status === "Izin").length;
+    const alpa = records.filter((p) => p.status === "Alpa").length;
+    const hadir = records.filter((p) => p.status === "Hadir").length;
+    return { sakit, izin, alpa, hadir, total: records.length };
+  };
+
   // Filtered nilai based on search, selected filters, and active tab semester
   const filteredNilai = baseNilaiList.filter((n) => {
     const matchSearch =
@@ -1727,6 +1742,12 @@ export default function NilaiManagementPage() {
     msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `📊 *Rata-rata Nilai:* ${avgScore} / 100\n`;
     msg += `🌟 *Predikat Umum:* ${generalPredicate}\n\n`;
+
+    const att = getStudentAttendance(siswa.id, siswa.nama);
+    msg += `📋 *Ketidakhadiran (Presensi):*\n`;
+    msg += `• Sakit: ${att.sakit} hari\n`;
+    msg += `• Izin: ${att.izin} hari\n`;
+    msg += `• Tanpa Keterangan: ${att.alpa} hari\n\n`;
 
     msg += `Terima kasih atas kerjasama dan bimbingan Ayah/Bunda di rumah. Semoga ananda senantiasa bersemangat menuntut ilmu dan berakhlak mulia.\n\n`;
     msg += `_Wassalamu'alaikum Warahmatullahi Wabarakatuh_\n\n`;
@@ -4809,6 +4830,52 @@ export default function NilaiManagementPage() {
               </table>
             )}
 
+            {/* Tabel Ketidakhadiran (Presensi Siswa) */}
+            {(() => {
+              const att = getStudentAttendance(raporSiswa.id, raporSiswa.nama);
+              return (
+                <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                  <div className="w-full sm:w-72">
+                    <table className="rapor-print-table w-full text-xs border-collapse border border-[#000000]">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-900 font-bold">
+                          <th colSpan={2} className="border border-[#000000] px-3 py-1.5 text-left uppercase tracking-wider text-[11px]">
+                            Ketidakhadiran
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="border border-[#000000] px-3 py-1.5 font-medium text-slate-800">
+                            1. Sakit
+                          </td>
+                          <td className="border border-[#000000] px-3 py-1.5 text-center font-bold font-mono text-slate-900 w-24">
+                            {att.sakit} hari
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-[#000000] px-3 py-1.5 font-medium text-slate-800">
+                            2. Izin
+                          </td>
+                          <td className="border border-[#000000] px-3 py-1.5 text-center font-bold font-mono text-slate-900 w-24">
+                            {att.izin} hari
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="border border-[#000000] px-3 py-1.5 font-medium text-slate-800">
+                            3. Tanpa Keterangan
+                          </td>
+                          <td className="border border-[#000000] px-3 py-1.5 text-center font-bold font-mono text-slate-900 w-24">
+                            {att.alpa} hari
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Signature Area */}
             {(() => {
               const matchedKelasObj = kelasList.find(
@@ -5151,6 +5218,8 @@ export default function NilaiManagementPage() {
                             ) / studentRecords.length
                           )
                         : 0;
+
+                    const att = getStudentAttendance(siswa.id, siswa.nama);
 
                     const matchedKelasObj = kelasList.find(
                       (k) => isClassMatch(k.nama, siswa.kelas)
@@ -5529,6 +5598,47 @@ export default function NilaiManagementPage() {
                             </tfoot>
                           </table>
                         )}
+
+                        {/* Tabel Ketidakhadiran (Presensi Siswa) */}
+                        <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                          <div className="w-full sm:w-72">
+                            <table className="rapor-print-table w-full text-xs border-collapse border border-[#000000]">
+                              <thead>
+                                <tr className="bg-slate-100 text-slate-900 font-bold">
+                                  <th colSpan={2} className="border border-[#000000] px-3 py-1.5 text-left uppercase tracking-wider text-[11px]">
+                                    Ketidakhadiran
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="border border-[#000000] px-3 py-1.5 font-medium text-slate-800">
+                                    1. Sakit
+                                  </td>
+                                  <td className="border border-[#000000] px-3 py-1.5 text-center font-bold font-mono text-slate-900 w-24">
+                                    {att.sakit} hari
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-[#000000] px-3 py-1.5 font-medium text-slate-800">
+                                    2. Izin
+                                  </td>
+                                  <td className="border border-[#000000] px-3 py-1.5 text-center font-bold font-mono text-slate-900 w-24">
+                                    {att.izin} hari
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-[#000000] px-3 py-1.5 font-medium text-slate-800">
+                                    3. Tanpa Keterangan
+                                  </td>
+                                  <td className="border border-[#000000] px-3 py-1.5 text-center font-bold font-mono text-slate-900 w-24">
+                                    {att.alpa} hari
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
 
                         {/* Signature Area (3 Kolom: Wali Santri, Wali Kelas, Kepala Sekolah) */}
                         <div className="pt-6 border-0 border-none text-xs">
