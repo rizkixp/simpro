@@ -655,28 +655,46 @@ export default function DashboardOverviewPage() {
       {/* Primary KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {/* Stat 1: Siswa */}
-        <Link
-          href="/dashboard/siswa"
-          className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/90 dark:border-emerald-950 shadow-xs flex items-center justify-between hover:border-emerald-400 dark:hover:border-emerald-700 hover:shadow-md transition-all group cursor-pointer"
-        >
-          <div>
-            <p className="text-xs font-semibold text-emerald-800/70 dark:text-emerald-400">
-              {teacherScope.isTeacher ? `Santri Kelas ${teacherScope.assignedClass}` : "Total Santri & Siswa"}
-            </p>
-            <p className="mt-1 text-2xl font-extrabold text-emerald-950 dark:text-white">{totalSiswa} Siswa</p>
-            <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 group-hover:underline">
-              <TrendingUp className="h-3 w-3" />
-              <span>
-                {teacherScope.isTeacher
-                  ? `Wali: ${teacherScope.teacherName} \u2192`
-                  : `Terbagi dalam ${totalKelas} Rombel Kelas \u2192`}
-              </span>
+        {user?.role === "admin" ? (
+          <Link
+            href="/dashboard/siswa"
+            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/90 dark:border-emerald-950 shadow-xs flex items-center justify-between hover:border-emerald-400 dark:hover:border-emerald-700 hover:shadow-md transition-all group cursor-pointer"
+          >
+            <div>
+              <p className="text-xs font-semibold text-emerald-800/70 dark:text-emerald-400">
+                Total Santri & Siswa
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-emerald-950 dark:text-white">{totalSiswa} Siswa</p>
+              <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 group-hover:underline">
+                <TrendingUp className="h-3 w-3" />
+                <span>Terbagi dalam {totalKelas} Rombel Kelas &rarr;</span>
+              </div>
+            </div>
+            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border border-emerald-100 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Users className="h-6 w-6" />
+            </div>
+          </Link>
+        ) : (
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/90 dark:border-emerald-950 shadow-xs flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-emerald-800/70 dark:text-emerald-400">
+                {teacherScope.isTeacher ? `Santri Kelas ${teacherScope.assignedClass}` : "Total Santri & Siswa"}
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-emerald-950 dark:text-white">{totalSiswa} Siswa</p>
+              <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                <TrendingUp className="h-3 w-3" />
+                <span>
+                  {teacherScope.isTeacher
+                    ? `Wali: ${teacherScope.teacherName}`
+                    : `${siswaList.filter((s) => s.status === "Aktif").length} Santri Aktif`}
+                </span>
+              </div>
+            </div>
+            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border border-emerald-100 flex items-center justify-center">
+              <Users className="h-6 w-6" />
             </div>
           </div>
-          <div className="h-12 w-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border border-emerald-100 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <Users className="h-6 w-6" />
-          </div>
-        </Link>
+        )}
 
         {/* Stat 2: Guru / Asatidz */}
         {user?.role === "guru" ? (
@@ -891,14 +909,25 @@ export default function DashboardOverviewPage() {
 
           {/* Quick Nav Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Link
-              href="/dashboard/siswa"
-              className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent border border-emerald-200/80 hover:border-emerald-500 hover:shadow-md transition-all group"
-            >
-              <Users className="h-6 w-6 text-emerald-700 mb-2 group-hover:scale-110 transition-transform" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Direktori Santri</h3>
-              <p className="mt-1 text-xs text-slate-500">Master data kesiswaan & NISN</p>
-            </Link>
+            {user?.role === "admin" ? (
+              <Link
+                href="/dashboard/siswa"
+                className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent border border-emerald-200/80 hover:border-emerald-500 hover:shadow-md transition-all group"
+              >
+                <Users className="h-6 w-6 text-emerald-700 mb-2 group-hover:scale-110 transition-transform" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Direktori Santri</h3>
+                <p className="mt-1 text-xs text-slate-500">Master data kesiswaan & NISN</p>
+              </Link>
+            ) : (
+              <Link
+                href="/dashboard/presensi"
+                className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent border border-emerald-200/80 hover:border-emerald-500 hover:shadow-md transition-all group"
+              >
+                <CalendarCheck2 className="h-6 w-6 text-emerald-700 mb-2 group-hover:scale-110 transition-transform" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Presensi Harian</h3>
+                <p className="mt-1 text-xs text-slate-500">Pencatatan kehadiran santri</p>
+              </Link>
+            )}
 
             <Link
               href="/dashboard/lms"

@@ -54,7 +54,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: "Data Siswa",
       href: "/dashboard/siswa",
       icon: Users,
-      roles: ["admin", "guru"],
+      roles: ["admin"],
     },
     {
       title: "Data Kelas",
