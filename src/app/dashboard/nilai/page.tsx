@@ -814,6 +814,18 @@ export default function NilaiManagementPage() {
     }
   }, [notification]);
 
+  // Listener tombol Escape untuk menutup modal pratinjau cetak rapor
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (raporSiswa) setRaporSiswa(null);
+        else if (isBatchRaporOpen) setIsBatchRaporOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [raporSiswa, isBatchRaporOpen]);
+
   // E-Rapor Print Modal Handlers
   const handleOpenRapor = (siswa: Siswa, type?: JenisRapor, sem?: "Ganjil" | "Genap") => {
     setRaporSiswa(siswa);
@@ -3408,7 +3420,23 @@ export default function NilaiManagementPage() {
       {/* MODAL 3: E-RAPOR DIGITAL SIAP CETAK (MULTI-RAPOR)        */}
       {/* ========================================================= */}
       {raporSiswa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setRaporSiswa(null);
+          }}
+        >
+          {/* Tombol Tutup Melayang (Floating Close Button) */}
+          <button
+            type="button"
+            onClick={() => setRaporSiswa(null)}
+            className="fixed top-5 right-5 z-[60] px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-2xl flex items-center gap-2 text-xs font-black cursor-pointer transition-all border-2 border-white/20 hover:shadow-rose-600/40 no-print"
+            title="Tutup Pratinjau Rapor (Esc)"
+          >
+            <X className="h-4 w-4 stroke-[3]" />
+            <span>TUTUP</span>
+          </button>
+
           <div className="w-full max-w-4xl bg-white text-slate-900 rounded-3xl p-8 sm:p-10 shadow-2xl relative my-8">
             {/* Action Bar (No Print) */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-6 no-print">
@@ -3579,10 +3607,11 @@ export default function NilaiManagementPage() {
                 <button
                   type="button"
                   onClick={() => setRaporSiswa(null)}
-                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
-                  title="Tutup Modal"
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  title="Tutup Modal Cetak Rapor (Esc)"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4 stroke-[2.5]" />
+                  <span>Tutup</span>
                 </button>
               </div>
             </div>
@@ -3822,6 +3851,53 @@ export default function NilaiManagementPage() {
                 </div>
               );
             })()}
+
+            {/* Bottom Action Footer (No Print) */}
+            <div className="mt-8 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 no-print">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrevSiswa}
+                  disabled={currentSiswaIndex <= 0}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span>Siswa Sebelumnya</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextSiswa}
+                  disabled={currentSiswaIndex >= baseSiswaList.length - 1}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-30 disabled:pointer-events-none text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                >
+                  <span>Siswa Berikutnya</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
+                    )
+                  }
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Cetak Dokumen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRaporSiswa(null)}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                >
+                  <X className="h-4 w-4 stroke-[2.5]" />
+                  <span>Tutup / Kembali</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -3830,7 +3906,23 @@ export default function NilaiManagementPage() {
       {/* MODAL 4: E-RAPOR SELURUH SISWA (BUNDEL RAPOR & LEGER NILAI) */}
       {/* ========================================================= */}
       {isBatchRaporOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsBatchRaporOpen(false);
+          }}
+        >
+          {/* Tombol Tutup Melayang (Floating Close Button) */}
+          <button
+            type="button"
+            onClick={() => setIsBatchRaporOpen(false)}
+            className="fixed top-5 right-5 z-[60] px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-2xl flex items-center gap-2 text-xs font-black cursor-pointer transition-all border-2 border-white/20 hover:shadow-rose-600/40 no-print"
+            title="Tutup Modal Cetak Rapor Rombel (Esc)"
+          >
+            <X className="h-4 w-4 stroke-[3]" />
+            <span>TUTUP</span>
+          </button>
+
           <div className="w-full max-w-6xl bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl relative my-6 max-h-[95vh] overflow-y-auto print:m-0 print:p-0 print:max-w-none print:shadow-none print:rounded-none print:max-h-none">
             {/* Action Bar (No Print) */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5 mb-6 no-print">
@@ -3986,10 +4078,11 @@ export default function NilaiManagementPage() {
                 <button
                   type="button"
                   onClick={() => setIsBatchRaporOpen(false)}
-                  className="p-2 rounded-full text-slate-400 hover:text-slate-600 cursor-pointer"
-                  title="Tutup Modal"
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  title="Tutup Modal Cetak Rapor Rombel (Esc)"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4 stroke-[2.5]" />
+                  <span>Tutup</span>
                 </button>
               </div>
             </div>
@@ -4411,6 +4504,37 @@ export default function NilaiManagementPage() {
                 </div>
               </div>
             )}
+
+            {/* Bottom Action Footer for Batch Rapor (No Print) */}
+            <div className="mt-8 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 no-print">
+              <div className="text-xs text-slate-500 font-medium">
+                Total Siswa: <strong>{batchStudents.length} Peserta Didik</strong> &bull; Rombel: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : `Kelas ${batchSelectedKelas}`}</strong>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      batchRaporViewMode === "bundel"
+                        ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                        : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                    )
+                  }
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Cetak Dokumen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsBatchRaporOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                >
+                  <X className="h-4 w-4 stroke-[2.5]" />
+                  <span>Tutup / Kembali</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
