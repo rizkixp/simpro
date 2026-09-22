@@ -876,6 +876,30 @@ export default function NilaiManagementPage() {
     return clean;
   };
 
+  // Helper to determine if subject is Muatan Lokal
+  const isMuatanLokal = (mapelName: string): boolean => {
+    const norm = (mapelName || "").toLowerCase().trim();
+    const mapelObj = mapelList.find((m) => m.nama.toLowerCase().trim() === norm);
+    if (mapelObj) {
+      if (mapelObj.kategori === "Muatan Lokal") return true;
+      if (mapelObj.kategori === "Wajib" || mapelObj.kategori === "Peminatan") return false;
+    }
+    return (
+      norm.includes("muatan lokal") ||
+      norm.includes("mulok") ||
+      norm.includes("bahasa jawa") ||
+      norm.includes("bahasa sunda") ||
+      norm.includes("bahasa daerah") ||
+      norm.includes("bahasa arab") ||
+      norm.includes("plbj") ||
+      norm.includes("tahfidz") ||
+      norm.includes("btq") ||
+      norm.includes("baca tulis al-qur'an") ||
+      norm.includes("kemuhammadiyahan") ||
+      norm.includes("ke-nu-an")
+    );
+  };
+
   // Generate official Islamic formatted WhatsApp message for student report
   const generateRaporWhatsAppText = (siswa: Siswa, type: JenisRapor, sem: "Ganjil" | "Genap" = waRaporSemester) => {
     const records = nilaiList.filter(
@@ -911,15 +935,35 @@ export default function NilaiManagementPage() {
     if (records.length === 0) {
       msg += `_(Data nilai mata pelajaran Semester ${sem} belum diinputkan)_\n`;
     } else {
-      records.forEach((r, i) => {
-        const score = isMid ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
-        const pred = isMid ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
-        const note = isMid ? "" : getStudentAkhir(r).catatan;
-        msg += `${i + 1}. *${r.mapel}*: ${score} (${pred})\n`;
-        if (!isMid && note && note !== "-") {
-          msg += `   _Catatan:_ "${note}"\n`;
-        }
-      });
+      const wajibRecs = records.filter((r) => !isMuatanLokal(r.mapel));
+      const mulokRecs = records.filter((r) => isMuatanLokal(r.mapel));
+
+      if (wajibRecs.length > 0) {
+        msg += `*A. Muatan Wajib*\n`;
+        wajibRecs.forEach((r, i) => {
+          const score = isMid ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
+          const pred = isMid ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
+          const note = isMid ? "" : getStudentAkhir(r).catatan;
+          msg += `${i + 1}. *${r.mapel}*: ${score} (${pred})\n`;
+          if (!isMid && note && note !== "-") {
+            msg += `   _Catatan:_ "${note}"\n`;
+          }
+        });
+      }
+
+      if (mulokRecs.length > 0) {
+        if (wajibRecs.length > 0) msg += `\n`;
+        msg += `*B. Muatan Lokal*\n`;
+        mulokRecs.forEach((r, i) => {
+          const score = isMid ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
+          const pred = isMid ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
+          const note = isMid ? "" : getStudentAkhir(r).catatan;
+          msg += `${i + 1}. *${r.mapel}*: ${score} (${pred})\n`;
+          if (!isMid && note && note !== "-") {
+            msg += `   _Catatan:_ "${note}"\n`;
+          }
+        });
+      }
     }
 
     msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -3687,35 +3731,102 @@ export default function NilaiManagementPage() {
                       </td>
                     </tr>
                   ) : (
-                    studentNilaiRecords.map((item, idx) => {
-                      const mid = getStudentMid(item);
-                      const mapelObj = mapelList.find(
-                        (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
-                      );
-                      const kkm = mapelObj?.kkm || 75;
-                      const isTuntas = mid.nilaiMid >= kkm;
+                    (() => {
+                      const wajibRecords = studentNilaiRecords.filter((item) => !isMuatanLokal(item.mapel));
+                      const mulokRecords = studentNilaiRecords.filter((item) => isMuatanLokal(item.mapel));
 
                       return (
-                        <tr key={item.id}>
-                          <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                          <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
-                            {mid.nilaiMid}
-                          </td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-bold">
-                            {mid.predikatMid}
-                          </td>
-                          <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
-                            {isTuntas ? (
-                              <span className="text-emerald-700">Tuntas</span>
-                            ) : (
-                              <span className="text-rose-700">Remedial</span>
-                            )}
-                          </td>
-                        </tr>
+                        <>
+                          {/* Kelompok A: Muatan Wajib */}
+                          <tr className="bg-slate-100/90 font-bold text-slate-900">
+                            <td colSpan={6} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                              A. Muatan Wajib
+                            </td>
+                          </tr>
+                          {wajibRecords.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                                - Belum ada mata pelajaran muatan wajib -
+                              </td>
+                            </tr>
+                          ) : (
+                            wajibRecords.map((item, idx) => {
+                              const mid = getStudentMid(item);
+                              const mapelObj = mapelList.find(
+                                (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                              );
+                              const kkm = mapelObj?.kkm || 75;
+                              const isTuntas = mid.nilaiMid >= kkm;
+
+                              return (
+                                <tr key={item.id}>
+                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                    {mid.nilaiMid}
+                                  </td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                    {mid.predikatMid}
+                                  </td>
+                                  <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
+                                    {isTuntas ? (
+                                      <span className="text-emerald-700">Tuntas</span>
+                                    ) : (
+                                      <span className="text-rose-700">Remedial</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+
+                          {/* Kelompok B: Muatan Lokal */}
+                          <tr className="bg-slate-100/90 font-bold text-slate-900">
+                            <td colSpan={6} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                              B. Muatan Lokal
+                            </td>
+                          </tr>
+                          {mulokRecords.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                                - Tidak ada mata pelajaran muatan lokal -
+                              </td>
+                            </tr>
+                          ) : (
+                            mulokRecords.map((item, idx) => {
+                              const mid = getStudentMid(item);
+                              const mapelObj = mapelList.find(
+                                (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                              );
+                              const kkm = mapelObj?.kkm || 75;
+                              const isTuntas = mid.nilaiMid >= kkm;
+
+                              return (
+                                <tr key={item.id}>
+                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                    {mid.nilaiMid}
+                                  </td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                    {mid.predikatMid}
+                                  </td>
+                                  <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
+                                    {isTuntas ? (
+                                      <span className="text-emerald-700">Tuntas</span>
+                                    ) : (
+                                      <span className="text-rose-700">Remedial</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </>
                       );
-                    })
+                    })()
                   )}
                 </tbody>
                 <tfoot>
@@ -3763,33 +3874,98 @@ export default function NilaiManagementPage() {
                       </td>
                     </tr>
                   ) : (
-                    studentNilaiRecords.map((item, idx) => {
-                      const akhir = getStudentAkhir(item);
-                      const mapelObj = mapelList.find(
-                        (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
-                      );
-                      const kkm = mapelObj?.kkm || 75;
+                    (() => {
+                      const wajibRecords = studentNilaiRecords.filter((item) => !isMuatanLokal(item.mapel));
+                      const mulokRecords = studentNilaiRecords.filter((item) => isMuatanLokal(item.mapel));
 
                       return (
-                        <tr key={item.id}>
-                          <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                          <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uas}</td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
-                            {akhir.nilaiAkhir}
-                          </td>
-                          <td className="border border-slate-300 px-2 py-2 text-center font-bold">
-                            {akhir.predikat}
-                          </td>
-                          <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
-                            {akhir.catatan || "-"}
-                          </td>
-                        </tr>
+                        <>
+                          {/* Kelompok A: Muatan Wajib */}
+                          <tr className="bg-slate-100/90 font-bold text-slate-900">
+                            <td colSpan={9} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                              A. Muatan Wajib
+                            </td>
+                          </tr>
+                          {wajibRecords.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                                - Belum ada mata pelajaran muatan wajib -
+                              </td>
+                            </tr>
+                          ) : (
+                            wajibRecords.map((item, idx) => {
+                              const akhir = getStudentAkhir(item);
+                              const mapelObj = mapelList.find(
+                                (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                              );
+                              const kkm = mapelObj?.kkm || 75;
+
+                              return (
+                                <tr key={item.id}>
+                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uas}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
+                                    {akhir.nilaiAkhir}
+                                  </td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                    {akhir.predikat}
+                                  </td>
+                                  <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
+                                    {akhir.catatan || "-"}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+
+                          {/* Kelompok B: Muatan Lokal */}
+                          <tr className="bg-slate-100/90 font-bold text-slate-900">
+                            <td colSpan={9} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                              B. Muatan Lokal
+                            </td>
+                          </tr>
+                          {mulokRecords.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                                - Tidak ada mata pelajaran muatan lokal -
+                              </td>
+                            </tr>
+                          ) : (
+                            mulokRecords.map((item, idx) => {
+                              const akhir = getStudentAkhir(item);
+                              const mapelObj = mapelList.find(
+                                (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                              );
+                              const kkm = mapelObj?.kkm || 75;
+
+                              return (
+                                <tr key={item.id}>
+                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uas}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
+                                    {akhir.nilaiAkhir}
+                                  </td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                    {akhir.predikat}
+                                  </td>
+                                  <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
+                                    {akhir.catatan || "-"}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </>
                       );
-                    })
+                    })()
                   )}
                 </tbody>
                 <tfoot>
@@ -4207,35 +4383,102 @@ export default function NilaiManagementPage() {
                                   </td>
                                 </tr>
                               ) : (
-                                studentRecords.map((item, idx) => {
-                                  const mid = getStudentMid(item);
-                                  const mapelObj = mapelList.find(
-                                    (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
-                                  );
-                                  const kkm = mapelObj?.kkm || 75;
-                                  const isTuntas = mid.nilaiMid >= kkm;
+                                (() => {
+                                  const batchWajib = studentRecords.filter((item) => !isMuatanLokal(item.mapel));
+                                  const batchMulok = studentRecords.filter((item) => isMuatanLokal(item.mapel));
 
                                   return (
-                                    <tr key={item.id} className="text-[11px]">
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
-                                        {mid.nilaiMid}
-                                      </td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
-                                        {mid.predikatMid}
-                                      </td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
-                                        {isTuntas ? (
-                                          <span className="text-emerald-700">Tuntas</span>
-                                        ) : (
-                                          <span className="text-rose-700">Remedial</span>
-                                        )}
-                                      </td>
-                                    </tr>
+                                    <>
+                                      {/* Kelompok A: Muatan Wajib */}
+                                      <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
+                                        <td colSpan={6} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                          A. Muatan Wajib
+                                        </td>
+                                      </tr>
+                                      {batchWajib.length === 0 ? (
+                                        <tr className="text-[11px]">
+                                          <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                            - Belum ada mata pelajaran muatan wajib -
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        batchWajib.map((item, idx) => {
+                                          const mid = getStudentMid(item);
+                                          const mapelObj = mapelList.find(
+                                            (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                          );
+                                          const kkm = mapelObj?.kkm || 75;
+                                          const isTuntas = mid.nilaiMid >= kkm;
+
+                                          return (
+                                            <tr key={item.id} className="text-[11px]">
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                                {mid.nilaiMid}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                                {mid.predikatMid}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
+                                                {isTuntas ? (
+                                                  <span className="text-emerald-700">Tuntas</span>
+                                                ) : (
+                                                  <span className="text-rose-700">Remedial</span>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+
+                                      {/* Kelompok B: Muatan Lokal */}
+                                      <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
+                                        <td colSpan={6} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                          B. Muatan Lokal
+                                        </td>
+                                      </tr>
+                                      {batchMulok.length === 0 ? (
+                                        <tr className="text-[11px]">
+                                          <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                            - Tidak ada mata pelajaran muatan lokal -
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        batchMulok.map((item, idx) => {
+                                          const mid = getStudentMid(item);
+                                          const mapelObj = mapelList.find(
+                                            (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                          );
+                                          const kkm = mapelObj?.kkm || 75;
+                                          const isTuntas = mid.nilaiMid >= kkm;
+
+                                          return (
+                                            <tr key={item.id} className="text-[11px]">
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                                {mid.nilaiMid}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                                {mid.predikatMid}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
+                                                {isTuntas ? (
+                                                  <span className="text-emerald-700">Tuntas</span>
+                                                ) : (
+                                                  <span className="text-rose-700">Remedial</span>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+                                    </>
                                   );
-                                })
+                                })()
                               )}
                             </tbody>
                             <tfoot>
@@ -4278,33 +4521,98 @@ export default function NilaiManagementPage() {
                                   </td>
                                 </tr>
                               ) : (
-                                studentRecords.map((item, idx) => {
-                                  const akhir = getStudentAkhir(item);
-                                  const mapelObj = mapelList.find(
-                                    (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
-                                  );
-                                  const kkm = mapelObj?.kkm || 75;
+                                (() => {
+                                  const batchWajib = studentRecords.filter((item) => !isMuatanLokal(item.mapel));
+                                  const batchMulok = studentRecords.filter((item) => isMuatanLokal(item.mapel));
 
                                   return (
-                                    <tr key={item.id} className="text-[11px]">
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
-                                        {akhir.nilaiAkhir}
-                                      </td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
-                                        {akhir.predikat}
-                                      </td>
-                                      <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
-                                        {akhir.catatan || "-"}
-                                      </td>
-                                    </tr>
+                                    <>
+                                      {/* Kelompok A: Muatan Wajib */}
+                                      <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
+                                        <td colSpan={9} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                          A. Muatan Wajib
+                                        </td>
+                                      </tr>
+                                      {batchWajib.length === 0 ? (
+                                        <tr className="text-[11px]">
+                                          <td colSpan={9} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                            - Belum ada mata pelajaran muatan wajib -
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        batchWajib.map((item, idx) => {
+                                          const akhir = getStudentAkhir(item);
+                                          const mapelObj = mapelList.find(
+                                            (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                          );
+                                          const kkm = mapelObj?.kkm || 75;
+
+                                          return (
+                                            <tr key={item.id} className="text-[11px]">
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
+                                                {akhir.nilaiAkhir}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                                {akhir.predikat}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                                {akhir.catatan || "-"}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+
+                                      {/* Kelompok B: Muatan Lokal */}
+                                      <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
+                                        <td colSpan={9} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                          B. Muatan Lokal
+                                        </td>
+                                      </tr>
+                                      {batchMulok.length === 0 ? (
+                                        <tr className="text-[11px]">
+                                          <td colSpan={9} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                            - Tidak ada mata pelajaran muatan lokal -
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        batchMulok.map((item, idx) => {
+                                          const akhir = getStudentAkhir(item);
+                                          const mapelObj = mapelList.find(
+                                            (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                          );
+                                          const kkm = mapelObj?.kkm || 75;
+
+                                          return (
+                                            <tr key={item.id} className="text-[11px]">
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
+                                                {akhir.nilaiAkhir}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                                {akhir.predikat}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                                {akhir.catatan || "-"}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+                                    </>
                                   );
-                                })
+                                })()
                               )}
                             </tbody>
                             <tfoot>

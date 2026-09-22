@@ -440,10 +440,25 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         }
       });
       setKelasList(mergedKelas);
-      setMapelList(load("mapel", INITIAL_MAPEL));
+      const loadedMapel = load("mapel", INITIAL_MAPEL);
+      const mergedMapel = [...(loadedMapel && loadedMapel.length > 0 ? loadedMapel : INITIAL_MAPEL)];
+      INITIAL_MAPEL.forEach((im) => {
+        if (!mergedMapel.some((m) => m.id === im.id || m.nama.toLowerCase() === im.nama.toLowerCase())) {
+          mergedMapel.push(im);
+        }
+      });
+      setMapelList(mergedMapel);
       setJadwalList(load("jadwal", INITIAL_JADWAL));
       setPresensiList(load("presensi", INITIAL_PRESENSI));
-      setNilaiList(load("nilai", INITIAL_NILAI));
+
+      const loadedNilai = load("nilai", INITIAL_NILAI);
+      const mergedNilai = [...(loadedNilai && loadedNilai.length > 0 ? loadedNilai : INITIAL_NILAI)];
+      INITIAL_NILAI.forEach((inil) => {
+        if (!mergedNilai.some((n) => n.id === inil.id)) {
+          mergedNilai.push(inil);
+        }
+      });
+      setNilaiList(mergedNilai);
       setSppList(load("spp", INITIAL_SPP));
       setJenisTagihanList(load("jenis_tagihan", INITIAL_JENIS_TAGIHAN));
       setPengumumanList(load("pengumuman", INITIAL_PENGUMUMAN));
