@@ -3622,11 +3622,11 @@ export default function NilaiManagementPage() {
               <p className="text-xs text-slate-600 mt-1 font-medium">
                 Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {raporPrintSemester || profile.semesterAktif}
               </p>
-              <div className="mt-2 inline-block px-3 py-1 rounded-full bg-slate-100 text-[10px] text-slate-700 font-medium">
-                {raporPrintType === "tengah"
-                  ? "Komposisi Penilaian STS: 100% Nilai Ujian Sumatif Tengah Semester (STS)"
-                  : "Komposisi Penilaian SAS: 30% Nilai Harian + 30% Ujian Mid + 40% Ujian Akhir Semester"}
-              </div>
+              {raporPrintType === "akhir" && (
+                <div className="mt-2 inline-block px-3 py-1 rounded-full bg-slate-100 text-[10px] text-slate-700 font-medium print:hidden">
+                  Komposisi Penilaian SAS: 30% Nilai Harian + 30% Ujian Mid + 40% Ujian Akhir Semester
+                </div>
+              )}
             </div>
 
             {/* Student & Class Info Box */}
