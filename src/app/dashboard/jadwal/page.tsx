@@ -33,6 +33,7 @@ import {
   SlidersHorizontal,
   Zap,
   Cloud,
+  ShieldAlert,
 } from "lucide-react";
 
 type ActiveMenu = "lihat" | "tambah" | "edit" | "hapus" | "mapel";
@@ -975,6 +976,31 @@ export default function JadwalPage() {
       guruCount: uniqueGuru,
     };
   }, [jadwalList, filteredJadwal, teacherScope]);
+
+  // Halaman Jadwal Pelajaran & KBM hanya dapat diakses pada mode admin
+  if (user?.role !== "admin") {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center shadow-xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-4 shadow-xs">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+            Akses Terbatas (Khusus Admin)
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+            Menu <strong>Jadwal Pelajaran & KBM</strong> hanya dapat diakses pada mode Administrator. Mode peran Anda ({user?.role || "Pengguna"}) tidak diberikan izin untuk mengakses menu ini.
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all w-full cursor-pointer"
+          >
+            <span>Kembali ke Dashboard Utama</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">

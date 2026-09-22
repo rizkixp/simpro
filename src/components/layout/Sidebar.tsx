@@ -72,7 +72,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: "Jadwal Pelajaran",
       href: "/dashboard/jadwal",
       icon: CalendarDays,
-      roles: ["admin", "guru", "siswa", "ortu"],
+      roles: ["admin"],
     },
     {
       title: "Presensi Harian",

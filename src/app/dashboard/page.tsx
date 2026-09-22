@@ -748,19 +748,19 @@ export default function DashboardOverviewPage() {
           </div>
         </Link>
 
-        {/* Stat 4: Keuangan / SPP / Tabungan */}
+        {/* Stat 4: LMS / Pembelajaran */}
         {user?.role === "guru" ? (
           <Link
-            href="/dashboard/jadwal"
+            href="/dashboard/lms"
             className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-100/90 dark:border-emerald-950 shadow-xs flex items-center justify-between hover:border-emerald-400 hover:shadow-md transition-all group cursor-pointer"
           >
             <div>
-              <p className="text-xs font-semibold text-emerald-800/70 dark:text-emerald-400">Jadwal KBM Kelas</p>
+              <p className="text-xs font-semibold text-emerald-800/70 dark:text-emerald-400">LMS Pembelajaran</p>
               <p className="mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">
-                {teacherScope.filterByClass(jadwalList).length} Sesi KBM
+                Kelas {teacherScope.assignedClass}
               </p>
               <p className="mt-1.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 group-hover:underline">
-                Jadwal Rombel {teacherScope.assignedClass} &rarr;
+                Buka Materi & Tugas &rarr;
               </p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 border border-emerald-100 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -861,13 +861,15 @@ export default function DashboardOverviewPage() {
                   <p className="text-xs text-slate-500">Kelas 6 SDI Smart School • Semester Ganjil</p>
                 </div>
               </div>
-              <Link
-                href="/dashboard/jadwal"
-                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
-              >
-                <span>Lihat Semua</span>
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+              {user?.role === "admin" && (
+                <Link
+                  href="/dashboard/jadwal"
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+                >
+                  <span>Lihat Semua</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              )}
             </div>
 
             <div className="space-y-3">
