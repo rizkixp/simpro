@@ -4823,7 +4823,6 @@ export default function NilaiManagementPage() {
                   : null) ||
                 matchedKelasObj?.waliKelasNama ||
                 (teacherScope.isTeacher ? teacherScope.teacherName : "Wali Kelas");
-              const waliNip = matchedWaliGuru?.nip || "198506122010012015";
 
               return (
                 <div className="pt-6 border-0 border-none text-xs">
@@ -4843,7 +4842,6 @@ export default function NilaiManagementPage() {
                       <p className="font-bold underline">
                         {raporSiswa.namaWali ? `( ${raporSiswa.namaWali} )` : "( ................................................ )"}
                       </p>
-                      <p className="text-[10px] text-slate-400">Tanda Tangan & Nama Terang</p>
                     </div>
 
                     {/* Kolom 2: Wali Kelas */}
@@ -4852,7 +4850,6 @@ export default function NilaiManagementPage() {
                       <p className="text-slate-800 font-medium">Wali Kelas {raporSiswa.kelas},</p>
                       <div className="h-16" />
                       <p className="font-bold underline">{waliNama}</p>
-                      <p className="text-[10px] text-slate-500">NIP: {waliNip}</p>
                     </div>
 
                     {/* Kolom 3: Kepala Sekolah */}
@@ -5167,7 +5164,6 @@ export default function NilaiManagementPage() {
                         : null) ||
                       matchedKelasObj?.waliKelasNama ||
                       (teacherScope.isTeacher ? teacherScope.teacherName : "Wali Kelas");
-                    const waliNip = matchedWaliGuru?.nip || "198506122010012015";
 
                     return (
                       <div
@@ -5552,7 +5548,6 @@ export default function NilaiManagementPage() {
                               <p className="font-bold underline">
                                 {siswa.namaWali ? `( ${siswa.namaWali} )` : "( ................................................ )"}
                               </p>
-                              <p className="text-[10px] text-slate-400">Tanda Tangan & Nama Terang</p>
                             </div>
 
                             {/* Kolom 2: Wali Kelas */}
@@ -5561,7 +5556,6 @@ export default function NilaiManagementPage() {
                               <p className="text-slate-800 font-medium">Wali Kelas {siswa.kelas},</p>
                               <div className="h-14" />
                               <p className="font-bold underline">{waliNama}</p>
-                              <p className="text-[10px] text-slate-400">NIP: {waliNip}</p>
                             </div>
 
                             {/* Kolom 3: Kepala Sekolah */}
