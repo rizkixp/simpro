@@ -181,6 +181,7 @@ export default function NilaiManagementPage() {
     alamatKontak: string;
     garisKop: "double" | "single";
     ukuranFontKop?: "sm" | "md" | "lg";
+    ukuranLogoKop?: "sm" | "md" | "lg" | "xl";
     tempatRapor: string;
     tanggalRapor: string;
   }
@@ -194,6 +195,7 @@ export default function NilaiManagementPage() {
     alamatKontak: `${profile?.alamat || "Jl. Pendidikan No. 45"} • Telp: ${profile?.telepon || "(021) 7890123"} • Website: ${profile?.website || "www.smartschool.sch.id"}`,
     garisKop: "double",
     ukuranFontKop: "md",
+    ukuranLogoKop: "lg",
     tempatRapor: "Jakarta",
     tanggalRapor: formatDateIndo(new Date().toISOString().split("T")[0]),
   });
@@ -211,6 +213,8 @@ export default function NilaiManagementPage() {
         setRaporConfig((prev) => ({
           ...prev,
           ...parsed,
+          ukuranFontKop: parsed.ukuranFontKop || prev.ukuranFontKop || "md",
+          ukuranLogoKop: parsed.ukuranLogoKop || prev.ukuranLogoKop || "lg",
           namaSekolah: parsed.namaSekolah || profile?.namaSekolah || prev.namaSekolah,
         }));
       }
@@ -413,6 +417,39 @@ export default function NilaiManagementPage() {
               </div>
             </div>
 
+            {/* Opsi Pengaturan Ukuran Logo Kop Surat (Kiri & Kanan) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div>
+                <span className="font-bold text-slate-700 dark:text-slate-200 block">
+                  Ukuran Logo Kop Surat (Kiri & Kanan):
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  Sesuaikan besaran tampilan logo instansi pada bagian kiri dan kanan kop rapor.
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: "sm", label: "Sedang (80px)" },
+                  { id: "md", label: "Besar (96px)" },
+                  { id: "lg", label: "Ekstra Besar (112px) - Default" },
+                  { id: "xl", label: "Jumbo (128px)" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => updateRaporConfig({ ukuranLogoKop: item.id as any })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all border ${
+                      (raporConfig.ukuranLogoKop || "lg") === item.id
+                        ? "bg-blue-600 text-white border-blue-700 shadow-sm"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Kop Text Inputs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <div>
@@ -610,6 +647,16 @@ export default function NilaiManagementPage() {
         ? isSmall ? "text-base sm:text-lg" : "text-lg sm:text-xl"
         : isSmall ? "text-sm sm:text-base" : "text-base sm:text-lg";
 
+    const logoSize = raporConfig.ukuranLogoKop || "lg";
+    const logoBoxClass =
+      logoSize === "sm"
+        ? isSmall ? "w-16 h-16" : "w-20 h-20"
+        : logoSize === "md"
+        ? isSmall ? "w-20 h-20" : "w-24 h-24"
+        : logoSize === "xl"
+        ? isSmall ? "w-28 h-28" : "w-32 h-32"
+        : isSmall ? "w-24 h-24" : "w-28 h-28"; // Default "lg" (Ekstra Besar: 112px / 96px)
+
     return (
       <div
         className={`text-center pb-3 mb-4 ${
@@ -618,24 +665,24 @@ export default function NilaiManagementPage() {
             : "border-b-2 border-[#000000]"
         }`}
       >
-        <div className="flex items-center justify-between gap-3 mb-1">
+        <div className="flex items-center justify-between gap-4 mb-1">
           {/* Logo Kiri */}
-          <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+          <div className={`${logoBoxClass} flex-shrink-0 flex items-center justify-center overflow-hidden`}>
             {raporConfig.logoKiriUrl ? (
               <img
                 src={raporConfig.logoKiriUrl}
                 alt="Logo Kiri"
-                className="max-h-16 max-w-16 object-contain"
+                className="w-full h-full object-contain"
               />
             ) : (
-              <div className={`${isSmall ? "h-10 w-10" : "h-12 w-12"} rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold`}>
-                <GraduationCap className={`${isSmall ? "h-6 w-6" : "h-7 w-7"}`} />
+              <div className={`${isSmall ? "h-14 w-14" : "h-18 w-18"} rounded-2xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-sm`}>
+                <GraduationCap className={`${isSmall ? "h-8 w-8" : "h-10 w-10"}`} />
               </div>
             )}
           </div>
 
           {/* Bagian Tulisan Tengah Kop Surat */}
-          <div className="flex-1 text-center">
+          <div className="flex-1 text-center px-2">
             {raporConfig.yayasanNama && (
               <p className={`${headerTitleSize} font-bold tracking-wide uppercase text-slate-900 leading-tight`}>
                 {raporConfig.yayasanNama}
@@ -657,15 +704,15 @@ export default function NilaiManagementPage() {
           </div>
 
           {/* Logo Kanan */}
-          <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+          <div className={`${logoBoxClass} flex-shrink-0 flex items-center justify-center overflow-hidden`}>
             {raporConfig.logoKananUrl ? (
               <img
                 src={raporConfig.logoKananUrl}
                 alt="Logo Kanan"
-                className="max-h-16 max-w-16 object-contain"
+                className="w-full h-full object-contain"
               />
             ) : (
-              <div className="w-16 h-16" />
+              <div className={logoBoxClass} />
             )}
           </div>
         </div>
