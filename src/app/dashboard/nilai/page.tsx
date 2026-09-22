@@ -4901,14 +4901,13 @@ export default function NilaiManagementPage() {
                   </div>
 
                   <div className="grid grid-cols-3 text-center gap-4">
-                    {/* Kolom 1: Orang Tua / Wali Santri */}
+                    {/* Kolom 1: Kepala Sekolah */}
                     <div>
                       <p className="text-slate-600">Mengetahui,</p>
-                      <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
+                      <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
                       <div className="h-16" />
-                      <p className="font-bold underline">
-                        {raporSiswa.namaWali ? `( ${raporSiswa.namaWali} )` : "( ................................................ )"}
-                      </p>
+                      <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                      <p className="text-[10px] text-slate-500">NIP: 197204151998031002</p>
                     </div>
 
                     {/* Kolom 2: Wali Kelas */}
@@ -4919,13 +4918,14 @@ export default function NilaiManagementPage() {
                       <p className="font-bold underline">{waliNama}</p>
                     </div>
 
-                    {/* Kolom 3: Kepala Sekolah */}
+                    {/* Kolom 3: Orang Tua / Wali Santri */}
                     <div>
                       <p className="text-slate-600 invisible">Mengetahui,</p>
-                      <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
+                      <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
                       <div className="h-16" />
-                      <p className="font-bold underline">{profile.kepalaSekolah}</p>
-                      <p className="text-[10px] text-slate-500">NIP: 197204151998031002</p>
+                      <p className="font-bold underline">
+                        {raporSiswa.namaWali ? `( ${raporSiswa.namaWali} )` : "( ................................................ )"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -5640,7 +5640,7 @@ export default function NilaiManagementPage() {
                           </div>
                         </div>
 
-                        {/* Signature Area (3 Kolom: Wali Santri, Wali Kelas, Kepala Sekolah) */}
+                        {/* Signature Area (3 Kolom: Kepala Sekolah, Wali Kelas, Orang Tua / Wali Santri) */}
                         <div className="pt-6 border-0 border-none text-xs">
                           {/* Titimangsa Alamat dan Tanggal Rapor */}
                           <div className="flex justify-end mb-2 pr-4">
@@ -5650,14 +5650,13 @@ export default function NilaiManagementPage() {
                           </div>
 
                           <div className="grid grid-cols-3 text-center gap-4">
-                            {/* Kolom 1: Orang Tua / Wali Santri */}
+                            {/* Kolom 1: Kepala Sekolah */}
                             <div>
                               <p className="text-slate-600">Mengetahui,</p>
-                              <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
+                              <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
                               <div className="h-14" />
-                              <p className="font-bold underline">
-                                {siswa.namaWali ? `( ${siswa.namaWali} )` : "( ................................................ )"}
-                              </p>
+                              <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                              <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
                             </div>
 
                             {/* Kolom 2: Wali Kelas */}
@@ -5668,13 +5667,14 @@ export default function NilaiManagementPage() {
                               <p className="font-bold underline">{waliNama}</p>
                             </div>
 
-                            {/* Kolom 3: Kepala Sekolah */}
+                            {/* Kolom 3: Orang Tua / Wali Santri */}
                             <div>
                               <p className="text-slate-600 invisible">Mengetahui,</p>
-                              <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
+                              <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
                               <div className="h-14" />
-                              <p className="font-bold underline">{profile.kepalaSekolah}</p>
-                              <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
+                              <p className="font-bold underline">
+                                {siswa.namaWali ? `( ${siswa.namaWali} )` : "( ................................................ )"}
+                              </p>
                             </div>
                           </div>
                         </div>
