@@ -134,60 +134,60 @@ export const SupabaseSchoolService = {
     }
 
     return {
-      namaSekolah: defaultRow.nama_sekolah ?? "",
-      npsn: defaultRow.npsn ?? "",
-      akreditasi: defaultRow.akreditasi ?? "",
-      alamat: defaultRow.alamat ?? "",
-      telepon: defaultRow.telepon ?? "",
-      email: defaultRow.email ?? "",
-      website: defaultRow.website ?? "",
-      kepalaSekolah: defaultRow.kepala_sekolah ?? "",
-      tahunAjaranAktif: defaultRow.tahun_ajaran_aktif || "2025/2026",
-      semesterAktif: defaultRow.semester_aktif || "Ganjil",
+      namaSekolah: extData.namaSekolah || defaultRow.nama_sekolah || "",
+      npsn: extData.npsn || defaultRow.npsn || "",
+      akreditasi: extData.akreditasi || defaultRow.akreditasi || "",
+      alamat: extData.alamat || defaultRow.alamat || "",
+      telepon: extData.telepon || defaultRow.telepon || "",
+      email: extData.email || defaultRow.email || "",
+      website: extData.website || defaultRow.website || "",
+      kepalaSekolah: extData.kepalaSekolah || defaultRow.kepala_sekolah || "",
+      tahunAjaranAktif: extData.tahunAjaranAktif || defaultRow.tahun_ajaran_aktif || "2025/2026",
+      semesterAktif: extData.semesterAktif || defaultRow.semester_aktif || "Ganjil",
       appName:
-        defaultRow.app_name !== undefined && defaultRow.app_name !== null
+        defaultRow.app_name !== undefined && defaultRow.app_name !== null && defaultRow.app_name !== ""
           ? defaultRow.app_name
           : extData.appName !== undefined
           ? extData.appName
           : "",
       appTagline:
-        defaultRow.app_tagline !== undefined && defaultRow.app_tagline !== null
+        defaultRow.app_tagline !== undefined && defaultRow.app_tagline !== null && defaultRow.app_tagline !== ""
           ? defaultRow.app_tagline
           : extData.appTagline !== undefined
           ? extData.appTagline
           : "",
       appLogoUrl:
-        defaultRow.app_logo_url !== undefined && defaultRow.app_logo_url !== null
+        defaultRow.app_logo_url !== undefined && defaultRow.app_logo_url !== null && defaultRow.app_logo_url !== ""
           ? defaultRow.app_logo_url
           : extData.appLogoUrl !== undefined
           ? extData.appLogoUrl
           : "",
       appIconPreset:
-        defaultRow.app_icon_preset !== undefined && defaultRow.app_icon_preset !== null
+        defaultRow.app_icon_preset !== undefined && defaultRow.app_icon_preset !== null && defaultRow.app_icon_preset !== ""
           ? defaultRow.app_icon_preset
           : extData.appIconPreset !== undefined
           ? extData.appIconPreset
           : "graduation",
       landingHeroBadge:
-        defaultRow.landing_hero_badge !== undefined && defaultRow.landing_hero_badge !== null
+        defaultRow.landing_hero_badge !== undefined && defaultRow.landing_hero_badge !== null && defaultRow.landing_hero_badge !== ""
           ? defaultRow.landing_hero_badge
           : extData.landingHeroBadge !== undefined
           ? extData.landingHeroBadge
           : "",
       landingHeroTitle:
-        defaultRow.landing_hero_title !== undefined && defaultRow.landing_hero_title !== null
+        defaultRow.landing_hero_title !== undefined && defaultRow.landing_hero_title !== null && defaultRow.landing_hero_title !== ""
           ? defaultRow.landing_hero_title
           : extData.landingHeroTitle !== undefined
           ? extData.landingHeroTitle
           : "",
       landingHeroSubtitle:
-        defaultRow.landing_hero_subtitle !== undefined && defaultRow.landing_hero_subtitle !== null
+        defaultRow.landing_hero_subtitle !== undefined && defaultRow.landing_hero_subtitle !== null && defaultRow.landing_hero_subtitle !== ""
           ? defaultRow.landing_hero_subtitle
           : extData.landingHeroSubtitle !== undefined
           ? extData.landingHeroSubtitle
           : "",
       landingCtaText:
-        defaultRow.landing_cta_text !== undefined && defaultRow.landing_cta_text !== null
+        defaultRow.landing_cta_text !== undefined && defaultRow.landing_cta_text !== null && defaultRow.landing_cta_text !== ""
           ? defaultRow.landing_cta_text
           : extData.landingCtaText !== undefined
           ? extData.landingCtaText
@@ -199,7 +199,7 @@ export const SupabaseSchoolService = {
           ? extData.landingShowDemoButton
           : true,
       landingFooterText:
-        defaultRow.landing_footer_text !== undefined && defaultRow.landing_footer_text !== null
+        defaultRow.landing_footer_text !== undefined && defaultRow.landing_footer_text !== null && defaultRow.landing_footer_text !== ""
           ? defaultRow.landing_footer_text
           : extData.landingFooterText !== undefined
           ? extData.landingFooterText
@@ -253,6 +253,7 @@ export const SupabaseSchoolService = {
     // 2. ALSO save extended properties to 'extended_config' row as JSON in nama_sekolah
     // This guarantees 100% persistence in Supabase even when the database table lacks new columns
     const extObj = {
+      ...profile,
       appName: profile.appName,
       appTagline: profile.appTagline,
       appLogoUrl: profile.appLogoUrl,

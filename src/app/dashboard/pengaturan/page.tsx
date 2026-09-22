@@ -58,7 +58,7 @@ export default function PengaturanPage() {
   } = useSchoolData();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isInitialMount = useRef(true);
+  const [isDirty, setIsDirty] = useState(false);
 
   const [formData, setFormData] = useState<SchoolProfile>({
     ...profile,
@@ -74,9 +74,9 @@ export default function PengaturanPage() {
     landingFooterText: profile?.landingFooterText ?? "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
   });
 
+  // Sinkronisasi form otomatis ketika data profile berhasil dimuat dari LocalStorage atau Supabase (hanya jika pengguna belum mengubah form)
   useEffect(() => {
-    if (profile && isInitialMount.current) {
-      isInitialMount.current = false;
+    if (!isDirty && profile) {
       setFormData({
         ...profile,
         appName: profile.appName ?? "SIM Sekolah PRO",
@@ -91,7 +91,12 @@ export default function PengaturanPage() {
         landingFooterText: profile.landingFooterText ?? "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
       });
     }
-  }, [profile]);
+  }, [profile, isDirty]);
+
+  const updateField = <K extends keyof SchoolProfile>(key: K, value: SchoolProfile[K]) => {
+    setIsDirty(true);
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
 
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -134,12 +139,15 @@ export default function PengaturanPage() {
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
           const compressed = canvas.toDataURL("image/png", 0.85);
+          setIsDirty(true);
           setFormData((prev) => ({ ...prev, appLogoUrl: compressed }));
         } else {
+          setIsDirty(true);
           setFormData((prev) => ({ ...prev, appLogoUrl: resultStr }));
         }
       };
       img.onerror = () => {
+        setIsDirty(true);
         setFormData((prev) => ({ ...prev, appLogoUrl: resultStr }));
       };
       img.src = resultStr;
@@ -213,9 +221,14 @@ export default function PengaturanPage() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await updateProfile(formData);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 4000);
+      const ok = await updateProfile(formData);
+      if (ok !== false) {
+        setIsDirty(false);
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 4000);
+      } else {
+        alert("Gagal menyimpan ke server cloud Supabase, namun data telah tersimpan di browser.");
+      }
     } catch (err: any) {
       console.error("Gagal menyimpan profil:", err);
       alert("Terjadi kendala saat menyimpan profil: " + (err.message || err));
@@ -231,7 +244,7 @@ export default function PengaturanPage() {
       )
     ) {
       resetToDefault();
-      setFormData({ ...profile });
+      setIsDirty(false);
       alert("Database sekolah berhasil di-reset ke data bawaan awal!");
     }
   };
@@ -618,7 +631,7 @@ export default function PengaturanPage() {
                   required
                   disabled={!canEdit}
                   value={formData.appName || ""}
-                  onChange={(e) => setFormData({ ...formData, appName: e.target.value })}
+                  onChange={(e) => updateField("appName", e.target.value)}
                   placeholder="Contoh: SIM Sekolah PRO atau SIM SDI Cendekia"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
                 />
@@ -635,7 +648,7 @@ export default function PengaturanPage() {
                   type="text"
                   disabled={!canEdit}
                   value={formData.appTagline || ""}
-                  onChange={(e) => setFormData({ ...formData, appTagline: e.target.value })}
+                  onChange={(e) => updateField("appTagline", e.target.value)}
                   placeholder="Contoh: Sistem Informasi Manajemen Sekolah Terpadu"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -677,7 +690,7 @@ export default function PengaturanPage() {
                       <button
                         type="button"
                         disabled={!canEdit}
-                        onClick={() => setFormData({ ...formData, appLogoUrl: "" })}
+                        onClick={() => updateField("appLogoUrl", "")}
                         className="px-3 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-400 dark:hover:bg-rose-950/40 font-semibold text-xs transition-all flex items-center gap-1.5"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -696,7 +709,7 @@ export default function PengaturanPage() {
                         type="text"
                         disabled={!canEdit}
                         value={formData.appLogoUrl || ""}
-                        onChange={(e) => setFormData({ ...formData, appLogoUrl: e.target.value })}
+                        onChange={(e) => updateField("appLogoUrl", e.target.value)}
                         placeholder="https://example.com/logo.png atau format Data URL"
                         className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-xs font-mono"
                       />
@@ -722,7 +735,7 @@ export default function PengaturanPage() {
                             key={preset.id}
                             type="button"
                             disabled={!canEdit}
-                            onClick={() => setFormData({ ...formData, appIconPreset: preset.id as any })}
+                            onClick={() => updateField("appIconPreset", preset.id as any)}
                             className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
                               isSelected
                                 ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/30"
@@ -838,7 +851,7 @@ export default function PengaturanPage() {
                   type="text"
                   disabled={!canEdit}
                   value={formData.landingHeroBadge || ""}
-                  onChange={(e) => setFormData({ ...formData, landingHeroBadge: e.target.value })}
+                  onChange={(e) => updateField("landingHeroBadge", e.target.value)}
                   placeholder="Contoh: Platform Manajemen Sekolah Generasi Terbaru #1"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -856,7 +869,7 @@ export default function PengaturanPage() {
                   type="text"
                   disabled={!canEdit}
                   value={formData.landingHeroTitle || ""}
-                  onChange={(e) => setFormData({ ...formData, landingHeroTitle: e.target.value })}
+                  onChange={(e) => updateField("landingHeroTitle", e.target.value)}
                   placeholder="Contoh: Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
                 />
@@ -871,7 +884,7 @@ export default function PengaturanPage() {
                   rows={3}
                   disabled={!canEdit}
                   value={formData.landingHeroSubtitle || ""}
-                  onChange={(e) => setFormData({ ...formData, landingHeroSubtitle: e.target.value })}
+                  onChange={(e) => updateField("landingHeroSubtitle", e.target.value)}
                   placeholder="Tuliskan pengantar singkat tentang fasilitas dan sistem sekolah..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 />
@@ -887,7 +900,7 @@ export default function PengaturanPage() {
                     type="text"
                     disabled={!canEdit}
                     value={formData.landingCtaText || ""}
-                    onChange={(e) => setFormData({ ...formData, landingCtaText: e.target.value })}
+                    onChange={(e) => updateField("landingCtaText", e.target.value)}
                     placeholder="Buka Portal & Form Login"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
                   />
@@ -902,7 +915,7 @@ export default function PengaturanPage() {
                       type="checkbox"
                       disabled={!canEdit}
                       checked={formData.landingShowDemoButton ?? true}
-                      onChange={(e) => setFormData({ ...formData, landingShowDemoButton: e.target.checked })}
+                      onChange={(e) => updateField("landingShowDemoButton", e.target.checked)}
                       className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
                     />
                     <span className="text-xs text-slate-800 dark:text-slate-200 font-medium">
@@ -924,7 +937,7 @@ export default function PengaturanPage() {
                   type="text"
                   disabled={!canEdit}
                   value={formData.landingFooterText || ""}
-                  onChange={(e) => setFormData({ ...formData, landingFooterText: e.target.value })}
+                  onChange={(e) => updateField("landingFooterText", e.target.value)}
                   placeholder="SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -949,7 +962,7 @@ export default function PengaturanPage() {
                   required
                   disabled={!canEdit}
                   value={formData.namaSekolah}
-                  onChange={(e) => setFormData({ ...formData, namaSekolah: e.target.value })}
+                  onChange={(e) => updateField("namaSekolah", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -963,7 +976,7 @@ export default function PengaturanPage() {
                   required
                   disabled={!canEdit}
                   value={formData.npsn}
-                  onChange={(e) => setFormData({ ...formData, npsn: e.target.value })}
+                  onChange={(e) => updateField("npsn", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -977,7 +990,7 @@ export default function PengaturanPage() {
                   required
                   disabled={!canEdit}
                   value={formData.akreditasi}
-                  onChange={(e) => setFormData({ ...formData, akreditasi: e.target.value })}
+                  onChange={(e) => updateField("akreditasi", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -991,7 +1004,7 @@ export default function PengaturanPage() {
                   required
                   disabled={!canEdit}
                   value={formData.kepalaSekolah}
-                  onChange={(e) => setFormData({ ...formData, kepalaSekolah: e.target.value })}
+                  onChange={(e) => updateField("kepalaSekolah", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -1014,7 +1027,7 @@ export default function PengaturanPage() {
                   required
                   disabled={!canEdit}
                   value={formData.alamat}
-                  onChange={(e) => setFormData({ ...formData, alamat: e.target.value })}
+                  onChange={(e) => updateField("alamat", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -1028,7 +1041,7 @@ export default function PengaturanPage() {
                     type="text"
                     disabled={!canEdit}
                     value={formData.telepon ?? ""}
-                    onChange={(e) => setFormData({ ...formData, telepon: e.target.value })}
+                    onChange={(e) => updateField("telepon", e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono"
                   />
                 </div>
@@ -1041,7 +1054,7 @@ export default function PengaturanPage() {
                     type="email"
                     disabled={!canEdit}
                     value={formData.email ?? ""}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => updateField("email", e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
                   />
                 </div>
@@ -1054,7 +1067,7 @@ export default function PengaturanPage() {
                     type="text"
                     disabled={!canEdit}
                     value={formData.website ?? ""}
-                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    onChange={(e) => updateField("website", e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
                   />
                 </div>
@@ -1078,7 +1091,7 @@ export default function PengaturanPage() {
                   required
                   disabled={!canEdit}
                   value={formData.tahunAjaranAktif}
-                  onChange={(e) => setFormData({ ...formData, tahunAjaranAktif: e.target.value })}
+                  onChange={(e) => updateField("tahunAjaranAktif", e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-semibold"
                   placeholder="2025/2026"
                 />
@@ -1091,7 +1104,7 @@ export default function PengaturanPage() {
                 <select
                   disabled={!canEdit}
                   value={formData.semesterAktif}
-                  onChange={(e) => setFormData({ ...formData, semesterAktif: e.target.value as any })}
+                  onChange={(e) => updateField("semesterAktif", e.target.value as any)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-semibold"
                 >
                   <option value="Ganjil">Semester Ganjil</option>

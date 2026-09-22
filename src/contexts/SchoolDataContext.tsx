@@ -280,7 +280,17 @@ interface SchoolDataContextType {
 const SchoolDataContext = createContext<SchoolDataContextType | undefined>(undefined);
 
 export function SchoolDataProvider({ children }: { children: React.ReactNode }) {
-  const [profile, setProfile] = useState<SchoolProfile>(INITIAL_SCHOOL_PROFILE);
+  const [profile, setProfile] = useState<SchoolProfile>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const item = localStorage.getItem("sim_data_profile");
+        if (item) return JSON.parse(item);
+      } catch (e) {
+        console.warn("Failed to load profile from localStorage", e);
+      }
+    }
+    return INITIAL_SCHOOL_PROFILE;
+  });
   const [siswaList, setSiswaList] = useState<Siswa[]>(INITIAL_SISWA);
   const [guruList, setGuruList] = useState<Guru[]>(INITIAL_GURU);
   const [kelasList, setKelasList] = useState<Kelas[]>(INITIAL_KELAS);
