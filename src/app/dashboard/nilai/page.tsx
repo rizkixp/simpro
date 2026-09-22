@@ -17,6 +17,7 @@ import {
   Plus,
   Printer,
   Edit2,
+  Edit3,
   FileText,
   X,
   GraduationCap,
@@ -35,6 +36,8 @@ import {
   RefreshCw,
   Download,
   Users,
+  Save,
+  TableProperties,
   ChevronLeft,
   MessageCircle,
   Share2,
@@ -243,6 +246,11 @@ export default function NilaiManagementPage() {
   const [batchRaporSemester, setBatchRaporSemester] = useState<"Ganjil" | "Genap">("Ganjil");
   const [batchRaporViewMode, setBatchRaporViewMode] = useState<"bundel" | "leger">("bundel");
   const [batchSelectedKelas, setBatchSelectedKelas] = useState<string>("Semua");
+
+  // Mode Edit / Input Nilai Langsung dari Leger Rombel
+  const [isLegerEditMode, setIsLegerEditMode] = useState<boolean>(false);
+  const [legerInputScores, setLegerInputScores] = useState<Record<string, string | number>>({});
+  const [isLegerSaving, setIsLegerSaving] = useState<boolean>(false);
 
   // Konfigurasi Kustomisasi Kop Surat & Titimangsa Rapor
   interface RaporConfig {
@@ -1649,6 +1657,234 @@ export default function NilaiManagementPage() {
     }
   };
 
+  // =========================================================================
+  // LOGIKA INPUT NILAI DARI LEGER NILAI ROMBEL (MATRIKS 1 KELAS x SEMUA MAPEL)
+  // =========================================================================
+  const initLegerInputScores = (
+    kelasTarget: string,
+    typeTarget: "tengah" | "akhir",
+    semesterTarget: "Ganjil" | "Genap"
+  ) => {
+    const students = baseSiswaList.filter((s) => {
+      if (teacherScope.isTeacher && teacherScope.assignedClass) {
+        return isClassMatch(s.kelas, teacherScope.assignedClass);
+      }
+      if (kelasTarget === "Semua") return true;
+      return isClassMatch(s.kelas, kelasTarget);
+    });
+
+    const initialScores: Record<string, string | number> = {};
+    students.forEach((s) => {
+      mapelList.forEach((m) => {
+        const rec = nilaiList.find(
+          (n) =>
+            n.siswaId === s.id &&
+            n.mapel.toLowerCase() === m.nama.toLowerCase() &&
+            (n.semester || "Ganjil").toLowerCase() === semesterTarget.toLowerCase()
+        );
+        const key = `${s.id}_${m.nama}`;
+        if (rec) {
+          if (typeTarget === "tengah") {
+            const val =
+              typeof rec.nilaiMid === "number"
+                ? rec.nilaiMid
+                : typeof rec.uts === "number" && rec.uts > 0
+                ? rec.uts
+                : "";
+            initialScores[key] = val;
+          } else {
+            const val =
+              typeof rec.nilaiAkhir === "number"
+                ? rec.nilaiAkhir
+                : typeof rec.uas === "number" && rec.uas > 0
+                ? rec.uas
+                : "";
+            initialScores[key] = val;
+          }
+        } else {
+          initialScores[key] = "";
+        }
+      });
+    });
+    setLegerInputScores(initialScores);
+  };
+
+  const handleLegerScoreChange = (
+    siswaId: string,
+    mapelNama: string,
+    valueStr: string
+  ) => {
+    const key = `${siswaId}_${mapelNama}`;
+    let cleanVal = valueStr;
+    if (cleanVal !== "") {
+      let num = Number(cleanVal);
+      if (num > 100) num = 100;
+      if (num < 0) num = 0;
+      cleanVal = String(num);
+    }
+    setLegerInputScores((prev) => ({
+      ...prev,
+      [key]: cleanVal,
+    }));
+  };
+
+  const handleFillKkmForMapel = (mapelNama: string, kkmValue: number) => {
+    setLegerInputScores((prev) => {
+      const updated = { ...prev };
+      batchStudents.forEach((s) => {
+        const key = `${s.id}_${mapelNama}`;
+        if (
+          updated[key] === "" ||
+          updated[key] === undefined ||
+          Number(updated[key]) === 0
+        ) {
+          updated[key] = kkmValue;
+        }
+      });
+      return updated;
+    });
+    setNotification({
+      type: "success",
+      message: `Nilai KKM (${kkmValue}) berhasil diisikan untuk siswa yang nilainya masih kosong pada mapel "${mapelNama}".`,
+    });
+  };
+
+  const handleFillAllKkmEmpty = () => {
+    let count = 0;
+    setLegerInputScores((prev) => {
+      const updated = { ...prev };
+      batchStudents.forEach((s) => {
+        mapelList.forEach((m) => {
+          const key = `${s.id}_${m.nama}`;
+          if (
+            updated[key] === "" ||
+            updated[key] === undefined ||
+            Number(updated[key]) === 0
+          ) {
+            updated[key] = m.kkm || 75;
+            count++;
+          }
+        });
+      });
+      return updated;
+    });
+    setNotification({
+      type: "success",
+      message: `Berhasil mengisi ${count} nilai kosong dengan standar KKM mata pelajaran.`,
+    });
+  };
+
+  const handleSaveLegerScores = async () => {
+    setIsLegerSaving(true);
+    try {
+      const itemsToSave: NilaiSiswa[] = [];
+
+      batchStudents.forEach((s) => {
+        mapelList.forEach((m) => {
+          const key = `${s.id}_${m.nama}`;
+          const rawVal = legerInputScores[key];
+
+          const existing = nilaiList.find(
+            (n) =>
+              n.siswaId === s.id &&
+              n.mapel.toLowerCase() === m.nama.toLowerCase() &&
+              (n.semester || "Ganjil").toLowerCase() === batchRaporSemester.toLowerCase()
+          );
+
+          if (rawVal !== "" && rawVal !== undefined) {
+            const numVal = Number(rawVal) || 0;
+            if (numVal > 0 || existing) {
+              if (batchRaporType === "tengah") {
+                const { nilaiMid, predikatMid } = calculateMidGrade(numVal);
+                itemsToSave.push({
+                  id: existing
+                    ? existing.id
+                    : `nilai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${s.id}-${m.id}`,
+                  siswaId: s.id,
+                  siswaNama: s.nama,
+                  nisn: s.nisn,
+                  kelas: s.kelas,
+                  mapel: m.nama,
+                  semester: batchRaporSemester,
+                  tahunAjaran: profile.tahunAjaranAktif,
+                  tugas: existing?.tugas || 0,
+                  uts: numVal,
+                  uas: existing?.uas || 0,
+                  nilaiMid: numVal,
+                  predikatMid,
+                  catatanMid:
+                    existing?.catatanMid || "Mengikuti pembelajaran dengan baik.",
+                  nilaiAkhir: existing?.hasSas ? (existing.nilaiAkhir || 0) : 0,
+                  predikat: existing?.hasSas ? existing.predikat : undefined,
+                  catatan:
+                    existing?.catatan ||
+                    "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+                  hasSts: true,
+                  hasSas: existing?.hasSas || false,
+                });
+              } else {
+                // Mode SAS (Sumatif Akhir Semester)
+                const uhVal = existing?.tugas || numVal;
+                const stsVal = existing?.uts || numVal;
+                const { nilaiAkhir, predikat } = calculateSemesterGrade(
+                  uhVal,
+                  stsVal,
+                  numVal
+                );
+                itemsToSave.push({
+                  id: existing
+                    ? existing.id
+                    : `nilai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${s.id}-${m.id}`,
+                  siswaId: s.id,
+                  siswaNama: s.nama,
+                  nisn: s.nisn,
+                  kelas: s.kelas,
+                  mapel: m.nama,
+                  semester: batchRaporSemester,
+                  tahunAjaran: profile.tahunAjaranAktif,
+                  tugas: uhVal,
+                  uts: stsVal,
+                  uas: numVal,
+                  nilaiMid: existing?.nilaiMid || stsVal,
+                  predikatMid:
+                    existing?.predikatMid || calculateMidGrade(stsVal).predikatMid,
+                  catatanMid: existing?.catatanMid || "",
+                  nilaiAkhir,
+                  predikat,
+                  catatan:
+                    existing?.catatan ||
+                    "Capaian kompetensi tuntas dengan baik, pertahankan prestasimu.",
+                  hasSts: existing?.hasSts || false,
+                  hasSas: true,
+                });
+              }
+            }
+          }
+        });
+      });
+
+      if (itemsToSave.length > 0) {
+        await bulkSaveNilai(itemsToSave);
+        setNotification({
+          type: "success",
+          message: `Berhasil menyimpan ${itemsToSave.length} rekaman nilai dari Leger untuk ${batchStudents.length} siswa Kelas ${batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas} (${batchRaporType === "tengah" ? "STS" : "SAS"} - Semester ${batchRaporSemester})!`,
+        });
+      } else {
+        setNotification({
+          type: "error",
+          message: "Tidak ada data nilai yang diisi untuk disimpan.",
+        });
+      }
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: `Gagal menyimpan nilai leger: ${err.message}`,
+      });
+    } finally {
+      setIsLegerSaving(false);
+    }
+  };
+
   // Delete Handlers
   const handleConfirmDeleteSingle = () => {
     if (!deletingNilai) return;
@@ -2099,6 +2335,7 @@ export default function NilaiManagementPage() {
           <button
             onClick={() => {
               setBatchRaporViewMode("leger");
+              setIsLegerEditMode(false);
               setBatchRaporType(isTengah ? "tengah" : "akhir");
               setBatchRaporSemester(activeSemester);
               setBatchSelectedKelas(selectedKelas !== "Semua" ? selectedKelas : "Semua");
@@ -2110,7 +2347,33 @@ export default function NilaiManagementPage() {
             <span>Leger Nilai Rombel</span>
           </button>
 
-
+          {/* Tombol Input Nilai Siswa 1 Kelas dari Leger Rombel */}
+          <button
+            onClick={() => {
+              const targetKelas =
+                teacherScope.isTeacher && teacherScope.assignedClass
+                  ? teacherScope.assignedClass
+                  : selectedKelas !== "Semua"
+                  ? selectedKelas
+                  : kelasList[0]?.nama || "Semua";
+              setBatchRaporViewMode("leger");
+              setIsLegerEditMode(true);
+              setBatchRaporType(isTengah ? "tengah" : "akhir");
+              setBatchRaporSemester(activeSemester);
+              setBatchSelectedKelas(targetKelas);
+              initLegerInputScores(
+                targetKelas,
+                isTengah ? "tengah" : "akhir",
+                activeSemester
+              );
+              setIsBatchRaporOpen(true);
+            }}
+            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs font-bold shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer"
+            title="Input dan edit nilai seluruh siswa 1 rombel sekaligus dalam format matriks leger nilai"
+          >
+            <TableProperties className="h-4 w-4" />
+            <span>Input Nilai Leger Rombel</span>
+          </button>
         </div>
       </div>
 
@@ -3296,6 +3559,32 @@ export default function NilaiManagementPage() {
                         <span>Mode Per-Siswa (Semua Mapel)</span>
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
                           Wali Kelas
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsBulkModalOpen(false);
+                          setBatchRaporViewMode("leger");
+                          setIsLegerEditMode(true);
+                          setBatchRaporType(bulkIsTengah ? "tengah" : "akhir");
+                          setBatchRaporSemester(bulkActiveSemester);
+                          setBatchSelectedKelas(bulkSelectedKelas);
+                          initLegerInputScores(
+                            bulkSelectedKelas,
+                            bulkIsTengah ? "tengah" : "akhir",
+                            bulkActiveSemester
+                          );
+                          setIsBatchRaporOpen(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+                        title="Buka input matriks seluruh siswa 1 kelas x seluruh mata pelajaran"
+                      >
+                        <TableProperties className="h-3.5 w-3.5 text-purple-600" />
+                        <span>Mode Leger Matriks Rombel</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                          1 Kelas Lengkap
                         </span>
                       </button>
                     </div>
@@ -5227,22 +5516,27 @@ export default function NilaiManagementPage() {
                   <span>Modul Cetak / Ekspor Rapor Seluruh Siswa</span>
                 </div>
                 <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
-                  <span>E-Rapor Rombel: {batchSelectedKelas === "Semua" ? "Seluruh Siswa" : `Kelas ${batchSelectedKelas}`}</span>
+                  <span>{isLegerEditMode ? "Input Nilai Leger Rombel" : "E-Rapor Rombel"}: {batchSelectedKelas === "Semua" ? "Seluruh Siswa" : `Kelas ${batchSelectedKelas}`}</span>
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold">
                     {batchStudents.length} Siswa
                   </span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Pilih mode cetak: Bundel Rapor Lembar Individu (multi-halaman) atau Buku Leger Nilai Komprehensif.
+                  {isLegerEditMode
+                    ? "Mode Matriks: Masukkan nilai siswa per rombel untuk seluruh mata pelajaran sekaligus secara real-time."
+                    : "Pilih mode cetak: Bundel Rapor Lembar Individu (multi-halaman) atau Buku Leger Nilai Komprehensif."}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">
-                {/* Mode Selector: Bundel vs Leger */}
+                {/* Mode Selector: Bundel vs Buku Leger vs Input Nilai Leger */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                   <button
                     type="button"
-                    onClick={() => setBatchRaporViewMode("bundel")}
+                    onClick={() => {
+                      setBatchRaporViewMode("bundel");
+                      setIsLegerEditMode(false);
+                    }}
                     className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                       batchRaporViewMode === "bundel"
                         ? "bg-emerald-600 text-white shadow"
@@ -5250,19 +5544,38 @@ export default function NilaiManagementPage() {
                     }`}
                   >
                     <Layers className="h-3.5 w-3.5" />
-                    <span>Bundel Rapor ({batchStudents.length} Lembar)</span>
+                    <span>Bundel Rapor ({batchStudents.length})</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBatchRaporViewMode("leger")}
+                    onClick={() => {
+                      setBatchRaporViewMode("leger");
+                      setIsLegerEditMode(false);
+                    }}
                     className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                      batchRaporViewMode === "leger"
+                      batchRaporViewMode === "leger" && !isLegerEditMode
                         ? "bg-indigo-600 text-white shadow"
                         : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
                     <FileText className="h-3.5 w-3.5" />
-                    <span>Buku Leger Nilai</span>
+                    <span>Buku Leger Cetak</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBatchRaporViewMode("leger");
+                      setIsLegerEditMode(true);
+                      initLegerInputScores(batchSelectedKelas, batchRaporType, batchRaporSemester);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      batchRaporViewMode === "leger" && isLegerEditMode
+                        ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <TableProperties className="h-3.5 w-3.5" />
+                    <span>Input Nilai Leger</span>
                   </button>
                 </div>
 
@@ -5270,7 +5583,12 @@ export default function NilaiManagementPage() {
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                   <button
                     type="button"
-                    onClick={() => setBatchRaporSemester("Ganjil")}
+                    onClick={() => {
+                      setBatchRaporSemester("Ganjil");
+                      if (isLegerEditMode) {
+                        initLegerInputScores(batchSelectedKelas, batchRaporType, "Ganjil");
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                       batchRaporSemester === "Ganjil"
                         ? "bg-slate-800 text-white shadow"
@@ -5281,7 +5599,12 @@ export default function NilaiManagementPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBatchRaporSemester("Genap")}
+                    onClick={() => {
+                      setBatchRaporSemester("Genap");
+                      if (isLegerEditMode) {
+                        initLegerInputScores(batchSelectedKelas, batchRaporType, "Genap");
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                       batchRaporSemester === "Genap"
                         ? "bg-slate-800 text-white shadow"
@@ -5296,7 +5619,12 @@ export default function NilaiManagementPage() {
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                   <button
                     type="button"
-                    onClick={() => setBatchRaporType("tengah")}
+                    onClick={() => {
+                      setBatchRaporType("tengah");
+                      if (isLegerEditMode) {
+                        initLegerInputScores(batchSelectedKelas, "tengah", batchRaporSemester);
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                       batchRaporType === "tengah"
                         ? "bg-amber-500 text-white shadow"
@@ -5308,7 +5636,12 @@ export default function NilaiManagementPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBatchRaporType("akhir")}
+                    onClick={() => {
+                      setBatchRaporType("akhir");
+                      if (isLegerEditMode) {
+                        initLegerInputScores(batchSelectedKelas, "akhir", batchRaporSemester);
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                       batchRaporType === "akhir"
                         ? "bg-blue-600 text-white shadow"
@@ -5324,7 +5657,13 @@ export default function NilaiManagementPage() {
                 {!teacherScope.isTeacher && (
                   <select
                     value={batchSelectedKelas}
-                    onChange={(e) => setBatchSelectedKelas(e.target.value)}
+                    onChange={(e) => {
+                      const newKelas = e.target.value;
+                      setBatchSelectedKelas(newKelas);
+                      if (isLegerEditMode) {
+                        initLegerInputScores(newKelas, batchRaporType, batchRaporSemester);
+                      }
+                    }}
                     className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none"
                   >
                     <option value="Semua">Semua Kelas ({baseSiswaList.length} Siswa)</option>
@@ -5336,54 +5675,98 @@ export default function NilaiManagementPage() {
                   </select>
                 )}
 
-                {/* Tombol Cetak Langsung */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    handlePrintReport(
-                      batchRaporViewMode === "bundel"
-                        ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
-                        : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
-                    )
-                  }
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
-                  title="Cetak langsung menggunakan printer atau dialog cetak"
-                >
-                  <Printer className="h-4 w-4" />
-                  <span>Cetak Langsung</span>
-                </button>
+                {/* Aksi Khusus Mode Input Leger vs Mode Cetak */}
+                {isLegerEditMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSaveLegerScores}
+                      disabled={isLegerSaving}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all disabled:opacity-50"
+                      title="Simpan seluruh nilai leger rombel ini"
+                    >
+                      {isLegerSaving ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      <span>{isLegerSaving ? "Menyimpan..." : "Simpan Nilai Leger"}</span>
+                    </button>
 
-                {/* Tombol Simpan PDF */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    handlePrintReport(
-                      batchRaporViewMode === "bundel"
-                        ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
-                        : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
-                    )
-                  }
-                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 cursor-pointer transition-all"
-                  title="Simpan dokumen sebagai satu berkas PDF"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Simpan / Ekspor PDF</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={handleFillAllKkmEmpty}
+                      className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                      title="Otomatis isi nilai kosong dengan standar KKM mapel"
+                    >
+                      <Sparkles className="h-4 w-4 text-amber-600" />
+                      <span>Isi KKM Kosong</span>
+                    </button>
 
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                      isRaporSettingsOpen
-                        ? "bg-amber-500 text-white shadow-amber-500/20"
-                        : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
-                    }`}
-                    title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
-                  >
-                    <Sliders className="h-4 w-4" />
-                    <span>Atur Kop & TTD</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        initLegerInputScores(batchSelectedKelas, batchRaporType, batchRaporSemester)
+                      }
+                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                      title="Reset dan muat ulang nilai dari database"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      <span>Reset</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* Tombol Cetak Langsung */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handlePrintReport(
+                          batchRaporViewMode === "bundel"
+                            ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                            : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                        )
+                      }
+                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+                      title="Cetak langsung menggunakan printer atau dialog cetak"
+                    >
+                      <Printer className="h-4 w-4" />
+                      <span>Cetak Langsung</span>
+                    </button>
+
+                    {/* Tombol Simpan PDF */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handlePrintReport(
+                          batchRaporViewMode === "bundel"
+                            ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                            : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                        )
+                      }
+                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 cursor-pointer transition-all"
+                      title="Simpan dokumen sebagai satu berkas PDF"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Simpan / Ekspor PDF</span>
+                    </button>
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                          isRaporSettingsOpen
+                            ? "bg-amber-500 text-white shadow-amber-500/20"
+                            : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                        }`}
+                        title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                      >
+                        <Sliders className="h-4 w-4" />
+                        <span>Atur Kop & TTD</span>
+                      </button>
+                    )}
+                  </>
                 )}
 
                 <button
@@ -5905,6 +6288,50 @@ export default function NilaiManagementPage() {
             {/* ========================================================= */}
             {batchRaporViewMode === "leger" && (
               <div className="space-y-6">
+                {/* Banner Mode Input jika isLegerEditMode */}
+                {isLegerEditMode && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm no-print">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-sm shrink-0">
+                        <TableProperties className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-purple-950">
+                            Mode Input Nilai Matriks Rombel ({batchSelectedKelas === "Semua" ? "Semua Kelas" : `Kelas ${batchSelectedKelas}`})
+                          </h4>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                            {batchRaporType === "tengah" ? "Nilai STS (Mid)" : "Nilai SAS (Akhir)"} &bull; Sem. {batchRaporSemester}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          Ketik nilai (0-100) langsung pada tabel di bawah. Total nilai, rata-rata, peringkat (#rank), dan status tuntas dihitung secara otomatis real-time. Klik tombol <strong>Simpan Nilai Leger</strong> setelah selesai.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={handleFillAllKkmEmpty}
+                        className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        title="Otomatis isi seluruh nilai kosong dengan standar KKM mapel"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                        <span>Isi KKM Kosong</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveLegerScores}
+                        disabled={isLegerSaving}
+                        className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                      >
+                        {isLegerSaving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        <span>{isLegerSaving ? "Menyimpan..." : "Simpan Nilai Leger"}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Kop Surat Leger */}
                 <div className="text-center border-b-2 border-slate-900 pb-4 mb-4">
                   <h2 className="text-lg font-black uppercase text-slate-900">
@@ -5914,7 +6341,7 @@ export default function NilaiManagementPage() {
                     NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi} &bull; {profile.alamat}
                   </p>
                   <h3 className="text-base font-extrabold uppercase mt-2 text-indigo-950">
-                    BUKU LEGER NILAI HASIL BELAJAR {batchRaporType === "tengah" ? "SUMATIF TENGAH SEMESTER (STS)" : "SUMATIF AKHIR SEMESTER (SAS)"}
+                    {isLegerEditMode ? "INPUT & REKAP NILAI HASIL BELAJAR" : "BUKU LEGER NILAI HASIL BELAJAR"} {batchRaporType === "tengah" ? "SUMATIF TENGAH SEMESTER (STS)" : "SUMATIF AKHIR SEMESTER (SAS)"}
                   </h3>
                   <p className="text-xs text-slate-600 font-medium">
                     Kelas: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}</strong> &bull; Semester: <strong>{batchRaporSemester || profile.semesterAktif}</strong> &bull; Tahun Ajaran: <strong>{profile.tahunAjaranAktif}</strong>
@@ -5936,19 +6363,34 @@ export default function NilaiManagementPage() {
                       const scoresByMapel: Record<string, number> = {};
 
                       mapelList.forEach((m) => {
-                        const rec = records.find(
-                          (r) => r.mapel.toLowerCase() === m.nama.toLowerCase()
-                        );
-                        if (rec) {
-                          const val =
-                            batchRaporType === "tengah"
-                              ? getStudentMid(rec).nilaiMid
-                              : getStudentAkhir(rec).nilaiAkhir;
-                          scoresByMapel[m.nama] = val;
-                          total += val;
-                          count++;
+                        if (isLegerEditMode) {
+                          const key = `${s.id}_${m.nama}`;
+                          const rawVal = legerInputScores[key];
+                          if (rawVal !== "" && rawVal !== undefined) {
+                            const val = Number(rawVal) || 0;
+                            scoresByMapel[m.nama] = val;
+                            if (val > 0) {
+                              total += val;
+                              count++;
+                            }
+                          } else {
+                            scoresByMapel[m.nama] = 0;
+                          }
                         } else {
-                          scoresByMapel[m.nama] = 0;
+                          const rec = records.find(
+                            (r) => r.mapel.toLowerCase() === m.nama.toLowerCase()
+                          );
+                          if (rec) {
+                            const val =
+                              batchRaporType === "tengah"
+                                ? getStudentMid(rec).nilaiMid
+                                : getStudentAkhir(rec).nilaiAkhir;
+                            scoresByMapel[m.nama] = val;
+                            total += val;
+                            count++;
+                          } else {
+                            scoresByMapel[m.nama] = 0;
+                          }
                         }
                       });
 
@@ -5974,11 +6416,21 @@ export default function NilaiManagementPage() {
                             {mapelList.map((m) => (
                               <th
                                 key={m.id}
-                                className="border border-slate-300 px-2 py-2 text-center min-w-[65px]"
+                                className="border border-slate-300 px-2 py-2 text-center min-w-[70px]"
                                 title={`${m.nama} (KKM: ${m.kkm || 75})`}
                               >
-                                <span className="block truncate max-w-[70px]">{m.nama}</span>
+                                <span className="block truncate max-w-[75px]">{m.nama}</span>
                                 <span className="text-[9px] font-normal text-slate-500">KKM {m.kkm || 75}</span>
+                                {isLegerEditMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFillKkmForMapel(m.nama, m.kkm || 75)}
+                                    className="mt-0.5 block mx-auto text-[8px] leading-tight px-1 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 cursor-pointer no-print transition-all"
+                                    title={`Isi otomatis nilai kosong pada mapel ${m.nama} dengan KKM (${m.kkm || 75})`}
+                                  >
+                                    Isi KKM
+                                  </button>
+                                )}
                               </th>
                             ))}
                             <th className="border border-slate-300 px-2 py-2 text-center bg-slate-200 w-16">Total</th>
@@ -6002,20 +6454,60 @@ export default function NilaiManagementPage() {
                                 <td className="border border-slate-300 px-3 py-1.5 font-bold text-slate-900">{s.nama}</td>
                                 <td className="border border-slate-300 px-2 py-1.5 text-center text-slate-600">{s.kelas}</td>
                                 {mapelList.map((m) => {
-                                  const val = s.scoresByMapel[m.nama];
-                                  const isTuntas = val >= (m.kkm || 75);
+                                  const rawVal = isLegerEditMode
+                                    ? (legerInputScores[`${s.id}_${m.nama}`] ?? "")
+                                    : s.scoresByMapel[m.nama];
+                                  const numVal = Number(rawVal) || 0;
+                                  const kkm = m.kkm || 75;
+                                  const isFilled = rawVal !== "" && rawVal !== undefined;
+                                  const isTuntas = numVal >= kkm;
+
+                                  if (isLegerEditMode) {
+                                    return (
+                                      <td
+                                        key={m.id}
+                                        className={`border border-slate-300 p-1 text-center ${
+                                          !isFilled
+                                            ? "bg-slate-50/50"
+                                            : isTuntas
+                                            ? "bg-emerald-50/40"
+                                            : "bg-rose-50/50"
+                                        }`}
+                                      >
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={100}
+                                          value={rawVal}
+                                          placeholder="-"
+                                          onChange={(e) =>
+                                            handleLegerScoreChange(s.id, m.nama, e.target.value)
+                                          }
+                                          className={`w-14 text-center font-mono text-xs font-bold py-1 px-1 rounded border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                            !isFilled
+                                              ? "border-slate-200 bg-white text-slate-400 placeholder:text-slate-300"
+                                              : isTuntas
+                                              ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                                              : "border-rose-300 bg-rose-50 text-rose-700 font-black"
+                                          }`}
+                                          title={`${s.nama} - ${m.nama} (KKM: ${kkm})`}
+                                        />
+                                      </td>
+                                    );
+                                  }
+
                                   return (
                                     <td
                                       key={m.id}
                                       className={`border border-slate-300 px-2 py-1.5 text-center font-mono ${
-                                        val === 0
+                                        numVal === 0
                                           ? "text-slate-300"
                                           : isTuntas
                                           ? "text-slate-800 font-semibold"
                                           : "text-rose-600 font-bold bg-rose-50"
                                       }`}
                                     >
-                                      {val > 0 ? val : "-"}
+                                      {numVal > 0 ? numVal : "-"}
                                     </td>
                                   );
                                 })}
@@ -6037,21 +6529,23 @@ export default function NilaiManagementPage() {
                 })()}
 
                 {/* Tanda Tangan Leger */}
-                <div className="grid grid-cols-2 text-center text-xs pt-8 border-0 border-none">
-                  <div>
-                    <p className="text-slate-500">Mengetahui,</p>
-                    <p className="font-bold">Kepala Sekolah</p>
-                    <div className="h-16" />
-                    <p className="font-bold underline text-sm">{profile.kepalaSekolah}</p>
+                {!isLegerEditMode && (
+                  <div className="grid grid-cols-2 text-center text-xs pt-8 border-0 border-none">
+                    <div>
+                      <p className="text-slate-500">Mengetahui,</p>
+                      <p className="font-bold">Kepala Sekolah</p>
+                      <div className="h-16" />
+                      <p className="font-bold underline text-sm">{profile.kepalaSekolah}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">{raporConfig.tempatRapor}, {raporConfig.tanggalRapor}</p>
+                      <p className="font-bold">Wali Kelas {batchSelectedKelas === "Semua" ? "" : batchSelectedKelas}</p>
+                      <div className="h-16" />
+                      <p className="font-bold underline text-sm">{teacherScope.teacherName || user?.name || "Wali Kelas"}</p>
+                      <p className="text-[10px] text-slate-400">Guru Pembina / Wali Kelas</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-slate-500">{raporConfig.tempatRapor}, {raporConfig.tanggalRapor}</p>
-                    <p className="font-bold">Wali Kelas {batchSelectedKelas === "Semua" ? "" : batchSelectedKelas}</p>
-                    <div className="h-16" />
-                    <p className="font-bold underline text-sm">{teacherScope.teacherName || user?.name || "Wali Kelas"}</p>
-                    <p className="text-[10px] text-slate-400">Guru Pembina / Wali Kelas</p>
-                  </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -6059,30 +6553,67 @@ export default function NilaiManagementPage() {
             <div className="mt-8 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 no-print">
               <div className="text-xs text-slate-500 font-medium">
                 Total Siswa: <strong>{batchStudents.length} Peserta Didik</strong> &bull; Rombel: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : `Kelas ${batchSelectedKelas}`}</strong>
+                {isLegerEditMode && (
+                  <span className="ml-2 text-emerald-600 font-semibold">
+                    &bull; Mode Input Matriks Aktif
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    handlePrintReport(
-                      batchRaporViewMode === "bundel"
-                        ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
-                        : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
-                    )
-                  }
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                >
-                  <Printer className="h-4 w-4" />
-                  <span>Cetak Dokumen</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsBatchRaporOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
-                >
-                  <X className="h-4 w-4 stroke-[2.5]" />
-                  <span>Tutup / Kembali</span>
-                </button>
+                {isLegerEditMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleFillAllKkmEmpty}
+                      className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Sparkles className="h-4 w-4 text-amber-600" />
+                      <span>Isi KKM Kosong</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveLegerScores}
+                      disabled={isLegerSaving}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      {isLegerSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      <span>{isLegerSaving ? "Menyimpan Nilai..." : "Simpan Seluruh Nilai Leger"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsBatchRaporOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <X className="h-4 w-4 stroke-[2.5]" />
+                      <span>Tutup</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handlePrintReport(
+                          batchRaporViewMode === "bundel"
+                            ? `Bundel_Rapor_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                            : `Buku_Leger_Nilai_${batchRaporType.toUpperCase()}_Kelas_${batchSelectedKelas}`
+                        )
+                      }
+                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                    >
+                      <Printer className="h-4 w-4" />
+                      <span>Cetak Dokumen</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsBatchRaporOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                    >
+                      <X className="h-4 w-4 stroke-[2.5]" />
+                      <span>Tutup / Kembali</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
