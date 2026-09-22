@@ -3421,7 +3421,7 @@ export default function NilaiManagementPage() {
       {/* ========================================================= */}
       {raporSiswa && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 pt-2 sm:pt-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto print:static print:p-0 print:m-0 print:bg-white print:overflow-visible rapor-print-container"
           onClick={(e) => {
             if (e.target === e.currentTarget) setRaporSiswa(null);
           }}
@@ -3430,14 +3430,14 @@ export default function NilaiManagementPage() {
           <button
             type="button"
             onClick={() => setRaporSiswa(null)}
-            className="fixed top-5 right-5 z-[60] px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-2xl flex items-center gap-2 text-xs font-black cursor-pointer transition-all border-2 border-white/20 hover:shadow-rose-600/40 no-print"
+            className="fixed top-4 right-4 z-[60] px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-2xl flex items-center gap-2 text-xs font-black cursor-pointer transition-all border-2 border-white/20 hover:shadow-rose-600/40 no-print"
             title="Tutup Pratinjau Rapor (Esc)"
           >
             <X className="h-4 w-4 stroke-[3]" />
             <span>TUTUP</span>
           </button>
 
-          <div className="w-full max-w-4xl bg-white text-slate-900 rounded-3xl p-8 sm:p-10 shadow-2xl relative my-8">
+          <div className="w-full max-w-4xl bg-white text-slate-900 rounded-2xl p-6 sm:p-10 shadow-xl relative mt-1 mb-8 border-0 border-none print:m-0 print:p-0 print:max-w-none print:w-full print:shadow-none print:rounded-none print:border-none rapor-print-card">
             {/* Action Bar (No Print) */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-6 no-print">
               {/* Type Switcher & Student Stepper in Print Modal */}
@@ -3654,14 +3654,14 @@ export default function NilaiManagementPage() {
             </div>
 
             {/* Student & Class Info Box */}
-            <div className="grid grid-cols-2 gap-4 text-xs mb-5 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div className="grid grid-cols-2 gap-4 text-xs mb-5 py-2 border-0 border-none bg-transparent">
               <div>
-                <p className="text-slate-500">Nama Peserta Didik: <strong className="text-slate-900">{raporSiswa.nama}</strong></p>
-                <p className="text-slate-500 mt-1">NISN: <strong className="text-slate-900 font-mono">{raporSiswa.nisn}</strong></p>
+                <p className="text-slate-600">Nama Peserta Didik: <strong className="text-slate-900">{raporSiswa.nama}</strong></p>
+                <p className="text-slate-600 mt-1">NISN: <strong className="text-slate-900 font-mono">{raporSiswa.nisn}</strong></p>
               </div>
               <div>
-                <p className="text-slate-500">Kelas: <strong className="text-slate-900">{raporSiswa.kelas}</strong></p>
-                <p className="text-slate-500 mt-1">Status Kesiswaan: <strong className="text-slate-900">{raporSiswa.status}</strong></p>
+                <p className="text-slate-600">Kelas: <strong className="text-slate-900">{raporSiswa.kelas}</strong></p>
+                <p className="text-slate-600 mt-1">Status Kesiswaan: <strong className="text-slate-900">{raporSiswa.status}</strong></p>
               </div>
             </div>
 
@@ -3832,7 +3832,7 @@ export default function NilaiManagementPage() {
               const waliNip = matchedWaliGuru?.nip || "198506122010012015";
 
               return (
-                <div className="grid grid-cols-2 text-center text-xs pt-6 border-t border-slate-200">
+                <div className="grid grid-cols-2 text-center text-xs pt-8 border-0 border-none">
                   <div>
                     <p className="text-slate-500">Mengetahui,</p>
                     <p className="text-slate-500">Wali Kelas {raporSiswa.kelas},</p>
@@ -3907,7 +3907,7 @@ export default function NilaiManagementPage() {
       {/* ========================================================= */}
       {isBatchRaporOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 pt-2 sm:pt-4 bg-slate-900/80 backdrop-blur-sm overflow-y-auto print:static print:p-0 print:m-0 print:bg-white print:overflow-visible rapor-print-container"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsBatchRaporOpen(false);
           }}
@@ -3916,14 +3916,14 @@ export default function NilaiManagementPage() {
           <button
             type="button"
             onClick={() => setIsBatchRaporOpen(false)}
-            className="fixed top-5 right-5 z-[60] px-4 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-2xl flex items-center gap-2 text-xs font-black cursor-pointer transition-all border-2 border-white/20 hover:shadow-rose-600/40 no-print"
+            className="fixed top-4 right-4 z-[60] px-4 py-2 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-2xl flex items-center gap-2 text-xs font-black cursor-pointer transition-all border-2 border-white/20 hover:shadow-rose-600/40 no-print"
             title="Tutup Modal Cetak Rapor Rombel (Esc)"
           >
             <X className="h-4 w-4 stroke-[3]" />
             <span>TUTUP</span>
           </button>
 
-          <div className="w-full max-w-6xl bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl relative my-6 max-h-[95vh] overflow-y-auto print:m-0 print:p-0 print:max-w-none print:shadow-none print:rounded-none print:max-h-none">
+          <div className="w-full max-w-6xl bg-white text-slate-900 rounded-2xl p-6 sm:p-10 shadow-xl relative mt-1 mb-8 border-0 border-none max-h-[96vh] overflow-y-auto print:m-0 print:p-0 print:max-w-none print:w-full print:shadow-none print:rounded-none print:border-none print:max-h-none rapor-print-card">
             {/* Action Bar (No Print) */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5 mb-6 no-print">
               <div>
@@ -4140,7 +4140,7 @@ export default function NilaiManagementPage() {
                       <div
                         key={siswa.id}
                         style={{ pageBreakAfter: "always", breakAfter: "page" }}
-                        className="p-6 sm:p-8 rounded-2xl border border-slate-200 bg-white print:border-none print:p-0 print:m-0"
+                        className="p-6 sm:p-8 bg-white border-0 border-none print:border-none print:p-0 print:m-0"
                       >
                         {/* Kop Surat */}
                         <div className="text-center border-b-2 border-slate-900 pb-4 mb-5">
@@ -4175,14 +4175,14 @@ export default function NilaiManagementPage() {
                         </div>
 
                         {/* Student Info Box */}
-                        <div className="grid grid-cols-2 gap-3 text-xs mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200 print:bg-slate-50">
+                        <div className="grid grid-cols-2 gap-3 text-xs mb-4 py-2 border-0 border-none bg-transparent">
                           <div>
-                            <p className="text-slate-500">Nama Peserta Didik: <strong className="text-slate-900">{siswa.nama}</strong></p>
-                            <p className="text-slate-500 mt-0.5">NISN: <strong className="text-slate-900 font-mono">{siswa.nisn}</strong></p>
+                            <p className="text-slate-600">Nama Peserta Didik: <strong className="text-slate-900">{siswa.nama}</strong></p>
+                            <p className="text-slate-600 mt-0.5">NISN: <strong className="text-slate-900 font-mono">{siswa.nisn}</strong></p>
                           </div>
                           <div>
-                            <p className="text-slate-500">Kelas: <strong className="text-slate-900">{siswa.kelas}</strong></p>
-                            <p className="text-slate-500 mt-0.5">Status: <strong className="text-slate-900">{siswa.status}</strong></p>
+                            <p className="text-slate-600">Kelas: <strong className="text-slate-900">{siswa.kelas}</strong></p>
+                            <p className="text-slate-600 mt-0.5">Status: <strong className="text-slate-900">{siswa.status}</strong></p>
                           </div>
                         </div>
 
@@ -4327,7 +4327,7 @@ export default function NilaiManagementPage() {
                         )}
 
                         {/* Signature Area */}
-                        <div className="grid grid-cols-2 text-center text-xs pt-4 border-t border-slate-200">
+                        <div className="grid grid-cols-2 text-center text-xs pt-6 border-0 border-none">
                           <div>
                             <p className="text-slate-500">Mengetahui,</p>
                             <p className="text-slate-500">Wali Kelas {siswa.kelas},</p>
@@ -4486,7 +4486,7 @@ export default function NilaiManagementPage() {
                 })()}
 
                 {/* Tanda Tangan Leger */}
-                <div className="grid grid-cols-2 text-center text-xs pt-6 border-t border-slate-200">
+                <div className="grid grid-cols-2 text-center text-xs pt-8 border-0 border-none">
                   <div>
                     <p className="text-slate-500">Mengetahui,</p>
                     <p className="font-bold">Kepala Sekolah</p>
