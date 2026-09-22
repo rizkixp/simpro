@@ -3772,7 +3772,7 @@ export default function NilaiManagementPage() {
                     <th className="border border-slate-300 px-3 py-2 text-center w-10">No</th>
                     <th className="border border-slate-300 px-3 py-2">Mata Pelajaran</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">KKM</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-24 bg-amber-50">Nilai Ujian STS</th>
+                    <th className="border border-slate-300 px-2 py-2 text-center w-24 bg-amber-50">Nilai Prestasi</th>
                     <th className="border border-slate-300 px-2 py-2 text-center w-16">Predikat</th>
                     <th className="border border-slate-300 px-3 py-2 text-center w-24">Keterangan</th>
                   </tr>
@@ -4512,7 +4512,7 @@ export default function NilaiManagementPage() {
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-8">No</th>
                                 <th className="border border-slate-300 px-2 py-1.5">Mata Pelajaran</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20 bg-amber-50">Nilai Ujian STS</th>
+                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20 bg-amber-50">Nilai Prestasi</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
                                 <th className="border border-slate-300 px-2 py-1.5 text-center w-20">Keterangan</th>
                               </tr>
