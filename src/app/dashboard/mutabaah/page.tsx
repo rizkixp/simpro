@@ -1809,9 +1809,9 @@ export default function MutabaahPage() {
             </div>
           </div>
 
-          {/* Sticky Bottom Save Bar when modified */}
+          {/* Sticky Top Save Bar when modified */}
           {isBatchModified && (
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 p-4 rounded-2xl bg-slate-900/95 backdrop-blur-md text-white shadow-2xl border border-slate-700 flex items-center gap-4 animate-in slide-in-from-bottom-5">
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 p-4 rounded-2xl bg-slate-900/95 backdrop-blur-md text-white shadow-2xl border border-slate-700 flex items-center gap-4 animate-in slide-in-from-top-5 duration-200 max-w-[95vw]">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-amber-400 animate-ping"></span>
                 <span className="text-xs font-bold">Ada perubahan centang yang belum disimpan!</span>
@@ -1819,7 +1819,7 @@ export default function MutabaahPage() {
               <button
                 type="button"
                 onClick={handleSaveAllBatch}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all cursor-pointer"
               >
                 <Save className="w-4 h-4" />
                 <span>Simpan Semua Perubahan</span>
