@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope } from "@/hooks/useTeacherScope";
@@ -82,10 +83,20 @@ export default function JadwalPage() {
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [isResetDefaultModalOpen, setIsResetDefaultModalOpen] = useState(false);
 
-  // Print Modal & Options (Senin s.d. Jumat)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printSelectedKelas, setPrintSelectedKelas] = useState<string>("Semua");
   const [printFormatMode, setPrintFormatMode] = useState<"matrix" | "table">("matrix");
+
+  // Close print modal with Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isPrintModalOpen) {
+        setIsPrintModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isPrintModalOpen]);
 
   // Hari Efektif KBM Sekolah (Senin s/d Jumat)
   const KBM_DAYS: JadwalPelajaran["hari"][] = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
@@ -1072,6 +1083,15 @@ export default function JadwalPage() {
             <Printer className="w-4 h-4" />
             Cetak Jadwal
           </button>
+
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 rounded-xl transition-colors border border-rose-200 dark:border-rose-800 cursor-pointer shadow-xs"
+            title="Tutup halaman Jadwal dan kembali ke Dashboard"
+          >
+            <X className="w-4 h-4 stroke-[2.5]" />
+            <span>Tutup Halaman</span>
+          </Link>
         </div>
       </div>
 
@@ -3044,7 +3064,12 @@ export default function JadwalPage() {
       {/* MODAL: CETAK JADWAL PELAJARAN RESMI (SENIN S.D. JUMAT)                     */}
       {/* ========================================================================= */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto print:static print:p-0 print:bg-transparent print:overflow-visible">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsPrintModalOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto print:static print:p-0 print:bg-transparent print:overflow-visible"
+        >
           <div className="w-full max-w-6xl bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl relative my-6 print:my-0 print:p-0 print:max-w-none print:shadow-none print:rounded-none">
             {/* Top Toolbar (Excluded from print) */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-6 no-print">
@@ -3130,10 +3155,11 @@ export default function JadwalPage() {
                 <button
                   type="button"
                   onClick={() => setIsPrintModalOpen(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                  title="Tutup Pratinjau"
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  title="Tutup Pratinjau Cetak Jadwal (Esc)"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4 stroke-[2.5]" />
+                  <span>Tutup Pratinjau</span>
                 </button>
               </div>
             </div>
@@ -3442,6 +3468,32 @@ export default function JadwalPage() {
               </div>
             </div>
           ))}
+
+          {/* Bottom Action Footer (No Print) */}
+          <div className="mt-8 pt-5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 no-print">
+            <div className="text-xs text-slate-500 font-medium">
+              Pratinjau Jadwal: <strong>{printFilteredClasses.length} Rombel Kelas</strong> &bull; Mode: <strong>{printFormatMode === "matrix" ? "Matriks 5 Hari" : "Tabel Rincian"}</strong>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Cetak Dokumen</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(false)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="Tutup Pratinjau Cetak Jadwal (Esc)"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+                <span>Tutup Halaman Cetak</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

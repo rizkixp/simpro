@@ -5123,7 +5123,6 @@ export default function NilaiManagementPage() {
                       <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
                       <div className="h-16" />
                       <p className="font-bold underline">{profile.kepalaSekolah}</p>
-                      <p className="text-[10px] text-slate-500">NIP: 197204151998031002</p>
                     </div>
 
                     {/* Kolom 2: Wali Kelas */}
@@ -5873,7 +5872,6 @@ export default function NilaiManagementPage() {
                               <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
                               <div className="h-14" />
                               <p className="font-bold underline">{profile.kepalaSekolah}</p>
-                              <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
                             </div>
 
                             {/* Kolom 2: Wali Kelas */}
@@ -6045,7 +6043,6 @@ export default function NilaiManagementPage() {
                     <p className="font-bold">Kepala Sekolah</p>
                     <div className="h-16" />
                     <p className="font-bold underline text-sm">{profile.kepalaSekolah}</p>
-                    <p className="text-[10px] text-slate-400">NIP. 197204151998031002</p>
                   </div>
                   <div>
                     <p className="text-slate-500">{raporConfig.tempatRapor}, {raporConfig.tanggalRapor}</p>
