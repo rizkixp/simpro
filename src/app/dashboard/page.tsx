@@ -54,7 +54,7 @@ export default function DashboardOverviewPage() {
 
   // Statistics calculation scoped to teacher class if role is guru
   const scopedSiswaList = teacherScope.isTeacher
-    ? teacherScope.filterByClass(siswaList)
+    ? teacherScope.filterByAssignedClass(siswaList)
     : siswaList;
 
   const totalSiswa = scopedSiswaList.length;

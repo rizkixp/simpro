@@ -15,6 +15,7 @@ export interface TeacherScope {
   assignedSubjects: string[];
   scopedMapelList: MataPelajaran[];
   filterByClass: <T extends { kelas?: string }>(items: T[]) => T[];
+  filterByAssignedClass: <T extends { kelas?: string }>(items: T[]) => T[];
   isClassAccessible: (kelasName: string) => boolean;
   filterBySubject: <T extends { mapel?: string }>(items: T[]) => T[];
   isSubjectAccessible: (mapelName: string) => boolean;
@@ -43,73 +44,120 @@ export function isClassMatch(classA?: string | null, classB?: string | null): bo
   const stripB = normB.replace(/^(kelas|kls)\s+/i, "").trim();
   if (stripA === stripB) return true;
 
-  // 4. Extract grade number
-  const extractGradeNumber = (s: string): string => {
-    if (s.includes("kelas 6") || s.includes("kls 6") || s === "6" || s === "vi" || s.startsWith("vi ") || s.startsWith("6 ") || s.startsWith("6-") || s.startsWith("vi-")) return "6";
-    if (s.includes("kelas 5") || s.includes("kls 5") || s === "5" || s === "v" || s.startsWith("v ") || s.startsWith("5 ") || s.startsWith("5-") || s.startsWith("v-")) return "5";
-    if (s.includes("kelas 4") || s.includes("kls 4") || s === "4" || s === "iv" || s.startsWith("iv ") || s.startsWith("4 ") || s.startsWith("4-") || s.startsWith("iv-")) return "4";
-    if (s.includes("kelas 3") || s.includes("kls 3") || s === "3" || s === "iii" || s.startsWith("iii ") || s.startsWith("3 ") || s.startsWith("3-") || s.startsWith("iii-")) return "3";
-    if (s.includes("kelas 2") || s.includes("kls 2") || s === "2" || s === "ii" || s.startsWith("ii ") || s.startsWith("2 ") || s.startsWith("2-") || s.startsWith("ii-") || s.startsWith("2")) return "2";
-    if (s.includes("kelas 1") || s.includes("kls 1") || s === "1" || s === "i" || s.startsWith("i ") || s.startsWith("1 ") || s.startsWith("1-") || s.startsWith("i-") || s.startsWith("1")) return "1";
-    if (s.includes("xii") || s.includes("12")) return "12";
-    if (s.includes("xi") || s.includes("11")) return "11";
-    if (s.includes("x") || s.includes("10")) return "10";
+  // 4. Extract grade level (1-12, roman I-XII)
+  const extractGrade = (s: string): string => {
+    const romanMatch = s.match(/\b(xii|xi|ix|viii|vii|vi|iv|v|iii|ii|x|i)\b/i);
+    if (romanMatch) {
+      const map: Record<string, string> = {
+        xii: "12", xi: "11", x: "10", ix: "9", viii: "8",
+        vii: "7", vi: "6", v: "5", iv: "4", iii: "3", ii: "2", i: "1",
+      };
+      return map[romanMatch[1].toLowerCase()] || "";
+    }
+    const digitMatch = s.match(/(?:^|kelas\s*|kls\s*|\b)(1[0-2]|[1-9])(?:\b|[a-z]|\.|\-)/i);
+    if (digitMatch) return digitMatch[1];
     return "";
   };
 
-  const gradeA = extractGradeNumber(normA);
-  const gradeB = extractGradeNumber(normB);
+  const gradeA = extractGrade(normA);
+  const gradeB = extractGrade(normB);
 
-  // If both have different grade numbers, they never match
+  // If both have explicit grades and they differ, never match (e.g. Kelas 1 vs Kelas 2)
   if (gradeA && gradeB && gradeA !== gradeB) return false;
 
-  // 5. Extract section/rombel identifier (e.g. A, B, C, 1, 2)
+  // 5. Extract section / rombel identifier (e.g. A, B, MIPA 1, IPS 2, 1, 2)
   const extractSection = (s: string, grade: string): string => {
-    // If the string is purely the grade itself (e.g. "6" or "vi"), it does not have a section
-    if (s === grade || s === `kelas ${grade}`) return "";
+    // 5a. Stream + number: e.g. MIPA 1, IPS 2, IPA 1, TKJ 2
+    const streamMatch = s.match(/\b(mipa|ipa|ips|bahasa|keagamaan|tkj|rpl)\s*[\-_.]?\s*(\d+)\b/i);
+    if (streamMatch) {
+      return streamMatch[1].toLowerCase() + streamMatch[2];
+    }
 
-    // Check single letter at end (e.g. "... b", "...-b", "...- b", "2b")
-    const letterMatch = s.match(/(?:^|[\s\-_0-9])([a-z])\s*$/i);
-    if (letterMatch) return letterMatch[1].toLowerCase();
+    // Stream prefix without number: e.g. X MIPA, XI IPS
+    const streamOnlyMatch = s.match(/\b(mipa|ipa|ips|bahasa|keagamaan|tkj|rpl)\b/i);
+    const streamPrefix = streamOnlyMatch ? streamOnlyMatch[1].toLowerCase() : "";
 
-    // Check single digit at end (e.g. "mipa 1", "mipa-2")
-    const digitMatch = s.match(/(?:^|[\s\-_])([0-9]+)\s*$/i);
-    if (digitMatch && digitMatch[1] !== grade) return digitMatch[1].toLowerCase();
+    // 5b. Single letter section right after grade number (e.g. 2A, 2-A, 2 A, 2.A)
+    const digitLetterMatch = s.match(/(?:^|\b|kelas\s*|kls\s*)(?:1[0-2]|[1-9])\s*[\-_.]?\s*([a-z])\b/i);
+    if (digitLetterMatch) {
+      return streamPrefix ? streamPrefix + digitLetterMatch[1].toLowerCase() : digitLetterMatch[1].toLowerCase();
+    }
+
+    // Roman followed by letter: e.g. "vii-a", "vii a", "x-b"
+    const romanLetterMatch = s.match(/\b(xii|xi|ix|viii|vii|vi|iv|v|iii|ii|x|i)\s*[\-_.]?\s*([a-z])\b/i);
+    if (romanLetterMatch) {
+      return streamPrefix ? streamPrefix + romanLetterMatch[2].toLowerCase() : romanLetterMatch[2].toLowerCase();
+    }
+
+    // 5c. Single letter at the very end (e.g. "... b", "...-b", "...- b")
+    const endLetterMatch = s.match(/(?:^|[\s\-_0-9.])([a-z])\s*$/i);
+    if (endLetterMatch) {
+      return endLetterMatch[1].toLowerCase();
+    }
+
+    // 5d. Single digit at the very end or after dot/dash (e.g. "7.1", "10-2") if not the grade itself
+    const endDigitMatch = s.match(/(?:^|[\s\-_.]|[a-z])(\d+)\s*$/i);
+    if (endDigitMatch && endDigitMatch[1] !== grade) {
+      return endDigitMatch[1];
+    }
 
     return "";
   };
 
-  const sectionA = extractSection(stripA, gradeA);
-  const sectionB = extractSection(stripB, gradeB);
+  const secA = extractSection(stripA, gradeA);
+  const secB = extractSection(stripB, gradeB);
 
-  // CRITICAL: If both have a section identifier and they are different, NEVER match!
-  if (sectionA && sectionB && sectionA !== sectionB) {
+  // CRITICAL: If both have section identifiers and they differ, NEVER match!
+  if (secA && secB && secA !== secB) {
     return false;
   }
 
-  // If both have section identifiers and they match:
-  if (sectionA && sectionB && sectionA === sectionB) {
-    if (gradeA && gradeB && gradeA !== gradeB) return false;
+  // Check major/stream conflict (e.g. "MIPA" vs "IPS")
+  const isMipaA = stripA.includes("mipa");
+  const isIpsA = stripA.includes("ips");
+  const isMipaB = stripB.includes("mipa");
+  const isIpsB = stripB.includes("ips");
+  if ((isMipaA && isIpsB) || (isIpsA && isMipaB)) return false;
 
-    // Check major/stream conflict (e.g. "MIPA" vs "IPS")
-    const isMipaA = stripA.includes("mipa");
-    const isIpsA = stripA.includes("ips");
-    const isMipaB = stripB.includes("mipa");
-    const isIpsB = stripB.includes("ips");
-    if ((isMipaA && isIpsB) || (isIpsA && isMipaB)) return false;
+  // 6. Extract nickname / subtitle (e.g. "Abu Bakar", "Umar", "Al Khawarizmi")
+  const extractNickname = (s: string): string => {
+    const dashParts = s.split(/\s*-\s*/);
+    if (dashParts.length > 1) {
+      const candidate = dashParts.slice(1).join(" ").trim();
+      if (candidate && candidate.length > 2) return candidate;
+    }
+    const parenMatch = s.match(/\(([^)]+)\)/);
+    if (parenMatch) return parenMatch[1].trim();
+    return "";
+  };
 
+  const nickA = extractNickname(normA);
+  const nickB = extractNickname(normB);
+
+  // If both have nicknames and they are completely different, they refer to parallel classes
+  if (nickA && nickB && nickA !== nickB && !nickA.includes(nickB) && !nickB.includes(nickA)) {
+    return false;
+  }
+
+  // If both have sections and sections match (e.g. "Kelas 2A - Al Khawarizmi" vs "Kelas 2A", or "2A" vs "2A"):
+  if (secA && secB && secA === secB) {
     return true;
   }
 
-  // If neither has a section identifier and both have the same grade (e.g. "Kelas 6" and "6"):
-  if (!sectionA && !sectionB && gradeA && gradeB && gradeA === gradeB) {
-    return true;
+  // If neither has section and both have the same grade (e.g. "Kelas 6" and "6"):
+  if (!secA && !secB && gradeA && gradeB && gradeA === gradeB) {
+    if (!nickA && !nickB) return true;
+    if (nickA && nickB && (nickA === nickB || nickA.includes(nickB) || nickB.includes(nickA))) return true;
+    const isPureGradeA = stripA === gradeA || stripA === `kelas ${gradeA}`;
+    const isPureGradeB = stripB === gradeB || stripB === `kelas ${gradeB}`;
+    if (isPureGradeA || isPureGradeB) return true;
+    return false;
   }
 
   // If one has no section because it is purely a grade-level string (e.g. "Kelas 2" or "2"):
-  const isPureGradeA = !sectionA && (stripA === gradeA || stripA === `kelas ${gradeA}`);
-  const isPureGradeB = !sectionB && (stripB === gradeB || stripB === `kelas ${gradeB}`);
-  if ((isPureGradeA || isPureGradeB) && gradeA && gradeB && gradeA === gradeB) {
+  const isPureGradeA = !secA && (stripA === gradeA || stripA === `kelas ${gradeA}`);
+  const isPureGradeB = !secB && (stripB === gradeB || stripB === `kelas ${gradeB}`);
+  if ((isPureGradeA || isPureGradeB) && gradeA && gradeB && gradeA === gradeB && !secA && !secB) {
     return true;
   }
 
@@ -136,6 +184,7 @@ export function useTeacherScope(): TeacherScope {
         assignedSubjects: allSubjectNames,
         scopedMapelList: mapelList,
         filterByClass: <T extends { kelas?: string }>(items: T[]) => items,
+        filterByAssignedClass: <T extends { kelas?: string }>(items: T[]) => items,
         isClassAccessible: () => true,
         filterBySubject: <T extends { mapel?: string }>(items: T[]) => items,
         isSubjectAccessible: () => true,
@@ -169,6 +218,14 @@ export function useTeacherScope(): TeacherScope {
     // Default fallback if no homeroom class is specified
     if (!assignedClass) {
       assignedClass = kelasList[0]?.nama || "X MIPA 1";
+    }
+
+    // Canonicalize assignedClass with kelasList if an exact or matching class exists
+    if (assignedClass && kelasList.length > 0) {
+      const canonical = kelasList.find((k) => isClassMatch(k.nama, assignedClass));
+      if (canonical) {
+        assignedClass = canonical.nama;
+      }
     }
 
     const normalizeTeacherName = (name: string): string => {
@@ -209,6 +266,11 @@ export function useTeacherScope(): TeacherScope {
 
     const filterByClass = <T extends { kelas?: string }>(items: T[]): T[] => {
       return items.filter((item) => item.kelas && isClassAccessible(item.kelas));
+    };
+
+    const filterByAssignedClass = <T extends { kelas?: string }>(items: T[]): T[] => {
+      if (!assignedClass) return items;
+      return items.filter((item) => item.kelas && isClassMatch(item.kelas, assignedClass));
     };
 
     // Determine assigned subjects for this teacher
@@ -297,6 +359,7 @@ export function useTeacherScope(): TeacherScope {
       assignedSubjects,
       scopedMapelList,
       filterByClass,
+      filterByAssignedClass,
       isClassAccessible,
       filterBySubject,
       isSubjectAccessible,

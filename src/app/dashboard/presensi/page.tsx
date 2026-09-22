@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTeacherScope } from "@/hooks/useTeacherScope";
+import { useTeacherScope, isClassMatch } from "@/hooks/useTeacherScope";
 import { StatusKehadiran } from "@/types/school";
 import { INITIAL_SISWA } from "@/lib/mock-data";
 import {
@@ -48,15 +48,11 @@ export default function PresensiPage() {
 
   // Base list filtered by class
   const classStudents = useMemo(() => {
-    if (teacherScope.isTeacher && teacherScope.assignedClass) {
-      return allStudents.filter(
-        (s) => s.kelas?.trim().toLowerCase() === teacherScope.assignedClass!.trim().toLowerCase()
-      );
+    if (teacherScope.isTeacher) {
+      return teacherScope.filterByAssignedClass(allStudents);
     }
     if (selectedKelas === "Semua") return allStudents;
-    return allStudents.filter(
-      (s) => s.kelas?.trim().toLowerCase() === selectedKelas.trim().toLowerCase()
-    );
+    return allStudents.filter((s) => isClassMatch(s.kelas, selectedKelas));
   }, [allStudents, selectedKelas, teacherScope]);
 
   // Metrics based on classStudents

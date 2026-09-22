@@ -448,16 +448,53 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         }
       });
       setMapelList(mergedMapel);
-      setJadwalList(load("jadwal", INITIAL_JADWAL));
+      const loadedJadwal = load("jadwal", INITIAL_JADWAL);
+      let mergedJadwal = [...(loadedJadwal && loadedJadwal.length > 0 ? loadedJadwal : INITIAL_JADWAL)];
+      mergedJadwal = mergedJadwal.map((j) => {
+        if (j.id === "jdw-01" && j.mapel === "Upacara & PAI") {
+          return { ...j, mapel: "Pendidikan Agama Islam" };
+        }
+        if (j.id === "jdw-08" && j.mapel === "Kajian Islam & Tahfidz") {
+          return { ...j, mapel: "Pendidikan Lingkungan & Budaya (PLBJ)" };
+        }
+        return j;
+      });
+      INITIAL_JADWAL.forEach((ij) => {
+        if (!mergedJadwal.some((j) => j.id === ij.id)) {
+          mergedJadwal.push(ij);
+        }
+      });
+      setJadwalList(mergedJadwal);
       setPresensiList(load("presensi", INITIAL_PRESENSI));
 
       const loadedNilai = load("nilai", INITIAL_NILAI);
-      const mergedNilai = [...(loadedNilai && loadedNilai.length > 0 ? loadedNilai : INITIAL_NILAI)];
+      let mergedNilai = [...(loadedNilai && loadedNilai.length > 0 ? loadedNilai : INITIAL_NILAI)];
       INITIAL_NILAI.forEach((inil) => {
         if (!mergedNilai.some((n) => n.id === inil.id)) {
           mergedNilai.push(inil);
         }
       });
+
+      // Migration: Kosongkan nilai default SAS (Ganjil & Genap) pada browser pengguna
+      const sasMigrationKey = "sim_data_nilai_sas_cleared_v1";
+      if (typeof window !== "undefined" && localStorage.getItem(sasMigrationKey) !== "true") {
+        mergedNilai = mergedNilai.map((n) => {
+          if (n.id.startsWith("nil-") || !n.hasSas) {
+            return {
+              ...n,
+              uas: 0,
+              nilaiAkhir: 0,
+              predikat: undefined,
+              hasSas: false,
+              hasSts: typeof n.nilaiMid === "number" || (typeof n.uts === "number" && n.uts > 0),
+            };
+          }
+          return n;
+        });
+        localStorage.setItem(sasMigrationKey, "true");
+        localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
+      }
+
       setNilaiList(mergedNilai);
       setSppList(load("spp", INITIAL_SPP));
       setJenisTagihanList(load("jenis_tagihan", INITIAL_JENIS_TAGIHAN));

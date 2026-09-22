@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope, isClassMatch } from "@/hooks/useTeacherScope";
-import { NilaiSiswa, Siswa, JenisRapor } from "@/types/school";
+import { NilaiSiswa, Siswa, JenisRapor, MataPelajaran } from "@/types/school";
 import {
   calculateGrade,
   calculateMidGrade,
@@ -66,6 +66,7 @@ export default function NilaiManagementPage() {
     kelasList,
     guruList,
     presensiList,
+    jadwalList,
   } = useSchoolData();
 
   // Notification feedback state
@@ -99,6 +100,77 @@ export default function NilaiManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedKelas, setSelectedKelas] = useState("Semua");
   const [selectedMapel, setSelectedMapel] = useState("Semua");
+
+  // Helper: Dapatkan daftar mata pelajaran suatu kelas berdasarkan entri di menu Jadwal Pelajaran & KBM
+  const getAvailableMapelForClass = (
+    targetKelas: string
+  ): { mapels: MataPelajaran[]; isScheduled: boolean } => {
+    if (!targetKelas || targetKelas === "Semua") {
+      const all = (teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
+        ? teacherScope.scopedMapelList
+        : mapelList) || mapelList;
+      return { mapels: all.length > 0 ? all : mapelList, isScheduled: false };
+    }
+
+    // Ambil jadwal pelajaran untuk kelas target
+    const classJadwal = (jadwalList || []).filter((j) =>
+      isClassMatch(j.kelas, targetKelas)
+    );
+
+    // Ambil nama-nama mapel unik dari jadwal
+    const scheduledNames = Array.from(
+      new Set(
+        classJadwal
+          .map((j) => j.mapel?.trim())
+          .filter((m): m is string => Boolean(m && m.length > 0))
+      )
+    );
+
+    if (scheduledNames.length > 0) {
+      const matched: MataPelajaran[] = [];
+      scheduledNames.forEach((name) => {
+        const found = mapelList.find(
+          (m) =>
+            m.nama.trim().toLowerCase() === name.toLowerCase() ||
+            name.toLowerCase().includes(m.nama.trim().toLowerCase()) ||
+            m.nama.trim().toLowerCase().includes(name.toLowerCase())
+        );
+        if (found) {
+          if (!matched.some((item) => item.id === found.id)) {
+            matched.push(found);
+          }
+        } else {
+          matched.push({
+            id: `mapel-sch-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+            kode: name.substring(0, 4).toUpperCase(),
+            nama: name,
+            kategori: "Wajib",
+            kkm: 75,
+          });
+        }
+      });
+
+      // Jika akun merupakan guru pengampu mata pelajaran tertentu, filter lebih lanjut
+      if (teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0) {
+        const teacherFiltered = matched.filter((sm) =>
+          teacherScope.scopedMapelList.some(
+            (tm) => tm.nama.trim().toLowerCase() === sm.nama.trim().toLowerCase()
+          )
+        );
+        if (teacherFiltered.length > 0) {
+          return { mapels: teacherFiltered, isScheduled: true };
+        }
+      }
+
+      return { mapels: matched, isScheduled: true };
+    }
+
+    // Fallback jika kelas belum diset jadwalnya di menu Jadwal Pelajaran & KBM
+    const fallback = (teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
+      ? teacherScope.scopedMapelList
+      : mapelList) || mapelList;
+    return { mapels: fallback.length > 0 ? fallback : mapelList, isScheduled: false };
+  };
 
   // Single Input / Edit Modal State
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
@@ -150,9 +222,9 @@ export default function NilaiManagementPage() {
   // Quick fill toolbar states
   const [quickFillSts, setQuickFillSts] = useState<number>(80);
   const [quickFillValues, setQuickFillValues] = useState({
-    tugas: 80,
+    tugas: 0,
     uts: 80,
-    uas: 85,
+    uas: 0,
   });
 
   // Derived helpers for Bulk Modal
@@ -892,13 +964,14 @@ export default function NilaiManagementPage() {
   });
 
   const canEdit = user?.role === "admin" || user?.role === "guru";
+  const isAdmin = user?.role === "admin";
 
   const baseSiswaList = teacherScope.isTeacher
-    ? teacherScope.filterByClass(siswaList)
+    ? teacherScope.filterByAssignedClass(siswaList)
     : siswaList;
 
   const baseNilaiList = teacherScope.isTeacher
-    ? teacherScope.filterBySubject(teacherScope.filterByClass(nilaiList))
+    ? teacherScope.filterBySubject(teacherScope.filterByAssignedClass(nilaiList))
     : nilaiList;
 
   // Grade resolution helpers with automatic calculation fallback
@@ -921,12 +994,26 @@ export default function NilaiManagementPage() {
         catatan: n.catatan || "Capaian kompetensi tuntas dengan baik.",
       };
     }
-    const calc = calculateSemesterGrade(n.tugas, n.uts, n.uas);
+    const calc = calculateSemesterGrade(n.tugas || 0, n.uts || 0, n.uas || 0);
     return {
       nilaiAkhir: calc.nilaiAkhir,
       predikat: calc.predikat,
       catatan: n.catatan || "Capaian kompetensi tuntas dengan baik.",
     };
+  };
+
+  // Helper untuk menentukan apakah record nilai memiliki data STS
+  const isRecordStsFilled = (n: NilaiSiswa): boolean => {
+    if (n.hasSts === false) return false;
+    if (n.hasSts === true) return true;
+    return typeof n.nilaiMid === "number" || (typeof n.uts === "number" && n.uts > 0);
+  };
+
+  // Helper untuk menentukan apakah record nilai memiliki data SAS
+  const isRecordSasFilled = (n: NilaiSiswa): boolean => {
+    if (n.hasSas === false) return false;
+    if (n.hasSas === true) return true;
+    return typeof n.uas === "number" && n.uas > 0 && typeof n.nilaiAkhir === "number" && n.nilaiAkhir > 0;
   };
 
   // Attendance resolution helper for student report card (presensi: Sakit, Izin, Alpa)
@@ -943,7 +1030,7 @@ export default function NilaiManagementPage() {
     return { sakit, izin, alpa, hadir, total: records.length };
   };
 
-  // Filtered nilai based on search, selected filters, and active tab semester
+  // Filtered nilai based on search, selected filters, active tab semester, and assessment type
   const filteredNilai = baseNilaiList.filter((n) => {
     const matchSearch =
       n.siswaNama.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -960,8 +1047,14 @@ export default function NilaiManagementPage() {
       activeRaporTab === "semua"
         ? true
         : (n.semester || "Ganjil").toLowerCase() === activeSemester.toLowerCase();
+    const matchType =
+      activeRaporTab === "semua"
+        ? true
+        : isTengah
+        ? isRecordStsFilled(n)
+        : isRecordSasFilled(n);
 
-    return matchSearch && matchKelas && matchMapel && matchSemester;
+    return matchSearch && matchKelas && matchMapel && matchSemester && matchType;
   });
 
   // Daftar Siswa Terfilter untuk Tabel Utama (menampilkan seluruh siswa dengan kondisi default jika belum ada nilai)
@@ -986,7 +1079,12 @@ export default function NilaiManagementPage() {
           : (n.semester || "Ganjil").toLowerCase() === activeSemester.toLowerCase()) &&
         (selectedMapel === "Semua"
           ? true
-          : n.mapel.toLowerCase() === selectedMapel.toLowerCase())
+          : n.mapel.toLowerCase() === selectedMapel.toLowerCase()) &&
+        (activeRaporTab === "semua"
+          ? true
+          : isTengah
+          ? isRecordStsFilled(n)
+          : isRecordSasFilled(n))
     );
     return records.length > 0;
   });
@@ -1023,18 +1121,18 @@ export default function NilaiManagementPage() {
   const handleOpenAdd = () => {
     setEditingId(null);
     const defaultSiswa = baseSiswaList[0] || siswaList[0];
-    const defaultMapel = teacherScope.isTeacher
-      ? teacherScope.scopedMapelList[0]?.nama || "Matematika"
-      : mapelList[0]?.nama || "Matematika";
+    const { mapels: availableMapels } = getAvailableMapelForClass(defaultSiswa?.kelas || "");
+    const defaultMapel = availableMapels[0]?.nama || (mapelList[0]?.nama || "Matematika");
+    const isSas = !isTengah;
     setFormData({
       siswaId: defaultSiswa?.id || "",
       mapel: defaultMapel,
       semester: activeSemester,
-      tugas: 82,
-      uts: 80,
-      uas: 85,
-      catatanMid: "Menunjukkan pemahaman materi tengah semester yang baik dan aktif berdiskusi.",
-      catatan: "Pertahankan ketekunan belajar dan tingkatkan literasi mandiri.",
+      tugas: isSas ? 0 : 82,
+      uts: isSas ? 0 : 80,
+      uas: 0,
+      catatanMid: isSas ? "" : "Menunjukkan pemahaman materi tengah semester yang baik dan aktif berdiskusi.",
+      catatan: isSas ? "" : "Pertahankan ketekunan belajar dan tingkatkan literasi mandiri.",
     });
     setIsInputModalOpen(true);
   };
@@ -1047,9 +1145,9 @@ export default function NilaiManagementPage() {
       siswaId: n.siswaId,
       mapel: n.mapel,
       semester: n.semester || activeSemester,
-      tugas: n.tugas,
-      uts: n.uts,
-      uas: n.uas,
+      tugas: n.tugas || 0,
+      uts: n.uts || 0,
+      uas: n.uas || 0,
       catatanMid: mid.catatanMid,
       catatan: akhir.catatan,
     });
@@ -1079,6 +1177,11 @@ export default function NilaiManagementPage() {
     );
 
     const targetSemester = formData.semester || activeSemester;
+    const isSas = !isTengah;
+    const uhVal = Number(formData.tugas) || 0;
+    const stsVal = Number(formData.uts) || 0;
+    const uasVal = Number(formData.uas) || 0;
+    const isSasFilled = isSas ? (uasVal > 0 || uhVal > 0) : false;
 
     saveNilai({
       id: editingId || undefined,
@@ -1089,15 +1192,17 @@ export default function NilaiManagementPage() {
       mapel: formData.mapel,
       semester: targetSemester,
       tahunAjaran: profile.tahunAjaranAktif,
-      tugas: Number(formData.tugas),
-      uts: Number(formData.uts),
-      uas: Number(formData.uas),
+      tugas: uhVal,
+      uts: stsVal,
+      uas: uasVal,
       nilaiMid,
       predikatMid,
       catatanMid: formData.catatanMid,
-      nilaiAkhir,
-      predikat,
+      nilaiAkhir: isSasFilled ? nilaiAkhir : 0,
+      predikat: isSasFilled ? predikat : undefined,
       catatan: formData.catatan,
+      hasSts: stsVal > 0,
+      hasSas: isSasFilled,
     });
 
     setIsInputModalOpen(false);
@@ -1121,6 +1226,7 @@ export default function NilaiManagementPage() {
   ) => {
     const sem: "Ganjil" | "Genap" =
       tab === "sts-genap" || tab === "sas-genap" ? "Genap" : "Ganjil";
+    const isSasTab = tab === "sas-ganjil" || tab === "sas-genap";
 
     const classStudents = baseSiswaList.filter(
       (s) => isClassMatch(s.kelas, targetKelas)
@@ -1140,15 +1246,16 @@ export default function NilaiManagementPage() {
       );
 
       if (existing) {
+        const hasSas = isRecordSasFilled(existing);
         return {
           siswaId: s.id,
           siswaNama: s.nama,
           nisn: s.nisn,
           kelas: s.kelas,
           kkm,
-          tugas: typeof existing.tugas === "number" ? existing.tugas : 80,
-          uts: typeof existing.uts === "number" ? existing.uts : 80,
-          uas: typeof existing.uas === "number" ? existing.uas : 80,
+          tugas: isSasTab ? (hasSas ? (existing.tugas ?? 0) : 0) : (typeof existing.tugas === "number" ? existing.tugas : 80),
+          uts: typeof existing.uts === "number" ? existing.uts : (isSasTab ? 0 : 80),
+          uas: isSasTab ? (hasSas ? (existing.uas ?? 0) : 0) : (typeof existing.uas === "number" ? existing.uas : 0),
           catatan: existing.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
           existingId: existing.id,
         };
@@ -1160,9 +1267,9 @@ export default function NilaiManagementPage() {
         nisn: s.nisn,
         kelas: s.kelas,
         kkm,
-        tugas: 80,
-        uts: 80,
-        uas: 80,
+        tugas: isSasTab ? 0 : 80,
+        uts: isSasTab ? 0 : 80,
+        uas: 0,
         catatan: "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
       };
     });
@@ -1180,27 +1287,28 @@ export default function NilaiManagementPage() {
       siswaList.find((s) => s.id === targetSiswaId);
     if (!targetSiswa) return;
 
-    // Filter mapel jika akun merupakan guru mata pelajaran (fallback ke mapelList jika guru kelas / umum)
-    const subjects = (teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
-      ? teacherScope.scopedMapelList
-      : mapelList) || mapelList;
-    const finalSubjects = subjects.length > 0 ? subjects : mapelList;
+    // Filter mapel yang sesuai dengan Jadwal Pelajaran & KBM kelas siswa ini
+    const { mapels: classMapels } = getAvailableMapelForClass(targetSiswa.kelas);
+    const finalSubjects = classMapels.length > 0 ? classMapels : mapelList;
 
     const existingStudentNilai = nilaiList.filter(
       (n) => n.siswaId === targetSiswaId && (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase()
     );
+
+    const isSasTab = !bulkIsTengah;
 
     const rows = finalSubjects.map((m) => {
       const existing = existingStudentNilai.find(
         (n) => n.mapel.toLowerCase() === m.nama.toLowerCase()
       );
       if (existing) {
+        const hasSas = isRecordSasFilled(existing);
         return {
           mapel: m.nama,
           kkm: m.kkm,
-          tugas: typeof existing.tugas === "number" ? existing.tugas : 82,
-          uts: typeof existing.uts === "number" ? existing.uts : 80,
-          uas: typeof existing.uas === "number" ? existing.uas : 85,
+          tugas: isSasTab ? (hasSas ? (existing.tugas ?? 0) : 0) : (typeof existing.tugas === "number" ? existing.tugas : 82),
+          uts: typeof existing.uts === "number" ? existing.uts : (isSasTab ? 0 : 80),
+          uas: isSasTab ? (hasSas ? (existing.uas ?? 0) : 0) : (typeof existing.uas === "number" ? existing.uas : 0),
           catatanMid: "",
           catatan: existing.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
           existingId: existing.id,
@@ -1209,9 +1317,9 @@ export default function NilaiManagementPage() {
       return {
         mapel: m.nama,
         kkm: m.kkm,
-        tugas: 82,
-        uts: 80,
-        uas: 85,
+        tugas: isSasTab ? 0 : 82,
+        uts: isSasTab ? 0 : 80,
+        uas: 0,
         catatanMid: "",
         catatan: "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
       };
@@ -1229,7 +1337,15 @@ export default function NilaiManagementPage() {
   // Handler pergantian kelas (Mode Per-Kelas)
   const handleBulkClassChange = (newKelas: string) => {
     setBulkSelectedKelas(newKelas);
-    initBulkClassRows(newKelas, bulkSelectedMapel, bulkAssessmentTab);
+    const { mapels: classMapels } = getAvailableMapelForClass(newKelas);
+    const isMapelStillAvailable = classMapels.some(
+      (m) => m.nama.toLowerCase() === bulkSelectedMapel.toLowerCase()
+    );
+    const nextMapel = isMapelStillAvailable
+      ? bulkSelectedMapel
+      : classMapels[0]?.nama || (mapelList[0]?.nama || "Matematika");
+    setBulkSelectedMapel(nextMapel);
+    initBulkClassRows(newKelas, nextMapel, bulkAssessmentTab);
   };
 
   // Handler pergantian mapel (Mode Per-Kelas)
@@ -1311,13 +1427,11 @@ export default function NilaiManagementPage() {
         : availableKelas[0] || (kelasList[0]?.nama || "");
     setBulkSelectedKelas(initialKelas);
 
-    const availableMapel = teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
-      ? teacherScope.scopedMapelList.map((m) => m.nama)
-      : mapelList.map((m) => m.nama);
+    const { mapels: initialClassMapels } = getAvailableMapelForClass(initialKelas);
     const initialMapel =
-      selectedMapel !== "Semua" && availableMapel.includes(selectedMapel)
+      selectedMapel !== "Semua" && initialClassMapels.some((m) => m.nama.toLowerCase() === selectedMapel.toLowerCase())
         ? selectedMapel
-        : availableMapel[0] || (mapelList[0]?.nama || "Matematika");
+        : initialClassMapels[0]?.nama || (mapelList[0]?.nama || "Matematika");
     setBulkSelectedMapel(initialMapel);
 
     // Tentukan mode awal (jika dipanggil dari tombol baris siswa, mode per-siswa; jika dari header, mode per-kelas)
@@ -1384,13 +1498,41 @@ export default function NilaiManagementPage() {
     if (bulkClassRows.length === 0) return;
 
     const itemsToSave = bulkClassRows.map((row) => {
-      const { nilaiMid, predikatMid } = calculateMidGrade(Number(row.uts) || 0);
-      const { nilaiAkhir, predikat } = calculateSemesterGrade(
-        Number(row.tugas) || 0,
-        Number(row.uts) || 0,
-        Number(row.uas) || 0
-      );
+      const existing = nilaiList.find((n) => n.id === row.existingId);
+      const uhVal = Number(row.tugas) || 0;
+      const stsVal = Number(row.uts) || (existing?.uts || 0);
+      const uasVal = Number(row.uas) || 0;
 
+      const { nilaiMid, predikatMid } = calculateMidGrade(stsVal);
+      const { nilaiAkhir, predikat } = calculateSemesterGrade(uhVal, stsVal, uasVal);
+
+      if (bulkIsTengah) {
+        // Mode STS
+        return {
+          id: row.existingId,
+          siswaId: row.siswaId,
+          siswaNama: row.siswaNama,
+          nisn: row.nisn,
+          kelas: row.kelas,
+          mapel: bulkSelectedMapel,
+          semester: bulkActiveSemester,
+          tahunAjaran: profile.tahunAjaranAktif,
+          tugas: existing?.tugas || 0,
+          uts: Number(row.uts) || 0,
+          uas: existing?.uas || 0,
+          nilaiMid,
+          predikatMid,
+          catatanMid: "",
+          nilaiAkhir: existing?.hasSas ? (existing.nilaiAkhir || 0) : 0,
+          predikat: existing?.hasSas ? existing.predikat : undefined,
+          catatan: existing?.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+          hasSts: true,
+          hasSas: existing?.hasSas || false,
+        };
+      }
+
+      // Mode SAS
+      const isSasFilled = uasVal > 0 || uhVal > 0;
       return {
         id: row.existingId,
         siswaId: row.siswaId,
@@ -1400,15 +1542,17 @@ export default function NilaiManagementPage() {
         mapel: bulkSelectedMapel,
         semester: bulkActiveSemester,
         tahunAjaran: profile.tahunAjaranAktif,
-        tugas: Number(row.tugas) || 0,
-        uts: Number(row.uts) || 0,
-        uas: Number(row.uas) || 0,
-        nilaiMid,
-        predikatMid,
-        catatanMid: "", // Catatan perkembangan dihilangkan untuk STS!
-        nilaiAkhir,
-        predikat,
+        tugas: uhVal,
+        uts: stsVal,
+        uas: uasVal,
+        nilaiMid: existing?.nilaiMid ?? nilaiMid,
+        predikatMid: existing?.predikatMid ?? predikatMid,
+        catatanMid: existing?.catatanMid || "",
+        nilaiAkhir: isSasFilled ? nilaiAkhir : 0,
+        predikat: isSasFilled ? predikat : undefined,
         catatan: row.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+        hasSts: existing?.hasSts ?? (stsVal > 0),
+        hasSas: isSasFilled,
       };
     });
 
@@ -1429,13 +1573,41 @@ export default function NilaiManagementPage() {
     if (!siswa) return;
 
     const itemsToSave = bulkRows.map((row) => {
-      const { nilaiMid, predikatMid } = calculateMidGrade(Number(row.uts) || 0);
-      const { nilaiAkhir, predikat } = calculateSemesterGrade(
-        Number(row.tugas) || 0,
-        Number(row.uts) || 0,
-        Number(row.uas) || 0
-      );
+      const existing = nilaiList.find((n) => n.id === row.existingId);
+      const uhVal = Number(row.tugas) || 0;
+      const stsVal = Number(row.uts) || (existing?.uts || 0);
+      const uasVal = Number(row.uas) || 0;
 
+      const { nilaiMid, predikatMid } = calculateMidGrade(stsVal);
+      const { nilaiAkhir, predikat } = calculateSemesterGrade(uhVal, stsVal, uasVal);
+
+      if (bulkIsTengah) {
+        // Mode STS
+        return {
+          id: row.existingId,
+          siswaId: siswa.id,
+          siswaNama: siswa.nama,
+          nisn: siswa.nisn,
+          kelas: siswa.kelas,
+          mapel: row.mapel,
+          semester: bulkActiveSemester,
+          tahunAjaran: profile.tahunAjaranAktif,
+          tugas: existing?.tugas || 0,
+          uts: Number(row.uts) || 0,
+          uas: existing?.uas || 0,
+          nilaiMid,
+          predikatMid,
+          catatanMid: "",
+          nilaiAkhir: existing?.hasSas ? (existing.nilaiAkhir || 0) : 0,
+          predikat: existing?.hasSas ? existing.predikat : undefined,
+          catatan: existing?.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+          hasSts: true,
+          hasSas: existing?.hasSas || false,
+        };
+      }
+
+      // Mode SAS
+      const isSasFilled = uasVal > 0 || uhVal > 0;
       return {
         id: row.existingId,
         siswaId: siswa.id,
@@ -1445,15 +1617,17 @@ export default function NilaiManagementPage() {
         mapel: row.mapel,
         semester: bulkActiveSemester,
         tahunAjaran: profile.tahunAjaranAktif,
-        tugas: Number(row.tugas) || 0,
-        uts: Number(row.uts) || 0,
-        uas: Number(row.uas) || 0,
-        nilaiMid,
-        predikatMid,
-        catatanMid: "", // Catatan perkembangan dihilangkan untuk STS!
-        nilaiAkhir,
-        predikat,
+        tugas: uhVal,
+        uts: stsVal,
+        uas: uasVal,
+        nilaiMid: existing?.nilaiMid ?? nilaiMid,
+        predikatMid: existing?.predikatMid ?? predikatMid,
+        catatanMid: existing?.catatanMid || "",
+        nilaiAkhir: isSasFilled ? nilaiAkhir : 0,
+        predikat: isSasFilled ? predikat : undefined,
         catatan: row.catatan || "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
+        hasSts: existing?.hasSts ?? (stsVal > 0),
+        hasSas: isSasFilled,
       };
     });
 
@@ -1656,10 +1830,13 @@ export default function NilaiManagementPage() {
 
   // Generate official Islamic formatted WhatsApp message for student report
   const generateRaporWhatsAppText = (siswa: Siswa, type: JenisRapor, sem: "Ganjil" | "Genap" = waRaporSemester) => {
-    const records = nilaiList.filter(
-      (n) => n.siswaId === siswa.id && (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase()
-    );
     const isMid = type === "tengah";
+    const records = nilaiList.filter(
+      (n) =>
+        n.siswaId === siswa.id &&
+        (n.semester || "Ganjil").toLowerCase() === sem.toLowerCase() &&
+        (isMid ? isRecordStsFilled(n) : isRecordSasFilled(n))
+    );
     const typeLabel = isMid ? "Sumatif Tengah Semester (STS)" : "Akhir Semester (PAS)";
     const avgScore =
       records.length > 0
@@ -1766,12 +1943,13 @@ export default function NilaiManagementPage() {
     setIsWaModalOpen(true);
   };
 
-  // Nilai records for selected rapor siswa filtered by chosen print semester
+  // Nilai records for selected rapor siswa filtered by chosen print semester and type
   const studentNilaiRecords = raporSiswa
     ? nilaiList.filter(
         (n) =>
           n.siswaId === raporSiswa.id &&
-          (n.semester || "Ganjil").toLowerCase() === (raporPrintSemester || "Ganjil").toLowerCase()
+          (n.semester || "Ganjil").toLowerCase() === (raporPrintSemester || "Ganjil").toLowerCase() &&
+          (raporPrintType === "tengah" ? isRecordStsFilled(n) : isRecordSasFilled(n))
       )
     : [];
 
@@ -1899,9 +2077,6 @@ export default function NilaiManagementPage() {
             <Award className="h-7 w-7 text-amber-500" />
             <span>Penilaian & E-Rapor Digital</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Manajemen penilaian multi-rapor (Rapor Tengah Semester & Rapor Akhir Semester), input bulk seluruh mapel per siswa, dan cetak lembar resmi.
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -2160,7 +2335,16 @@ export default function NilaiManagementPage() {
           ) : (
             <select
               value={selectedKelas}
-              onChange={(e) => setSelectedKelas(e.target.value)}
+              onChange={(e) => {
+                const newK = e.target.value;
+                setSelectedKelas(newK);
+                if (newK !== "Semua" && selectedMapel !== "Semua") {
+                  const { mapels: km } = getAvailableMapelForClass(newK);
+                  if (!km.some((m) => m.nama.toLowerCase() === selectedMapel.toLowerCase())) {
+                    setSelectedMapel("Semua");
+                  }
+                }
+              }}
               className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none"
             >
               <option value="Semua">Semua Kelas</option>
@@ -2172,41 +2356,29 @@ export default function NilaiManagementPage() {
             </select>
           )}
 
-          <select
-            value={selectedMapel}
-            onChange={(e) => setSelectedMapel(e.target.value)}
-            className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none"
-          >
-            {teacherScope.isTeacher ? (
-              teacherScope.scopedMapelList.length > 1 ? (
-                <>
-                  <option value="Semua">
-                    Semua Mapel Diampu ({teacherScope.scopedMapelList.length})
-                  </option>
-                  {teacherScope.scopedMapelList.map((m) => (
-                    <option key={m.id} value={m.nama}>
-                      {m.nama} (Diampu)
-                    </option>
-                  ))}
-                </>
-              ) : (
-                teacherScope.scopedMapelList.map((m) => (
-                  <option key={m.id} value="Semua">
-                    {m.nama} (Mapel Diampu)
-                  </option>
-                ))
-              )
-            ) : (
-              <>
-                <option value="Semua">Semua Mata Pelajaran</option>
-                {mapelList.map((m) => (
+          {(() => {
+            const activeFilterKelas = teacherScope.isTeacher && teacherScope.assignedClass
+              ? teacherScope.assignedClass
+              : selectedKelas;
+            const { mapels: filteredMapelOptions, isScheduled: isFilterScheduled } = getAvailableMapelForClass(activeFilterKelas);
+
+            return (
+              <select
+                value={selectedMapel}
+                onChange={(e) => setSelectedMapel(e.target.value)}
+                className="px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none font-medium"
+              >
+                <option value="Semua">
+                  Semua Mapel {activeFilterKelas !== "Semua" ? `(Kelas ${activeFilterKelas})` : ""}
+                </option>
+                {filteredMapelOptions.map((m) => (
                   <option key={m.id} value={m.nama}>
-                    {m.nama}
+                    {m.nama} {isFilterScheduled && activeFilterKelas !== "Semua" ? "(Jadwal KBM)" : ""}
                   </option>
                 ))}
-              </>
-            )}
-          </select>
+              </select>
+            );
+          })()}
 
           <span className="text-xs text-slate-500 ml-auto md:ml-2">
             Total Siswa: <strong>{filteredSiswa.length}</strong>
@@ -2325,12 +2497,16 @@ export default function NilaiManagementPage() {
                       n.siswaId === s.id &&
                       (activeRaporTab === "semua"
                         ? true
-                        : (n.semester || "Ganjil").toLowerCase() === activeSemester.toLowerCase())
+                        : (n.semester || "Ganjil").toLowerCase() === activeSemester.toLowerCase()) &&
+                      (activeRaporTab === "semua"
+                        ? true
+                        : isTengah
+                        ? isRecordStsFilled(n)
+                        : isRecordSasFilled(n))
                   );
 
-                  const totalMapelCount = teacherScope.isTeacher
-                    ? Math.max(1, teacherScope.scopedMapelList.length)
-                    : Math.max(1, mapelList.length);
+                  const { mapels: studentClassMapels } = getAvailableMapelForClass(s.kelas);
+                  const totalMapelCount = Math.max(1, studentClassMapels.length);
 
                   const filledCount = studentRecords.length;
                   const hasGrades = filledCount > 0;
@@ -3151,27 +3327,36 @@ export default function NilaiManagementPage() {
                       </select>
                     </div>
 
-                    <div className="w-full sm:w-1/3">
-                      <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-1.5">
-                        <BookOpen className="h-4 w-4 text-amber-600" />
-                        <span>Pilih Mata Pelajaran *</span>
-                      </label>
-                      <select
-                        required
-                        value={bulkSelectedMapel}
-                        onChange={(e) => handleBulkMapelChange(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
-                      >
-                        {(teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0
-                          ? teacherScope.scopedMapelList
-                          : mapelList
-                        ).map((m) => (
-                          <option key={m.id} value={m.nama}>
-                            {m.nama} (KKM: {m.kkm})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {(() => {
+                      const { mapels: perClassMapels, isScheduled: perClassIsScheduled } = getAvailableMapelForClass(bulkSelectedKelas);
+                      return (
+                        <div className="w-full sm:w-1/3">
+                          <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <BookOpen className="h-4 w-4 text-amber-600" />
+                              <span>Pilih Mata Pelajaran *</span>
+                            </span>
+                            {perClassIsScheduled && (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                Jadwal KBM
+                              </span>
+                            )}
+                          </label>
+                          <select
+                            required
+                            value={bulkSelectedMapel}
+                            onChange={(e) => handleBulkMapelChange(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                          >
+                            {perClassMapels.map((m) => (
+                              <option key={m.id} value={m.nama}>
+                                {m.nama} (KKM: {m.kkm})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })()}
 
                     <div className="sm:ml-auto flex items-center gap-3">
                       <div className="bg-white dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs shadow-sm">
@@ -3421,11 +3606,14 @@ export default function NilaiManagementPage() {
                       ) : (
                         bulkClassRows.map((row, idx) => {
                           const rowMid = calculateMidGrade(Number(row.uts) || 0);
-                          const rowAkhir = calculateSemesterGrade(
-                            Number(row.tugas) || 0,
-                            Number(row.uts) || 0,
-                            Number(row.uas) || 0
-                          );
+                          const hasSasScore = (Number(row.uas) > 0 || Number(row.tugas) > 0);
+                          const rowAkhir = hasSasScore
+                            ? calculateSemesterGrade(
+                                Number(row.tugas) || 0,
+                                Number(row.uts) || 0,
+                                Number(row.uas) || 0
+                              )
+                            : { nilaiAkhir: "-", predikat: "-" };
                           const isTuntas = (Number(row.uts) || 0) >= row.kkm;
 
                           if (bulkIsTengah) {
@@ -3525,10 +3713,10 @@ export default function NilaiManagementPage() {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  required
-                                  value={row.tugas}
+                                  value={row.tugas === 0 ? "" : row.tugas}
+                                  placeholder="0"
                                   onChange={(e) =>
-                                    handleBulkClassRowChange(idx, "tugas", Number(e.target.value))
+                                    handleBulkClassRowChange(idx, "tugas", e.target.value === "" ? 0 : Number(e.target.value))
                                   }
                                   className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -3540,10 +3728,10 @@ export default function NilaiManagementPage() {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  required
-                                  value={row.uts}
+                                  value={row.uts === 0 ? "" : row.uts}
+                                  placeholder="0"
                                   onChange={(e) =>
-                                    handleBulkClassRowChange(idx, "uts", Number(e.target.value))
+                                    handleBulkClassRowChange(idx, "uts", e.target.value === "" ? 0 : Number(e.target.value))
                                   }
                                   className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -3555,10 +3743,10 @@ export default function NilaiManagementPage() {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  required
-                                  value={row.uas}
+                                  value={row.uas === 0 ? "" : row.uas}
+                                  placeholder="0"
                                   onChange={(e) =>
-                                    handleBulkClassRowChange(idx, "uas", Number(e.target.value))
+                                    handleBulkClassRowChange(idx, "uas", e.target.value === "" ? 0 : Number(e.target.value))
                                   }
                                   className="w-16 px-1.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -3631,11 +3819,14 @@ export default function NilaiManagementPage() {
                       ) : (
                         bulkRows.map((row, idx) => {
                           const rowMid = calculateMidGrade(Number(row.uts) || 0);
-                          const rowAkhir = calculateSemesterGrade(
-                            Number(row.tugas) || 0,
-                            Number(row.uts) || 0,
-                            Number(row.uas) || 0
-                          );
+                          const hasSasScore = (Number(row.uas) > 0 || Number(row.tugas) > 0);
+                          const rowAkhir = hasSasScore
+                            ? calculateSemesterGrade(
+                                Number(row.tugas) || 0,
+                                Number(row.uts) || 0,
+                                Number(row.uas) || 0
+                              )
+                            : { nilaiAkhir: "-", predikat: "-" };
                           const isTuntas = (Number(row.uts) || 0) >= row.kkm;
 
                           if (bulkIsTengah) {
@@ -3736,10 +3927,10 @@ export default function NilaiManagementPage() {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  required
-                                  value={row.tugas}
+                                  value={row.tugas === 0 ? "" : row.tugas}
+                                  placeholder="0"
                                   onChange={(e) =>
-                                    handleBulkRowChange(idx, "tugas", Number(e.target.value))
+                                    handleBulkRowChange(idx, "tugas", e.target.value === "" ? 0 : Number(e.target.value))
                                   }
                                   className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
                                 />
@@ -3751,10 +3942,10 @@ export default function NilaiManagementPage() {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  required
-                                  value={row.uts}
+                                  value={row.uts === 0 ? "" : row.uts}
+                                  placeholder="0"
                                   onChange={(e) =>
-                                    handleBulkRowChange(idx, "uts", Number(e.target.value))
+                                    handleBulkRowChange(idx, "uts", e.target.value === "" ? 0 : Number(e.target.value))
                                   }
                                   className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
                                 />
@@ -3766,10 +3957,10 @@ export default function NilaiManagementPage() {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  required
-                                  value={row.uas}
+                                  value={row.uas === 0 ? "" : row.uas}
+                                  placeholder="0"
                                   onChange={(e) =>
-                                    handleBulkRowChange(idx, "uas", Number(e.target.value))
+                                    handleBulkRowChange(idx, "uas", e.target.value === "" ? 0 : Number(e.target.value))
                                   }
                                   className="w-16 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
                                 />
@@ -4028,7 +4219,19 @@ export default function NilaiManagementPage() {
                   required
                   disabled={Boolean(editingId)}
                   value={formData.siswaId}
-                  onChange={(e) => setFormData({ ...formData, siswaId: e.target.value })}
+                  onChange={(e) => {
+                    const newSiswaId = e.target.value;
+                    const stu = baseSiswaList.find((s) => s.id === newSiswaId) || siswaList.find((s) => s.id === newSiswaId);
+                    const { mapels: nextMapels } = getAvailableMapelForClass(stu?.kelas || "");
+                    const isAvailable = nextMapels.some(
+                      (m) => m.nama.toLowerCase() === formData.mapel.toLowerCase()
+                    );
+                    setFormData({
+                      ...formData,
+                      siswaId: newSiswaId,
+                      mapel: isAvailable ? formData.mapel : (nextMapels[0]?.nama || formData.mapel),
+                    });
+                  }}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
                 >
                   {baseSiswaList.map((s) => (
@@ -4039,40 +4242,55 @@ export default function NilaiManagementPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Mata Pelajaran *
-                  </label>
-                  <select
-                    value={formData.mapel}
-                    onChange={(e) => setFormData({ ...formData, mapel: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
-                  >
-                    {(teacherScope.isTeacher ? teacherScope.scopedMapelList : mapelList).map((m) => (
-                      <option key={m.id} value={m.nama}>
-                        {m.nama} (KKM: {m.kkm})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {(() => {
+                const singleInputStudent =
+                  baseSiswaList.find((s) => s.id === formData.siswaId) ||
+                  siswaList.find((s) => s.id === formData.siswaId);
+                const { mapels: singleModalMapels, isScheduled: singleModalIsScheduled } =
+                  getAvailableMapelForClass(singleInputStudent?.kelas || "");
 
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Semester *
-                  </label>
-                  <select
-                    value={formData.semester}
-                    onChange={(e) =>
-                      setFormData({ ...formData, semester: e.target.value as "Ganjil" | "Genap" })
-                    }
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
-                  >
-                    <option value="Ganjil">Semester Ganjil</option>
-                    <option value="Genap">Semester Genap</option>
-                  </select>
-                </div>
-              </div>
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                        <span>Mata Pelajaran *</span>
+                        {singleModalIsScheduled && (
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                            Jadwal KBM {singleInputStudent?.kelas}
+                          </span>
+                        )}
+                      </label>
+                      <select
+                        value={formData.mapel}
+                        onChange={(e) => setFormData({ ...formData, mapel: e.target.value })}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                      >
+                        {singleModalMapels.map((m) => (
+                          <option key={m.id} value={m.nama}>
+                            {m.nama} (KKM: {m.kkm})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Semester *
+                      </label>
+                      <select
+                        value={formData.semester}
+                        onChange={(e) =>
+                          setFormData({ ...formData, semester: e.target.value as "Ganjil" | "Genap" })
+                        }
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
+                      >
+                        <option value="Ganjil">Semester Ganjil</option>
+                        <option value="Genap">Semester Genap</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Komponen Nilai Inputs */}
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
@@ -4339,9 +4557,9 @@ export default function NilaiManagementPage() {
                 </div>
               </div>
 
-              {/* Action Buttons (Direct Print & PDF Export) */}
+              {/* Action Buttons (Direct Print & PDF Export) - Hanya Admin */}
               <div className="flex items-center gap-2">
-                {canEdit && (
+                {isAdmin && (
                   <>
                     <button
                       type="button"
@@ -4386,60 +4604,60 @@ export default function NilaiManagementPage() {
                       <UserX className="h-4 w-4" />
                       <span>Hapus Siswa</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handlePrintReport(
+                          `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
+                        )
+                      }
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                      title="Cetak langsung menggunakan dialog print peramban"
+                    >
+                      <Printer className="h-4 w-4" />
+                      <span>Cetak Langsung</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handlePrintReport(
+                          `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
+                        )
+                      }
+                      className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer"
+                      title="Simpan dokumen sebagai file PDF beresolusi tinggi"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Simpan / Ekspor PDF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenWhatsAppModal(raporSiswa)}
+                      className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-green-600/20 transition-all cursor-pointer"
+                      title="Kirim ringkasan laporan hasil belajar langsung ke WhatsApp orang tua"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      <span>Kirim WA Wali</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                        isRaporSettingsOpen
+                          ? "bg-amber-500 text-white shadow-amber-500/20"
+                          : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                      }`}
+                      title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                    >
+                      <Sliders className="h-4 w-4" />
+                      <span>Atur Kop & TTD</span>
+                    </button>
                   </>
                 )}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    handlePrintReport(
-                      `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
-                    )
-                  }
-                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                  title="Cetak langsung menggunakan dialog print peramban"
-                >
-                  <Printer className="h-4 w-4" />
-                  <span>Cetak Langsung</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    handlePrintReport(
-                      `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
-                    )
-                  }
-                  className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer"
-                  title="Simpan dokumen sebagai file PDF beresolusi tinggi"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Simpan / Ekspor PDF</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleOpenWhatsAppModal(raporSiswa)}
-                  className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-green-600/20 transition-all cursor-pointer"
-                  title="Kirim ringkasan laporan hasil belajar langsung ke WhatsApp orang tua"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span>Kirim WA Wali</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                    isRaporSettingsOpen
-                      ? "bg-amber-500 text-white shadow-amber-500/20"
-                      : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
-                  }`}
-                  title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
-                >
-                  <Sliders className="h-4 w-4" />
-                  <span>Atur Kop & TTD</span>
-                </button>
 
                 <button
                   type="button"
@@ -4454,7 +4672,7 @@ export default function NilaiManagementPage() {
             </div>
 
             {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
-            {renderRaporSettingsPanel()}
+            {isAdmin && renderRaporSettingsPanel()}
 
             {/* Official School Letterhead (Kop Surat) */}
             {renderOfficialLetterhead()}
@@ -5153,19 +5371,21 @@ export default function NilaiManagementPage() {
                   <span>Simpan / Ekspor PDF</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                    isRaporSettingsOpen
-                      ? "bg-amber-500 text-white shadow-amber-500/20"
-                      : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
-                  }`}
-                  title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
-                >
-                  <Sliders className="h-4 w-4" />
-                  <span>Atur Kop & TTD</span>
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                      isRaporSettingsOpen
+                        ? "bg-amber-500 text-white shadow-amber-500/20"
+                        : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                    }`}
+                    title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                  >
+                    <Sliders className="h-4 w-4" />
+                    <span>Atur Kop & TTD</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -5180,7 +5400,7 @@ export default function NilaiManagementPage() {
             </div>
 
             {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
-            {renderRaporSettingsPanel()}
+            {isAdmin && renderRaporSettingsPanel()}
 
             {/* ========================================================= */}
             {/* KONTEN 1: MODE BUNDEL LEMBAR RAPOR PER SISWA (MULTI-PAGE) */}
@@ -5196,7 +5416,8 @@ export default function NilaiManagementPage() {
                     const studentRecords = nilaiList.filter(
                       (n) =>
                         n.siswaId === siswa.id &&
-                        (n.semester || "Ganjil").toLowerCase() === (batchRaporSemester || "Ganjil").toLowerCase()
+                        (n.semester || "Ganjil").toLowerCase() === (batchRaporSemester || "Ganjil").toLowerCase() &&
+                        (batchRaporType === "tengah" ? isRecordStsFilled(n) : isRecordSasFilled(n))
                     );
                     const midAvg =
                       studentRecords.length > 0
@@ -5709,7 +5930,8 @@ export default function NilaiManagementPage() {
                       const records = nilaiList.filter(
                         (n) =>
                           n.siswaId === s.id &&
-                          (n.semester || "Ganjil").toLowerCase() === (batchRaporSemester || "Ganjil").toLowerCase()
+                          (n.semester || "Ganjil").toLowerCase() === (batchRaporSemester || "Ganjil").toLowerCase() &&
+                          (batchRaporType === "tengah" ? isRecordStsFilled(n) : isRecordSasFilled(n))
                       );
                       let total = 0;
                       let count = 0;

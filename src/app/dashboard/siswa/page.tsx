@@ -103,7 +103,7 @@ export default function SiswaManagementPage() {
 
   // If teacher, only students of assignedClass are in scope
   const baseSiswaList = teacherScope.isTeacher
-    ? teacherScope.filterByClass(siswaList)
+    ? teacherScope.filterByAssignedClass(siswaList)
     : siswaList;
 
   // Filtered Siswa

@@ -103,19 +103,21 @@ export interface NilaiSiswa {
   // Isian Komponen Nilai Harian & Ujian
   uh1?: number; // Ulangan Harian 1
   uh2?: number; // Ulangan Harian 2
-  tugas: number; // Rata-rata Ulangan Harian / Tugas Harian
-  uts: number; // Ujian Mid Semester (UTS / PTS)
-  uas: number; // Ujian Akhir Semester (UAS / PAS)
+  tugas?: number; // Rata-rata Ulangan Harian / Tugas Harian
+  uts?: number; // Ujian Mid Semester (UTS / PTS)
+  uas?: number; // Ujian Akhir Semester (UAS / PAS)
   // Komponen Rapor Tengah Semester (STS / Mid)
   nilaiMid?: number; // Hasil Rapor Tengah Semester: 100% Ujian STS (tanpa UH)
   predikatMid?: "A" | "B" | "C" | "D";
   catatanMid?: string;
   // Komponen Rapor Akhir Semester (PAS / Semester)
-  nilaiAkhir: number; // Hasil Rapor Akhir: 30% UH + 30% Mid + 40% UAS
-  predikat: "A" | "B" | "C" | "D";
+  nilaiAkhir?: number; // Hasil Rapor Akhir: 30% UH + 30% Mid + 40% UAS
+  predikat?: "A" | "B" | "C" | "D";
   catatan?: string;
   // Jenis Rapor spesifik
   jenisRapor?: JenisRapor | "semua";
+  hasSts?: boolean; // Menandai apakah nilai STS telah diinputkan
+  hasSas?: boolean; // Menandai apakah nilai SAS telah diinputkan
 }
 
 export type KategoriTagihan =
