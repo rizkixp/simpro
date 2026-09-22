@@ -876,29 +876,64 @@ export default function NilaiManagementPage() {
     return clean;
   };
 
-  // Helper to determine if subject is Muatan Lokal
-  const isMuatanLokal = (mapelName: string): boolean => {
+  // Helper to determine subject category in report card: Wajib, Muatan Lokal, or Kecerdasan Al-Qur'an
+  const getMapelSection = (mapelName: string): "wajib" | "mulok" | "quran" => {
     const norm = (mapelName || "").toLowerCase().trim();
     const mapelObj = mapelList.find((m) => m.nama.toLowerCase().trim() === norm);
     if (mapelObj) {
-      if (mapelObj.kategori === "Muatan Lokal") return true;
-      if (mapelObj.kategori === "Wajib" || mapelObj.kategori === "Peminatan") return false;
+      if (mapelObj.kategori === "Kecerdasan Al-Qur'an") return "quran";
+      if (mapelObj.kategori === "Muatan Lokal") return "mulok";
+      if (mapelObj.kategori === "Wajib" || mapelObj.kategori === "Peminatan") {
+        if (
+          norm.includes("al-qur'an") ||
+          norm.includes("al-quran") ||
+          norm.includes("alquran") ||
+          norm.includes("tahfidz") ||
+          norm.includes("tahsin") ||
+          norm.includes("tartil") ||
+          norm.includes("tilawah") ||
+          norm.includes("btq") ||
+          norm.includes("baca tulis al-qur'an") ||
+          norm.includes("kecerdasan al-qur'an")
+        ) {
+          return "quran";
+        }
+        return "wajib";
+      }
     }
-    return (
+    // Check keywords for Al-Qur'an
+    if (
+      norm.includes("al-qur'an") ||
+      norm.includes("al-quran") ||
+      norm.includes("alquran") ||
+      norm.includes("tahfidz") ||
+      norm.includes("tahsin") ||
+      norm.includes("tartil") ||
+      norm.includes("tilawah") ||
+      norm.includes("tajwid") ||
+      norm.includes("btq") ||
+      norm.includes("baca tulis al-qur'an") ||
+      norm.includes("kecerdasan al-qur'an")
+    ) {
+      return "quran";
+    }
+    // Check keywords for Muatan Lokal
+    if (
       norm.includes("muatan lokal") ||
       norm.includes("mulok") ||
       norm.includes("bahasa jawa") ||
       norm.includes("bahasa sunda") ||
       norm.includes("bahasa daerah") ||
-      norm.includes("bahasa arab") ||
       norm.includes("plbj") ||
-      norm.includes("tahfidz") ||
-      norm.includes("btq") ||
-      norm.includes("baca tulis al-qur'an") ||
       norm.includes("kemuhammadiyahan") ||
       norm.includes("ke-nu-an")
-    );
+    ) {
+      return "mulok";
+    }
+    return "wajib";
   };
+
+  const isMuatanLokal = (mapelName: string): boolean => getMapelSection(mapelName) === "mulok";
 
   // Generate official Islamic formatted WhatsApp message for student report
   const generateRaporWhatsAppText = (siswa: Siswa, type: JenisRapor, sem: "Ganjil" | "Genap" = waRaporSemester) => {
@@ -935,8 +970,11 @@ export default function NilaiManagementPage() {
     if (records.length === 0) {
       msg += `_(Data nilai mata pelajaran Semester ${sem} belum diinputkan)_\n`;
     } else {
-      const wajibRecs = records.filter((r) => !isMuatanLokal(r.mapel));
-      const mulokRecs = records.filter((r) => isMuatanLokal(r.mapel));
+      const wajibRecs = records.filter((r) => getMapelSection(r.mapel) === "wajib");
+      const mulokRecs = records.filter((r) => getMapelSection(r.mapel) === "mulok");
+      const quranRecs = records.filter((r) => getMapelSection(r.mapel) === "quran");
+
+      let hasPrevious = false;
 
       if (wajibRecs.length > 0) {
         msg += `*A. Muatan Wajib*\n`;
@@ -949,12 +987,28 @@ export default function NilaiManagementPage() {
             msg += `   _Catatan:_ "${note}"\n`;
           }
         });
+        hasPrevious = true;
       }
 
       if (mulokRecs.length > 0) {
-        if (wajibRecs.length > 0) msg += `\n`;
+        if (hasPrevious) msg += `\n`;
         msg += `*B. Muatan Lokal*\n`;
         mulokRecs.forEach((r, i) => {
+          const score = isMid ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
+          const pred = isMid ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
+          const note = isMid ? "" : getStudentAkhir(r).catatan;
+          msg += `${i + 1}. *${r.mapel}*: ${score} (${pred})\n`;
+          if (!isMid && note && note !== "-") {
+            msg += `   _Catatan:_ "${note}"\n`;
+          }
+        });
+        hasPrevious = true;
+      }
+
+      if (quranRecs.length > 0) {
+        if (hasPrevious) msg += `\n`;
+        msg += `*C. Kecerdasan Al-Qur'an*\n`;
+        quranRecs.forEach((r, i) => {
           const score = isMid ? getStudentMid(r).nilaiMid : getStudentAkhir(r).nilaiAkhir;
           const pred = isMid ? getStudentMid(r).predikatMid : getStudentAkhir(r).predikat;
           const note = isMid ? "" : getStudentAkhir(r).catatan;
@@ -3732,8 +3786,9 @@ export default function NilaiManagementPage() {
                     </tr>
                   ) : (
                     (() => {
-                      const wajibRecords = studentNilaiRecords.filter((item) => !isMuatanLokal(item.mapel));
-                      const mulokRecords = studentNilaiRecords.filter((item) => isMuatanLokal(item.mapel));
+                      const wajibRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
+                      const mulokRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
+                      const quranRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "quran");
 
                       return (
                         <>
@@ -3795,6 +3850,50 @@ export default function NilaiManagementPage() {
                             </tr>
                           ) : (
                             mulokRecords.map((item, idx) => {
+                              const mid = getStudentMid(item);
+                              const mapelObj = mapelList.find(
+                                (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                              );
+                              const kkm = mapelObj?.kkm || 75;
+                              const isTuntas = mid.nilaiMid >= kkm;
+
+                              return (
+                                <tr key={item.id}>
+                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                    {mid.nilaiMid}
+                                  </td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                    {mid.predikatMid}
+                                  </td>
+                                  <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
+                                    {isTuntas ? (
+                                      <span className="text-emerald-700">Tuntas</span>
+                                    ) : (
+                                      <span className="text-rose-700">Remedial</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+
+                          {/* Kelompok C: Kecerdasan Al-Qur'an */}
+                          <tr className="bg-slate-100/90 font-bold text-slate-900">
+                            <td colSpan={6} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                              C. Kecerdasan Al-Qur&apos;an
+                            </td>
+                          </tr>
+                          {quranRecords.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                                - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
+                              </td>
+                            </tr>
+                          ) : (
+                            quranRecords.map((item, idx) => {
                               const mid = getStudentMid(item);
                               const mapelObj = mapelList.find(
                                 (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
@@ -3875,8 +3974,9 @@ export default function NilaiManagementPage() {
                     </tr>
                   ) : (
                     (() => {
-                      const wajibRecords = studentNilaiRecords.filter((item) => !isMuatanLokal(item.mapel));
-                      const mulokRecords = studentNilaiRecords.filter((item) => isMuatanLokal(item.mapel));
+                      const wajibRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
+                      const mulokRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
+                      const quranRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "quran");
 
                       return (
                         <>
@@ -3936,6 +4036,48 @@ export default function NilaiManagementPage() {
                             </tr>
                           ) : (
                             mulokRecords.map((item, idx) => {
+                              const akhir = getStudentAkhir(item);
+                              const mapelObj = mapelList.find(
+                                (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                              );
+                              const kkm = mapelObj?.kkm || 75;
+
+                              return (
+                                <tr key={item.id}>
+                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uas}</td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
+                                    {akhir.nilaiAkhir}
+                                  </td>
+                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                    {akhir.predikat}
+                                  </td>
+                                  <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
+                                    {akhir.catatan || "-"}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+
+                          {/* Kelompok C: Kecerdasan Al-Qur'an */}
+                          <tr className="bg-slate-100/90 font-bold text-slate-900">
+                            <td colSpan={9} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                              C. Kecerdasan Al-Qur&apos;an
+                            </td>
+                          </tr>
+                          {quranRecords.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                                - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
+                              </td>
+                            </tr>
+                          ) : (
+                            quranRecords.map((item, idx) => {
                               const akhir = getStudentAkhir(item);
                               const mapelObj = mapelList.find(
                                 (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
@@ -4384,8 +4526,9 @@ export default function NilaiManagementPage() {
                                 </tr>
                               ) : (
                                 (() => {
-                                  const batchWajib = studentRecords.filter((item) => !isMuatanLokal(item.mapel));
-                                  const batchMulok = studentRecords.filter((item) => isMuatanLokal(item.mapel));
+                                  const batchWajib = studentRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
+                                  const batchMulok = studentRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
+                                  const batchQuran = studentRecords.filter((item) => getMapelSection(item.mapel) === "quran");
 
                                   return (
                                     <>
@@ -4447,6 +4590,50 @@ export default function NilaiManagementPage() {
                                         </tr>
                                       ) : (
                                         batchMulok.map((item, idx) => {
+                                          const mid = getStudentMid(item);
+                                          const mapelObj = mapelList.find(
+                                            (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                          );
+                                          const kkm = mapelObj?.kkm || 75;
+                                          const isTuntas = mid.nilaiMid >= kkm;
+
+                                          return (
+                                            <tr key={item.id} className="text-[11px]">
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                                {mid.nilaiMid}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                                {mid.predikatMid}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
+                                                {isTuntas ? (
+                                                  <span className="text-emerald-700">Tuntas</span>
+                                                ) : (
+                                                  <span className="text-rose-700">Remedial</span>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+
+                                      {/* Kelompok C: Kecerdasan Al-Qur'an */}
+                                      <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
+                                        <td colSpan={6} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                          C. Kecerdasan Al-Qur&apos;an
+                                        </td>
+                                      </tr>
+                                      {batchQuran.length === 0 ? (
+                                        <tr className="text-[11px]">
+                                          <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                            - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        batchQuran.map((item, idx) => {
                                           const mid = getStudentMid(item);
                                           const mapelObj = mapelList.find(
                                             (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
@@ -4522,8 +4709,9 @@ export default function NilaiManagementPage() {
                                 </tr>
                               ) : (
                                 (() => {
-                                  const batchWajib = studentRecords.filter((item) => !isMuatanLokal(item.mapel));
-                                  const batchMulok = studentRecords.filter((item) => isMuatanLokal(item.mapel));
+                                  const batchWajib = studentRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
+                                  const batchMulok = studentRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
+                                  const batchQuran = studentRecords.filter((item) => getMapelSection(item.mapel) === "quran");
 
                                   return (
                                     <>
@@ -4583,6 +4771,48 @@ export default function NilaiManagementPage() {
                                         </tr>
                                       ) : (
                                         batchMulok.map((item, idx) => {
+                                          const akhir = getStudentAkhir(item);
+                                          const mapelObj = mapelList.find(
+                                            (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
+                                          );
+                                          const kkm = mapelObj?.kkm || 75;
+
+                                          return (
+                                            <tr key={item.id} className="text-[11px]">
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
+                                                {akhir.nilaiAkhir}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                                {akhir.predikat}
+                                              </td>
+                                              <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                                {akhir.catatan || "-"}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })
+                                      )}
+
+                                      {/* Kelompok C: Kecerdasan Al-Qur'an */}
+                                      <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
+                                        <td colSpan={9} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                          C. Kecerdasan Al-Qur&apos;an
+                                        </td>
+                                      </tr>
+                                      {batchQuran.length === 0 ? (
+                                        <tr className="text-[11px]">
+                                          <td colSpan={9} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                            - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
+                                          </td>
+                                        </tr>
+                                      ) : (
+                                        batchQuran.map((item, idx) => {
                                           const akhir = getStudentAkhir(item);
                                           const mapelObj = mapelList.find(
                                             (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()

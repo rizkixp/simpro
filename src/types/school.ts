@@ -51,7 +51,7 @@ export interface MataPelajaran {
   id: string;
   kode: string;
   nama: string;
-  kategori: "Wajib" | "Peminatan" | "Muatan Lokal";
+  kategori: "Wajib" | "Peminatan" | "Muatan Lokal" | "Kecerdasan Al-Qur'an";
   kkm: number;
 }
 

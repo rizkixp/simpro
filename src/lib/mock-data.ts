@@ -415,6 +415,8 @@ export const INITIAL_MAPEL: MataPelajaran[] = [
   { id: "mpl-08", kode: "EKO", nama: "Ekonomi", kategori: "Peminatan", kkm: 75 },
   { id: "mpl-09", kode: "BDH", nama: "Bahasa Daerah", kategori: "Muatan Lokal", kkm: 75 },
   { id: "mpl-10", kode: "PLBJ", nama: "Pendidikan Lingkungan & Budaya (PLBJ)", kategori: "Muatan Lokal", kkm: 75 },
+  { id: "mpl-11", kode: "TFZ", nama: "Tahfidz & Tahsin Al-Qur'an", kategori: "Kecerdasan Al-Qur'an", kkm: 80 },
+  { id: "mpl-12", kode: "BTQ", nama: "Baca Tulis Al-Qur'an (BTQ)", kategori: "Kecerdasan Al-Qur'an", kkm: 80 },
 ];
 
 export const INITIAL_JADWAL: JadwalPelajaran[] = [
@@ -458,6 +460,11 @@ export const INITIAL_NILAI: NilaiSiswa[] = [
   { id: "nil-21", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Pendidikan Lingkungan & Budaya (PLBJ)", semester: "Ganjil", tahunAjaran: "2025/2026", tugas: 90, uts: 90, uas: 92, nilaiMid: 90, nilaiAkhir: 91, predikat: "A", catatan: "Menunjukkan kepedulian lingkungan dan pemahaman budaya lokal yang tinggi." },
   { id: "nil-22", siswaId: "sis-002", siswaNama: "Anisa Zahra Humaira", nisn: "0078129035", kelas: "X MIPA 1", mapel: "Bahasa Daerah", semester: "Ganjil", tahunAjaran: "2025/2026", tugas: 92, uts: 90, uas: 94, nilaiMid: 90, nilaiAkhir: 92, predikat: "A", catatan: "Sangat aktif dalam percakapan dan apresiasi sastra daerah." },
   { id: "nil-23", siswaId: "sis-002", siswaNama: "Anisa Zahra Humaira", nisn: "0078129035", kelas: "X MIPA 1", mapel: "Pendidikan Lingkungan & Budaya (PLBJ)", semester: "Ganjil", tahunAjaran: "2025/2026", tugas: 94, uts: 92, uas: 95, nilaiMid: 92, nilaiAkhir: 94, predikat: "A", catatan: "Kreatif dalam proyek pelestarian lingkungan sekolah." },
+  // Sample Kecerdasan Al-Qur'an Semester Ganjil
+  { id: "nil-26", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Tahfidz & Tahsin Al-Qur'an", semester: "Ganjil", tahunAjaran: "2025/2026", tugas: 95, uts: 96, uas: 98, nilaiMid: 96, nilaiAkhir: 97, predikat: "A", catatan: "Hafalan juz 30 mutqin, makhraj dan tajwid sangat fasih." },
+  { id: "nil-27", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Baca Tulis Al-Qur'an (BTQ)", semester: "Ganjil", tahunAjaran: "2025/2026", tugas: 92, uts: 94, uas: 95, nilaiMid: 94, nilaiAkhir: 94, predikat: "A", catatan: "Penulisan kaligrafi dan kaidah hukum bacaan Al-Qur'an sangat baik." },
+  { id: "nil-28", siswaId: "sis-002", siswaNama: "Anisa Zahra Humaira", nisn: "0078129035", kelas: "X MIPA 1", mapel: "Tahfidz & Tahsin Al-Qur'an", semester: "Ganjil", tahunAjaran: "2025/2026", tugas: 96, uts: 95, uas: 98, nilaiMid: 95, nilaiAkhir: 97, predikat: "A", catatan: "Tartil membaca dan hafalan surat-surat pilihan sangat baik." },
+  { id: "nil-29", siswaId: "sis-002", siswaNama: "Anisa Zahra Humaira", nisn: "0078129035", kelas: "X MIPA 1", mapel: "Baca Tulis Al-Qur'an (BTQ)", semester: "Ganjil", tahunAjaran: "2025/2026", tugas: 94, uts: 95, uas: 96, nilaiMid: 95, nilaiAkhir: 95, predikat: "A", catatan: "Sangat teliti dalam menulis imla' ayat-ayat Al-Qur'an." },
   // Sample Semester Genap
   { id: "nil-14", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Matematika", semester: "Genap", tahunAjaran: "2025/2026", tugas: 92, uts: 90, uas: 94, nilaiMid: 90, nilaiAkhir: 92, predikat: "A", catatan: "Peningkatan pemahaman konsep kalkulus sangat baik." },
   { id: "nil-15", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Fisika", semester: "Genap", tahunAjaran: "2025/2026", tugas: 88, uts: 85, uas: 90, nilaiMid: 85, nilaiAkhir: 88, predikat: "A", catatan: "Eksperimen optik dan gelombang sangat teliti." },
@@ -466,6 +473,9 @@ export const INITIAL_NILAI: NilaiSiswa[] = [
   // Sample Muatan Lokal Semester Genap
   { id: "nil-24", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Bahasa Daerah", semester: "Genap", tahunAjaran: "2025/2026", tugas: 90, uts: 88, uas: 92, nilaiMid: 88, nilaiAkhir: 90, predikat: "A", catatan: "Keterampilan berbahasa daerah terus berkembang positif." },
   { id: "nil-25", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Pendidikan Lingkungan & Budaya (PLBJ)", semester: "Genap", tahunAjaran: "2025/2026", tugas: 92, uts: 92, uas: 94, nilaiMid: 92, nilaiAkhir: 93, predikat: "A", catatan: "Sangat aktif dalam kegiatan pelestarian kearifan lokal." },
+  // Sample Kecerdasan Al-Qur'an Semester Genap
+  { id: "nil-30", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Tahfidz & Tahsin Al-Qur'an", semester: "Genap", tahunAjaran: "2025/2026", tugas: 96, uts: 96, uas: 98, nilaiMid: 96, nilaiAkhir: 97, predikat: "A", catatan: "Konsistensi murojaah hafalan Al-Qur'an sangat membanggakan." },
+  { id: "nil-31", siswaId: "sis-001", siswaNama: "Ahmad Rizky Pratama", nisn: "0078129034", kelas: "X MIPA 1", mapel: "Baca Tulis Al-Qur'an (BTQ)", semester: "Genap", tahunAjaran: "2025/2026", tugas: 95, uts: 94, uas: 96, nilaiMid: 94, nilaiAkhir: 95, predikat: "A", catatan: "Mampu mempraktikkan waqaf dan ibtida' dengan sangat tepat." },
   { id: "nil-18", siswaId: "sis-002", siswaNama: "Anisa Zahra Humaira", nisn: "0078129035", kelas: "X MIPA 1", mapel: "Matematika", semester: "Genap", tahunAjaran: "2025/2026", tugas: 95, uts: 95, uas: 96, nilaiMid: 95, nilaiAkhir: 95, predikat: "A", catatan: "Pemecahan masalah geometri analitik sangat memuaskan." },
   { id: "nil-19", siswaId: "sis-003", siswaNama: "Bima Arya Putra", nisn: "0078129036", kelas: "X MIPA 1", mapel: "Matematika", semester: "Genap", tahunAjaran: "2025/2026", tugas: 82, uts: 80, uas: 84, nilaiMid: 80, nilaiAkhir: 82, predikat: "B", catatan: "Menunjukkan kemajuan signifikan dalam latihan soal mandiri." },
 ];

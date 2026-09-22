@@ -2179,7 +2179,7 @@ export default function JadwalPage() {
             </div>
 
             {/* Quick Filter Pills / Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
               <div
                 onClick={() => setMapelFilterKategori("Semua")}
                 className={`p-3 rounded-xl border cursor-pointer transition-all ${
@@ -2233,6 +2233,20 @@ export default function JadwalPage() {
                   {mapelList.filter((m) => m.kategori === "Muatan Lokal").length} Mapel
                 </span>
               </div>
+
+              <div
+                onClick={() => setMapelFilterKategori("Kecerdasan Al-Qur'an")}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  mapelFilterKategori === "Kecerdasan Al-Qur'an"
+                    ? "bg-teal-50/70 dark:bg-teal-950/30 border-teal-300 dark:border-teal-800 text-teal-900 dark:text-teal-200"
+                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+                }`}
+              >
+                <span className="text-[11px] font-medium block">Kecerdasan Al-Qur'an</span>
+                <span className="text-lg font-extrabold">
+                  {mapelList.filter((m) => m.kategori === "Kecerdasan Al-Qur'an").length} Mapel
+                </span>
+              </div>
             </div>
           </div>
 
@@ -2271,6 +2285,7 @@ export default function JadwalPage() {
                 <option value="Wajib">Wajib</option>
                 <option value="Peminatan">Peminatan</option>
                 <option value="Muatan Lokal">Muatan Lokal</option>
+                <option value="Kecerdasan Al-Qur'an">Kecerdasan Al-Qur'an</option>
               </select>
             </div>
           </div>
@@ -2336,7 +2351,9 @@ export default function JadwalPage() {
                                   ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
                                   : m.kategori === "Peminatan"
                                   ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
-                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                  : m.kategori === "Muatan Lokal"
+                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                                  : "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
                               }`}
                             >
                               {m.kategori}
@@ -2886,8 +2903,8 @@ export default function JadwalPage() {
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Kategori Kelompok <span className="text-rose-500">*</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["Wajib", "Peminatan", "Muatan Lokal"] as const).map((kat) => (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(["Wajib", "Peminatan", "Muatan Lokal", "Kecerdasan Al-Qur'an"] as const).map((kat) => (
                     <button
                       key={kat}
                       type="button"
@@ -2898,7 +2915,9 @@ export default function JadwalPage() {
                             ? "bg-blue-600 text-white border-blue-600 shadow-sm"
                             : kat === "Peminatan"
                             ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                            : "bg-amber-600 text-white border-amber-600 shadow-sm"
+                            : kat === "Muatan Lokal"
+                            ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                            : "bg-teal-600 text-white border-teal-600 shadow-sm"
                           : "border-slate-200 dark:border-slate-700 hover:border-slate-300 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60"
                       }`}
                     >
