@@ -115,4 +115,10 @@
     box-shadow: none !important;
     border-radius: 0 !important;
   }
+  /* Memastikan border tabel cetak rapor strictly berwarna hitam pekat (#000000) saat di-print/PDF */
+  .rapor-print-table,
+  .rapor-print-table th,
+  .rapor-print-table td {
+    border-color: #000000 !important;
+  }
 }

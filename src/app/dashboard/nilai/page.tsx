@@ -44,6 +44,10 @@ import {
   AlertTriangle,
   UserX,
   Eraser,
+  Sliders,
+  Upload,
+  RotateCcw,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -166,6 +170,453 @@ export default function NilaiManagementPage() {
   const [batchRaporSemester, setBatchRaporSemester] = useState<"Ganjil" | "Genap">("Ganjil");
   const [batchRaporViewMode, setBatchRaporViewMode] = useState<"bundel" | "leger">("bundel");
   const [batchSelectedKelas, setBatchSelectedKelas] = useState<string>("Semua");
+
+  // Konfigurasi Kustomisasi Kop Surat & Titimangsa Rapor
+  interface RaporConfig {
+    logoKiriUrl: string;
+    logoKananUrl: string;
+    yayasanNama: string;
+    namaSekolah: string;
+    npsnAkreditasi: string;
+    alamatKontak: string;
+    garisKop: "double" | "single";
+    tempatRapor: string;
+    tanggalRapor: string;
+  }
+
+  const getDefaultRaporConfig = (): RaporConfig => ({
+    logoKiriUrl: "",
+    logoKananUrl: "",
+    yayasanNama: "YAYASAN PENDIDIKAN ISLAM TERPADU",
+    namaSekolah: profile?.namaSekolah || "SDI SMART SCHOOL",
+    npsnAkreditasi: `NPSN: ${profile?.npsn || "20104567"} • Akreditasi: ${profile?.akreditasi || "A"}`,
+    alamatKontak: `${profile?.alamat || "Jl. Pendidikan No. 45"} • Telp: ${profile?.telepon || "(021) 7890123"} • Website: ${profile?.website || "www.smartschool.sch.id"}`,
+    garisKop: "double",
+    tempatRapor: "Jakarta",
+    tanggalRapor: formatDateIndo(new Date().toISOString().split("T")[0]),
+  });
+
+  const [raporConfig, setRaporConfig] = useState<RaporConfig>(getDefaultRaporConfig);
+  const [isRaporSettingsOpen, setIsRaporSettingsOpen] = useState(false);
+  const [activeRaporConfigTab, setActiveRaporConfigTab] = useState<"kop" | "titimangsa">("kop");
+
+  // Load saved rapor config from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("simpro_rapor_config");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setRaporConfig((prev) => ({
+          ...prev,
+          ...parsed,
+          namaSekolah: parsed.namaSekolah || profile?.namaSekolah || prev.namaSekolah,
+        }));
+      }
+    } catch (e) {
+      console.warn("Failed to load simpro_rapor_config:", e);
+    }
+  }, [profile?.namaSekolah]);
+
+  const updateRaporConfig = (updates: Partial<RaporConfig>) => {
+    setRaporConfig((prev) => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem("simpro_rapor_config", JSON.stringify(next));
+      } catch (e) {
+        console.warn("Failed to save simpro_rapor_config:", e);
+      }
+      return next;
+    });
+  };
+
+  const handleLogoUpload = (side: "kiri" | "kanan", e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        updateRaporConfig(
+          side === "kiri"
+            ? { logoKiriUrl: reader.result }
+            : { logoKananUrl: reader.result }
+        );
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const renderRaporSettingsPanel = () => {
+    if (!isRaporSettingsOpen) return null;
+
+    return (
+      <div className="mb-6 p-4 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-700/50 shadow-sm print:hidden animate-in fade-in duration-200">
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-amber-200 dark:border-amber-800/40">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-amber-500 text-white">
+              <Sliders className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                Kustomisasi Kop Surat & Titimangsa Rapor
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Sesuaikan logo kiri/kanan, teks kop instansi, serta titimangsa alamat dan tanggal rapor.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const fresh = getDefaultRaporConfig();
+                setRaporConfig(fresh);
+                localStorage.removeItem("simpro_rapor_config");
+              }}
+              className="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center gap-1 transition-all cursor-pointer"
+              title="Reset Pengaturan ke Default"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset Default</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsRaporSettingsOpen(false)}
+              className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Switcher: Logo & Kop vs Titimangsa Tanda Tangan */}
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setActiveRaporConfigTab("kop")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeRaporConfigTab === "kop"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+            }`}
+          >
+            1. Logo & Teks Kop Surat
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveRaporConfigTab("titimangsa")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeRaporConfigTab === "titimangsa"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+            }`}
+          >
+            2. Alamat & Tanggal Rapor (Titimangsa Tanda Tangan)
+          </button>
+        </div>
+
+        {activeRaporConfigTab === "kop" ? (
+          <div className="space-y-4 text-xs">
+            {/* Logo Settings Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              {/* Logo Kiri */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Logo Kiri (Yayasan / Sekolah)
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800 flex-shrink-0">
+                    {raporConfig.logoKiriUrl ? (
+                      <img src={raporConfig.logoKiriUrl} alt="Logo Kiri" className="w-full h-full object-contain" />
+                    ) : (
+                      <GraduationCap className="h-6 w-6 text-blue-600" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium cursor-pointer transition-all">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>Unggah Gambar</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleLogoUpload("kiri", e)}
+                        />
+                      </label>
+                      {raporConfig.logoKiriUrl && (
+                        <button
+                          type="button"
+                          onClick={() => updateRaporConfig({ logoKiriUrl: "" })}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium cursor-pointer"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Atau tempel URL gambar..."
+                      value={raporConfig.logoKiriUrl}
+                      onChange={(e) => updateRaporConfig({ logoKiriUrl: e.target.value })}
+                      className="w-full text-[11px] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Logo Kanan */}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1">
+                  Logo Kanan (Kemenag / Disdik / Program)
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-800 flex-shrink-0">
+                    {raporConfig.logoKananUrl ? (
+                      <img src={raporConfig.logoKananUrl} alt="Logo Kanan" className="w-full h-full object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic text-center px-1">Tanpa Logo</span>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium cursor-pointer transition-all">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>Unggah Gambar</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleLogoUpload("kanan", e)}
+                        />
+                      </label>
+                      {raporConfig.logoKananUrl && (
+                        <button
+                          type="button"
+                          onClick={() => updateRaporConfig({ logoKananUrl: "" })}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-medium cursor-pointer"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Atau tempel URL gambar..."
+                      value={raporConfig.logoKananUrl}
+                      onChange={(e) => updateRaporConfig({ logoKananUrl: e.target.value })}
+                      className="w-full text-[11px] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Kop Text Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Yayasan / Lembaga Penyelenggara (Baris 1)
+                </label>
+                <input
+                  type="text"
+                  value={raporConfig.yayasanNama}
+                  onChange={(e) => updateRaporConfig({ yayasanNama: e.target.value })}
+                  placeholder="Contoh: YAYASAN PENDIDIKAN ISLAM ..."
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Satuan Pendidikan (Baris 2 / Utama)
+                </label>
+                <input
+                  type="text"
+                  value={raporConfig.namaSekolah}
+                  onChange={(e) => updateRaporConfig({ namaSekolah: e.target.value })}
+                  placeholder="Contoh: SD ISLAM TERPADU ..."
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  NPSN & Akreditasi (Baris 3)
+                </label>
+                <input
+                  type="text"
+                  value={raporConfig.npsnAkreditasi}
+                  onChange={(e) => updateRaporConfig({ npsnAkreditasi: e.target.value })}
+                  placeholder="Contoh: NPSN: 20104567 • Akreditasi: A"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Alamat, Kontak & Web (Baris 4)
+                </label>
+                <input
+                  type="text"
+                  value={raporConfig.alamatKontak}
+                  onChange={(e) => updateRaporConfig({ alamatKontak: e.target.value })}
+                  placeholder="Contoh: Jl. Merdeka No. 12 • Telp: (021) 123456"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="md:col-span-2 flex items-center gap-4 pt-1">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  Garis Pembatas Kop:
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateRaporConfig({ garisKop: "double" })}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer border ${
+                      raporConfig.garisKop === "double"
+                        ? "bg-amber-500 text-white border-amber-600 font-bold"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
+                    }`}
+                  >
+                    Garis Ganda (Resmi)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateRaporConfig({ garisKop: "single" })}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer border ${
+                      raporConfig.garisKop === "single"
+                        ? "bg-amber-500 text-white border-amber-600 font-bold"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300"
+                    }`}
+                  >
+                    Garis Tunggal Tebal
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Titimangsa Tab */
+          <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
+            <p className="text-slate-500">
+              Titimangsa ini akan muncul di atas kolom tanda tangan pada bagian bawah lembar rapor:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Alamat / Kota Penetapan Rapor
+                </label>
+                <input
+                  type="text"
+                  value={raporConfig.tempatRapor}
+                  onChange={(e) => updateRaporConfig({ tempatRapor: e.target.value })}
+                  placeholder="Contoh: Jakarta, Bandung, Surabaya..."
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Tanggal Rapor
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={raporConfig.tanggalRapor}
+                    onChange={(e) => updateRaporConfig({ tanggalRapor: e.target.value })}
+                    placeholder="Contoh: 20 Desember 2024"
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRaporConfig({
+                        tanggalRapor: formatDateIndo(new Date().toISOString().split("T")[0]),
+                      })
+                    }
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer text-[11px] whitespace-nowrap"
+                  >
+                    Hari Ini
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-between">
+              <span>Pratinjau Format Titimangsa:</span>
+              <strong className="text-slate-900 dark:text-slate-100 font-mono">
+                {raporConfig.tempatRapor}, {raporConfig.tanggalRapor}
+              </strong>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderOfficialLetterhead = (isSmall = false) => {
+    const isDouble = raporConfig.garisKop === "double";
+    return (
+      <div
+        className={`text-center pb-3 mb-4 ${
+          isDouble
+            ? "border-b-4 border-double border-[#000000]"
+            : "border-b-2 border-[#000000]"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3 mb-1">
+          {/* Logo Kiri */}
+          <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+            {raporConfig.logoKiriUrl ? (
+              <img
+                src={raporConfig.logoKiriUrl}
+                alt="Logo Kiri"
+                className="max-h-16 max-w-16 object-contain"
+              />
+            ) : (
+              <div className={`${isSmall ? "h-10 w-10" : "h-12 w-12"} rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold`}>
+                <GraduationCap className={`${isSmall ? "h-6 w-6" : "h-7 w-7"}`} />
+              </div>
+            )}
+          </div>
+
+          {/* Bagian Tulisan Tengah Kop Surat */}
+          <div className="flex-1 text-center">
+            {raporConfig.yayasanNama && (
+              <p className="text-[11px] sm:text-xs font-bold tracking-wider uppercase text-slate-800">
+                {raporConfig.yayasanNama}
+              </p>
+            )}
+            <h2 className={`${isSmall ? "text-lg" : "text-xl"} font-extrabold uppercase tracking-wide text-slate-900 leading-tight`}>
+              {raporConfig.namaSekolah || profile.namaSekolah}
+            </h2>
+            <p className="text-[11px] sm:text-xs text-slate-700 font-medium mt-0.5">
+              {raporConfig.npsnAkreditasi ||
+                `NPSN: ${profile.npsn} • Akreditasi: ${profile.akreditasi}`}
+            </p>
+            <p className="text-[10px] sm:text-[11px] text-slate-600 max-w-xl mx-auto mt-0.5">
+              {raporConfig.alamatKontak ||
+                `${profile.alamat} • Telp: ${profile.telepon} • Website: ${profile.website}`}
+            </p>
+          </div>
+
+          {/* Logo Kanan */}
+          <div className="w-16 h-16 flex-shrink-0 flex items-center justify-center">
+            {raporConfig.logoKananUrl ? (
+              <img
+                src={raporConfig.logoKananUrl}
+                alt="Logo Kanan"
+                className="max-h-16 max-w-16 object-contain"
+              />
+            ) : (
+              <div className="w-16 h-16" />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // WhatsApp Share State
   const [isWaModalOpen, setIsWaModalOpen] = useState(false);
@@ -3704,6 +4155,20 @@ export default function NilaiManagementPage() {
 
                 <button
                   type="button"
+                  onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                    isRaporSettingsOpen
+                      ? "bg-amber-500 text-white shadow-amber-500/20"
+                      : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                  }`}
+                  title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                >
+                  <Sliders className="h-4 w-4" />
+                  <span>Atur Kop & TTD</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setRaporSiswa(null)}
                   className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                   title="Tutup Modal Cetak Rapor (Esc)"
@@ -3714,25 +4179,11 @@ export default function NilaiManagementPage() {
               </div>
             </div>
 
+            {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
+            {renderRaporSettingsPanel()}
+
             {/* Official School Letterhead (Kop Surat) */}
-            <div className="text-center border-b-2 border-slate-900 pb-4 mb-5">
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold">
-                  <GraduationCap className="h-7 w-7" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-extrabold uppercase tracking-wide text-slate-900">
-                    {profile.namaSekolah}
-                  </h2>
-                  <p className="text-xs text-slate-600 font-medium">
-                    NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi}
-                  </p>
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-500 max-w-xl mx-auto">
-                {profile.alamat} &bull; Telp: {profile.telepon} &bull; Website: {profile.website}
-              </p>
-            </div>
+            {renderOfficialLetterhead()}
 
             {/* Report Title & Type Info */}
             <div className="text-center mb-5">
@@ -3766,21 +4217,20 @@ export default function NilaiManagementPage() {
             {/* Table of Grades */}
             {raporPrintType === "tengah" ? (
               // Table for Rapor Tengah Semester (PTS)
-              <table className="w-full text-xs text-left border-collapse border border-slate-300 mb-6">
+              <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-6">
                 <thead>
                   <tr className="bg-slate-100 text-slate-800 font-bold">
-                    <th className="border border-slate-300 px-3 py-2 text-center w-10">No</th>
-                    <th className="border border-slate-300 px-3 py-2">Mata Pelajaran</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-16">KKM</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-24 bg-amber-50">Nilai Prestasi</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-16">Predikat</th>
-                    <th className="border border-slate-300 px-3 py-2 text-center w-24">Keterangan</th>
+                    <th className="border border-[#000000] px-3 py-2 text-center w-10">No</th>
+                    <th className="border border-[#000000] px-3 py-2">Mata Pelajaran</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-16">KKM</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-24 bg-amber-50">Nilai Prestasi</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-16">Predikat</th>
                   </tr>
                 </thead>
                 <tbody>
                   {studentNilaiRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="border border-slate-300 px-3 py-6 text-center text-slate-400">
+                      <td colSpan={5} className="border border-[#000000] px-3 py-6 text-center text-slate-400">
                         Belum ada nilai mata pelajaran yang diinputkan untuk siswa ini.
                       </td>
                     </tr>
@@ -3794,13 +4244,13 @@ export default function NilaiManagementPage() {
                         <>
                           {/* Kelompok A: Muatan Wajib */}
                           <tr className="bg-slate-100/90 font-bold text-slate-900">
-                            <td colSpan={6} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                            <td colSpan={5} className="border border-[#000000] px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
                               A. Muatan Wajib
                             </td>
                           </tr>
                           {wajibRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                              <td colSpan={5} className="border border-[#000000] px-3 py-2 text-center text-slate-400 italic">
                                 - Belum ada mata pelajaran muatan wajib -
                               </td>
                             </tr>
@@ -3811,25 +4261,17 @@ export default function NilaiManagementPage() {
                                 (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                               );
                               const kkm = mapelObj?.kkm || 75;
-                              const isTuntas = mid.nilaiMid >= kkm;
 
                               return (
                                 <tr key={item.id}>
-                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                  <td className="border border-[#000000] px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-[#000000] px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
                                     {mid.nilaiMid}
                                   </td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold">
                                     {mid.predikatMid}
-                                  </td>
-                                  <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
-                                    {isTuntas ? (
-                                      <span className="text-emerald-700">Tuntas</span>
-                                    ) : (
-                                      <span className="text-rose-700">Remedial</span>
-                                    )}
                                   </td>
                                 </tr>
                               );
@@ -3838,13 +4280,13 @@ export default function NilaiManagementPage() {
 
                           {/* Kelompok B: Muatan Lokal */}
                           <tr className="bg-slate-100/90 font-bold text-slate-900">
-                            <td colSpan={6} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                            <td colSpan={5} className="border border-[#000000] px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
                               B. Muatan Lokal
                             </td>
                           </tr>
                           {mulokRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                              <td colSpan={5} className="border border-[#000000] px-3 py-2 text-center text-slate-400 italic">
                                 - Tidak ada mata pelajaran muatan lokal -
                               </td>
                             </tr>
@@ -3855,25 +4297,17 @@ export default function NilaiManagementPage() {
                                 (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                               );
                               const kkm = mapelObj?.kkm || 75;
-                              const isTuntas = mid.nilaiMid >= kkm;
 
                               return (
                                 <tr key={item.id}>
-                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                  <td className="border border-[#000000] px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-[#000000] px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
                                     {mid.nilaiMid}
                                   </td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold">
                                     {mid.predikatMid}
-                                  </td>
-                                  <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
-                                    {isTuntas ? (
-                                      <span className="text-emerald-700">Tuntas</span>
-                                    ) : (
-                                      <span className="text-rose-700">Remedial</span>
-                                    )}
                                   </td>
                                 </tr>
                               );
@@ -3882,13 +4316,13 @@ export default function NilaiManagementPage() {
 
                           {/* Kelompok C: Kecerdasan Al-Qur'an */}
                           <tr className="bg-slate-100/90 font-bold text-slate-900">
-                            <td colSpan={6} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                            <td colSpan={5} className="border border-[#000000] px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
                               C. Kecerdasan Al-Qur&apos;an
                             </td>
                           </tr>
                           {quranRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                              <td colSpan={5} className="border border-[#000000] px-3 py-2 text-center text-slate-400 italic">
                                 - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
                               </td>
                             </tr>
@@ -3899,25 +4333,17 @@ export default function NilaiManagementPage() {
                                 (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                               );
                               const kkm = mapelObj?.kkm || 75;
-                              const isTuntas = mid.nilaiMid >= kkm;
 
                               return (
                                 <tr key={item.id}>
-                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                  <td className="border border-[#000000] px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-[#000000] px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
                                     {mid.nilaiMid}
                                   </td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold">
                                     {mid.predikatMid}
-                                  </td>
-                                  <td className="border border-slate-300 px-3 py-2 text-center font-bold text-xs">
-                                    {isTuntas ? (
-                                      <span className="text-emerald-700">Tuntas</span>
-                                    ) : (
-                                      <span className="text-rose-700">Remedial</span>
-                                    )}
                                   </td>
                                 </tr>
                               );
@@ -3930,45 +4356,42 @@ export default function NilaiManagementPage() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-50 font-semibold">
-                    <td colSpan={3} className="border border-slate-300 px-3 py-2 text-right">
+                    <td colSpan={3} className="border border-[#000000] px-3 py-2 text-right">
                       Rata-Rata Nilai Sumatif Tengah Semester (STS):
                     </td>
-                    <td className="border border-slate-300 px-2 py-2 text-center font-bold text-amber-800 text-sm font-mono bg-amber-50">
+                    <td className="border border-[#000000] px-2 py-2 text-center font-bold text-amber-800 text-sm font-mono bg-amber-50">
                       {studentMidAverage}
                     </td>
-                    <td colSpan={2} className="border border-slate-300 px-3 py-2 text-slate-600">
-                      Predikat Umum:{" "}
-                      <strong>
-                        {studentMidAverage >= 88
-                          ? "A (Sangat Baik)"
-                          : studentMidAverage >= 75
-                          ? "B (Baik)"
-                          : "C (Cukup)"}
-                      </strong>
+                    <td colSpan={1} className="border border-[#000000] px-2 py-2 text-center text-slate-700 font-bold">
+                      {studentMidAverage >= 88
+                        ? "A"
+                        : studentMidAverage >= 75
+                        ? "B"
+                        : "C"}
                     </td>
                   </tr>
                 </tfoot>
               </table>
             ) : (
               // Table for Rapor Akhir Semester (PAS)
-              <table className="w-full text-xs text-left border-collapse border border-slate-300 mb-6">
+              <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-6">
                 <thead>
                   <tr className="bg-slate-100 text-slate-800 font-bold">
-                    <th className="border border-slate-300 px-3 py-2 text-center w-10">No</th>
-                    <th className="border border-slate-300 px-3 py-2">Mata Pelajaran</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-14">KKM</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-20">Harian (30%)</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-20">Mid (30%)</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-20">UAS (40%)</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-20 bg-blue-50">Nilai Akhir</th>
-                    <th className="border border-slate-300 px-2 py-2 text-center w-16">Predikat</th>
-                    <th className="border border-slate-300 px-3 py-2">Catatan Capaian Kompetensi</th>
+                    <th className="border border-[#000000] px-3 py-2 text-center w-10">No</th>
+                    <th className="border border-[#000000] px-3 py-2">Mata Pelajaran</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-14">KKM</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-20">Harian (30%)</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-20">Mid (30%)</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-20">UAS (40%)</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-20 bg-blue-50">Nilai Akhir</th>
+                    <th className="border border-[#000000] px-2 py-2 text-center w-16">Predikat</th>
+                    <th className="border border-[#000000] px-3 py-2">Catatan Capaian Kompetensi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {studentNilaiRecords.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="border border-slate-300 px-3 py-6 text-center text-slate-400">
+                      <td colSpan={9} className="border border-[#000000] px-3 py-6 text-center text-slate-400">
                         Belum ada nilai mata pelajaran yang diinputkan untuk siswa ini.
                       </td>
                     </tr>
@@ -3982,13 +4405,13 @@ export default function NilaiManagementPage() {
                         <>
                           {/* Kelompok A: Muatan Wajib */}
                           <tr className="bg-slate-100/90 font-bold text-slate-900">
-                            <td colSpan={9} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                            <td colSpan={9} className="border border-[#000000] px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
                               A. Muatan Wajib
                             </td>
                           </tr>
                           {wajibRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={9} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                              <td colSpan={9} className="border border-[#000000] px-3 py-2 text-center text-slate-400 italic">
                                 - Belum ada mata pelajaran muatan wajib -
                               </td>
                             </tr>
@@ -4002,19 +4425,19 @@ export default function NilaiManagementPage() {
 
                               return (
                                 <tr key={item.id}>
-                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uas}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
+                                  <td className="border border-[#000000] px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-[#000000] px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.tugas}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.uts}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.uas}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
                                     {akhir.nilaiAkhir}
                                   </td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold">
                                     {akhir.predikat}
                                   </td>
-                                  <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
+                                  <td className="border border-[#000000] px-3 py-2 text-slate-600 text-[11px]">
                                     {akhir.catatan || "-"}
                                   </td>
                                 </tr>
@@ -4024,13 +4447,13 @@ export default function NilaiManagementPage() {
 
                           {/* Kelompok B: Muatan Lokal */}
                           <tr className="bg-slate-100/90 font-bold text-slate-900">
-                            <td colSpan={9} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                            <td colSpan={9} className="border border-[#000000] px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
                               B. Muatan Lokal
                             </td>
                           </tr>
                           {mulokRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={9} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                              <td colSpan={9} className="border border-[#000000] px-3 py-2 text-center text-slate-400 italic">
                                 - Tidak ada mata pelajaran muatan lokal -
                               </td>
                             </tr>
@@ -4044,19 +4467,19 @@ export default function NilaiManagementPage() {
 
                               return (
                                 <tr key={item.id}>
-                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uas}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
+                                  <td className="border border-[#000000] px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-[#000000] px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.tugas}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.uts}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.uas}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
                                     {akhir.nilaiAkhir}
                                   </td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold">
                                     {akhir.predikat}
                                   </td>
-                                  <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
+                                  <td className="border border-[#000000] px-3 py-2 text-slate-600 text-[11px]">
                                     {akhir.catatan || "-"}
                                   </td>
                                 </tr>
@@ -4066,13 +4489,13 @@ export default function NilaiManagementPage() {
 
                           {/* Kelompok C: Kecerdasan Al-Qur'an */}
                           <tr className="bg-slate-100/90 font-bold text-slate-900">
-                            <td colSpan={9} className="border border-slate-300 px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
+                            <td colSpan={9} className="border border-[#000000] px-3 py-1.5 font-bold uppercase tracking-wider bg-slate-100">
                               C. Kecerdasan Al-Qur&apos;an
                             </td>
                           </tr>
                           {quranRecords.length === 0 ? (
                             <tr>
-                              <td colSpan={9} className="border border-slate-300 px-3 py-2 text-center text-slate-400 italic">
+                              <td colSpan={9} className="border border-[#000000] px-3 py-2 text-center text-slate-400 italic">
                                 - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
                               </td>
                             </tr>
@@ -4086,19 +4509,19 @@ export default function NilaiManagementPage() {
 
                               return (
                                 <tr key={item.id}>
-                                  <td className="border border-slate-300 px-3 py-2 text-center">{idx + 1}</td>
-                                  <td className="border border-slate-300 px-3 py-2 font-semibold">{item.mapel}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{kkm}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.tugas}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uts}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-mono">{item.uas}</td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
+                                  <td className="border border-[#000000] px-3 py-2 text-center">{idx + 1}</td>
+                                  <td className="border border-[#000000] px-3 py-2 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{kkm}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.tugas}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.uts}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-mono">{item.uas}</td>
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold text-blue-700 bg-blue-50/50 font-mono">
                                     {akhir.nilaiAkhir}
                                   </td>
-                                  <td className="border border-slate-300 px-2 py-2 text-center font-bold">
+                                  <td className="border border-[#000000] px-2 py-2 text-center font-bold">
                                     {akhir.predikat}
                                   </td>
-                                  <td className="border border-slate-300 px-3 py-2 text-slate-600 text-[11px]">
+                                  <td className="border border-[#000000] px-3 py-2 text-slate-600 text-[11px]">
                                     {akhir.catatan || "-"}
                                   </td>
                                 </tr>
@@ -4112,13 +4535,13 @@ export default function NilaiManagementPage() {
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-50 font-semibold">
-                    <td colSpan={6} className="border border-slate-300 px-3 py-2 text-right">
+                    <td colSpan={6} className="border border-[#000000] px-3 py-2 text-right">
                       Rata-Rata Nilai Akhir Semester (PAS):
                     </td>
-                    <td className="border border-slate-300 px-2 py-2 text-center font-bold text-blue-800 text-sm font-mono bg-blue-50">
+                    <td className="border border-[#000000] px-2 py-2 text-center font-bold text-blue-800 text-sm font-mono bg-blue-50">
                       {studentAkhirAverage}
                     </td>
-                    <td colSpan={2} className="border border-slate-300 px-3 py-2 text-slate-600">
+                    <td colSpan={2} className="border border-[#000000] px-3 py-2 text-slate-600">
                       Predikat Umum:{" "}
                       <strong>
                         {studentAkhirAverage >= 88
@@ -4150,21 +4573,43 @@ export default function NilaiManagementPage() {
               const waliNip = matchedWaliGuru?.nip || "198506122010012015";
 
               return (
-                <div className="grid grid-cols-2 text-center text-xs pt-8 border-0 border-none">
-                  <div>
-                    <p className="text-slate-500">Mengetahui,</p>
-                    <p className="text-slate-500">Wali Kelas {raporSiswa.kelas},</p>
-                    <div className="h-16" />
-                    <p className="font-bold underline">{waliNama}</p>
-                    <p className="text-[10px] text-slate-400">NIP: {waliNip}</p>
+                <div className="pt-6 border-0 border-none text-xs">
+                  {/* Titimangsa Alamat dan Tanggal Rapor */}
+                  <div className="flex justify-end mb-2 pr-4">
+                    <p className="text-slate-800 font-medium">
+                      {raporConfig.tempatRapor}, {raporConfig.tanggalRapor}
+                    </p>
                   </div>
 
-                  <div>
-                    <p className="text-slate-500">Jakarta, {formatDateIndo(new Date().toISOString().split("T")[0])}</p>
-                    <p className="text-slate-500">Kepala Sekolah,</p>
-                    <div className="h-14" />
-                    <p className="font-bold underline">{profile.kepalaSekolah}</p>
-                    <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
+                  <div className="grid grid-cols-3 text-center gap-4">
+                    {/* Kolom 1: Orang Tua / Wali Santri */}
+                    <div>
+                      <p className="text-slate-600">Mengetahui,</p>
+                      <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
+                      <div className="h-16" />
+                      <p className="font-bold underline">
+                        {raporSiswa.namaWali ? `( ${raporSiswa.namaWali} )` : "( ................................................ )"}
+                      </p>
+                      <p className="text-[10px] text-slate-400">Tanda Tangan & Nama Terang</p>
+                    </div>
+
+                    {/* Kolom 2: Wali Kelas */}
+                    <div>
+                      <p className="text-slate-600 invisible">Mengetahui,</p>
+                      <p className="text-slate-800 font-medium">Wali Kelas {raporSiswa.kelas},</p>
+                      <div className="h-16" />
+                      <p className="font-bold underline">{waliNama}</p>
+                      <p className="text-[10px] text-slate-500">NIP: {waliNip}</p>
+                    </div>
+
+                    {/* Kolom 3: Kepala Sekolah */}
+                    <div>
+                      <p className="text-slate-600 invisible">Mengetahui,</p>
+                      <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
+                      <div className="h-16" />
+                      <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                      <p className="text-[10px] text-slate-500">NIP: 197204151998031002</p>
+                    </div>
                   </div>
                 </div>
               );
@@ -4395,6 +4840,20 @@ export default function NilaiManagementPage() {
 
                 <button
                   type="button"
+                  onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                    isRaporSettingsOpen
+                      ? "bg-amber-500 text-white shadow-amber-500/20"
+                      : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                  }`}
+                  title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                >
+                  <Sliders className="h-4 w-4" />
+                  <span>Atur Kop & TTD</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setIsBatchRaporOpen(false)}
                   className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                   title="Tutup Modal Cetak Rapor Rombel (Esc)"
@@ -4404,6 +4863,9 @@ export default function NilaiManagementPage() {
                 </button>
               </div>
             </div>
+
+            {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
+            {renderRaporSettingsPanel()}
 
             {/* ========================================================= */}
             {/* KONTEN 1: MODE BUNDEL LEMBAR RAPOR PER SISWA (MULTI-PAGE) */}
@@ -4461,24 +4923,7 @@ export default function NilaiManagementPage() {
                         className="p-6 sm:p-8 bg-white border-0 border-none print:border-none print:p-0 print:m-0"
                       >
                         {/* Kop Surat */}
-                        <div className="text-center border-b-2 border-slate-900 pb-4 mb-5">
-                          <div className="flex items-center justify-center gap-3 mb-2">
-                            <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold">
-                              <GraduationCap className="h-6 w-6" />
-                            </div>
-                            <div>
-                              <h2 className="text-lg font-extrabold uppercase tracking-wide text-slate-900">
-                                {profile.namaSekolah}
-                              </h2>
-                              <p className="text-[11px] text-slate-600 font-medium">
-                                NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi}
-                              </p>
-                            </div>
-                          </div>
-                          <p className="text-[10px] text-slate-500 max-w-xl mx-auto">
-                            {profile.alamat} &bull; Telp: {profile.telepon} &bull; Website: {profile.website}
-                          </p>
-                        </div>
+                        {renderOfficialLetterhead(true)}
 
                         {/* Title */}
                         <div className="text-center mb-4">
@@ -4506,21 +4951,20 @@ export default function NilaiManagementPage() {
 
                         {/* Table of Grades */}
                         {batchRaporType === "tengah" ? (
-                          <table className="w-full text-xs text-left border-collapse border border-slate-300 mb-5">
+                          <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-5">
                             <thead>
                               <tr className="bg-slate-100 text-slate-800 font-bold text-[11px]">
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-8">No</th>
-                                <th className="border border-slate-300 px-2 py-1.5">Mata Pelajaran</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20 bg-amber-50">Nilai Prestasi</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-20">Keterangan</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-8">No</th>
+                                <th className="border border-[#000000] px-2 py-1.5">Mata Pelajaran</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-12">KKM</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-20 bg-amber-50">Nilai Prestasi</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-14">Predikat</th>
                               </tr>
                             </thead>
                             <tbody>
                               {studentRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={6} className="border border-slate-300 px-3 py-4 text-center text-slate-400">
+                                  <td colSpan={5} className="border border-[#000000] px-3 py-4 text-center text-slate-400">
                                     Belum ada nilai yang diinputkan untuk siswa ini.
                                   </td>
                                 </tr>
@@ -4534,13 +4978,13 @@ export default function NilaiManagementPage() {
                                     <>
                                       {/* Kelompok A: Muatan Wajib */}
                                       <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
-                                        <td colSpan={6} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                        <td colSpan={5} className="border border-[#000000] px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
                                           A. Muatan Wajib
                                         </td>
                                       </tr>
                                       {batchWajib.length === 0 ? (
                                         <tr className="text-[11px]">
-                                          <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                          <td colSpan={5} className="border border-[#000000] px-2 py-1.5 text-center text-slate-400 italic">
                                             - Belum ada mata pelajaran muatan wajib -
                                           </td>
                                         </tr>
@@ -4551,25 +4995,17 @@ export default function NilaiManagementPage() {
                                             (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                                           );
                                           const kkm = mapelObj?.kkm || 75;
-                                          const isTuntas = mid.nilaiMid >= kkm;
 
                                           return (
                                             <tr key={item.id} className="text-[11px]">
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
                                                 {mid.nilaiMid}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold">
                                                 {mid.predikatMid}
-                                              </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
-                                                {isTuntas ? (
-                                                  <span className="text-emerald-700">Tuntas</span>
-                                                ) : (
-                                                  <span className="text-rose-700">Remedial</span>
-                                                )}
                                               </td>
                                             </tr>
                                           );
@@ -4578,13 +5014,13 @@ export default function NilaiManagementPage() {
 
                                       {/* Kelompok B: Muatan Lokal */}
                                       <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
-                                        <td colSpan={6} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                        <td colSpan={5} className="border border-[#000000] px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
                                           B. Muatan Lokal
                                         </td>
                                       </tr>
                                       {batchMulok.length === 0 ? (
                                         <tr className="text-[11px]">
-                                          <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                          <td colSpan={5} className="border border-[#000000] px-2 py-1.5 text-center text-slate-400 italic">
                                             - Tidak ada mata pelajaran muatan lokal -
                                           </td>
                                         </tr>
@@ -4595,25 +5031,17 @@ export default function NilaiManagementPage() {
                                             (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                                           );
                                           const kkm = mapelObj?.kkm || 75;
-                                          const isTuntas = mid.nilaiMid >= kkm;
 
                                           return (
                                             <tr key={item.id} className="text-[11px]">
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
                                                 {mid.nilaiMid}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold">
                                                 {mid.predikatMid}
-                                              </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
-                                                {isTuntas ? (
-                                                  <span className="text-emerald-700">Tuntas</span>
-                                                ) : (
-                                                  <span className="text-rose-700">Remedial</span>
-                                                )}
                                               </td>
                                             </tr>
                                           );
@@ -4622,13 +5050,13 @@ export default function NilaiManagementPage() {
 
                                       {/* Kelompok C: Kecerdasan Al-Qur'an */}
                                       <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
-                                        <td colSpan={6} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                        <td colSpan={5} className="border border-[#000000] px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
                                           C. Kecerdasan Al-Qur&apos;an
                                         </td>
                                       </tr>
                                       {batchQuran.length === 0 ? (
                                         <tr className="text-[11px]">
-                                          <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                          <td colSpan={5} className="border border-[#000000] px-2 py-1.5 text-center text-slate-400 italic">
                                             - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
                                           </td>
                                         </tr>
@@ -4639,25 +5067,17 @@ export default function NilaiManagementPage() {
                                             (m) => m.nama.toLowerCase() === item.mapel.toLowerCase()
                                           );
                                           const kkm = mapelObj?.kkm || 75;
-                                          const isTuntas = mid.nilaiMid >= kkm;
 
                                           return (
                                             <tr key={item.id} className="text-[11px]">
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
                                                 {mid.nilaiMid}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold">
                                                 {mid.predikatMid}
-                                              </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-[10px]">
-                                                {isTuntas ? (
-                                                  <span className="text-emerald-700">Tuntas</span>
-                                                ) : (
-                                                  <span className="text-rose-700">Remedial</span>
-                                                )}
                                               </td>
                                             </tr>
                                           );
@@ -4670,40 +5090,37 @@ export default function NilaiManagementPage() {
                             </tbody>
                             <tfoot>
                               <tr className="bg-slate-50 font-semibold text-[11px]">
-                                <td colSpan={3} className="border border-slate-300 px-3 py-1.5 text-right">
+                                <td colSpan={3} className="border border-[#000000] px-3 py-1.5 text-right">
                                   Rata-Rata Nilai Rapor STS:
                                 </td>
-                                <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-amber-800 font-mono bg-amber-50">
+                                <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-amber-800 font-mono bg-amber-50">
                                   {midAvg}
                                 </td>
-                                <td colSpan={2} className="border border-slate-300 px-3 py-1.5 text-slate-600">
-                                  Predikat:{" "}
-                                  <strong>
-                                    {midAvg >= 88 ? "A (Sangat Baik)" : midAvg >= 75 ? "B (Baik)" : "C (Cukup)"}
-                                  </strong>
+                                <td colSpan={1} className="border border-[#000000] px-2 py-1.5 text-center text-slate-700 font-bold">
+                                  {midAvg >= 88 ? "A" : midAvg >= 75 ? "B" : "C"}
                                 </td>
                               </tr>
                             </tfoot>
                           </table>
                         ) : (
-                          <table className="w-full text-xs text-left border-collapse border border-slate-300 mb-5">
+                          <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-5">
                             <thead>
                               <tr className="bg-slate-100 text-slate-800 font-bold text-[11px]">
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-8">No</th>
-                                <th className="border border-slate-300 px-2 py-1.5">Mata Pelajaran</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-12">KKM</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16">UH (30%)</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16">Mid (30%)</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16">UAS (40%)</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-16 bg-blue-50">Nilai Akhir</th>
-                                <th className="border border-slate-300 px-2 py-1.5 text-center w-14">Predikat</th>
-                                <th className="border border-slate-300 px-2 py-1.5">Catatan Capaian</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-8">No</th>
+                                <th className="border border-[#000000] px-2 py-1.5">Mata Pelajaran</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-12">KKM</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-16">UH (30%)</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-16">Mid (30%)</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-16">UAS (40%)</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-16 bg-blue-50">Nilai Akhir</th>
+                                <th className="border border-[#000000] px-2 py-1.5 text-center w-14">Predikat</th>
+                                <th className="border border-[#000000] px-2 py-1.5">Catatan Capaian</th>
                               </tr>
                             </thead>
                             <tbody>
                               {studentRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={9} className="border border-slate-300 px-3 py-4 text-center text-slate-400">
+                                  <td colSpan={9} className="border border-[#000000] px-3 py-4 text-center text-slate-400">
                                     Belum ada nilai yang diinputkan untuk siswa ini.
                                   </td>
                                 </tr>
@@ -4717,13 +5134,13 @@ export default function NilaiManagementPage() {
                                     <>
                                       {/* Kelompok A: Muatan Wajib */}
                                       <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
-                                        <td colSpan={9} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                        <td colSpan={9} className="border border-[#000000] px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
                                           A. Muatan Wajib
                                         </td>
                                       </tr>
                                       {batchWajib.length === 0 ? (
                                         <tr className="text-[11px]">
-                                          <td colSpan={9} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                          <td colSpan={9} className="border border-[#000000] px-2 py-1.5 text-center text-slate-400 italic">
                                             - Belum ada mata pelajaran muatan wajib -
                                           </td>
                                         </tr>
@@ -4737,19 +5154,19 @@ export default function NilaiManagementPage() {
 
                                           return (
                                             <tr key={item.id} className="text-[11px]">
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.uas}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
                                                 {akhir.nilaiAkhir}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold">
                                                 {akhir.predikat}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-slate-600 text-[10px]">
                                                 {akhir.catatan || "-"}
                                               </td>
                                             </tr>
@@ -4759,13 +5176,13 @@ export default function NilaiManagementPage() {
 
                                       {/* Kelompok B: Muatan Lokal */}
                                       <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
-                                        <td colSpan={9} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                        <td colSpan={9} className="border border-[#000000] px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
                                           B. Muatan Lokal
                                         </td>
                                       </tr>
                                       {batchMulok.length === 0 ? (
                                         <tr className="text-[11px]">
-                                          <td colSpan={9} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                          <td colSpan={9} className="border border-[#000000] px-2 py-1.5 text-center text-slate-400 italic">
                                             - Tidak ada mata pelajaran muatan lokal -
                                           </td>
                                         </tr>
@@ -4779,19 +5196,19 @@ export default function NilaiManagementPage() {
 
                                           return (
                                             <tr key={item.id} className="text-[11px]">
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.uas}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
                                                 {akhir.nilaiAkhir}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold">
                                                 {akhir.predikat}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-slate-600 text-[10px]">
                                                 {akhir.catatan || "-"}
                                               </td>
                                             </tr>
@@ -4801,13 +5218,13 @@ export default function NilaiManagementPage() {
 
                                       {/* Kelompok C: Kecerdasan Al-Qur'an */}
                                       <tr className="bg-slate-100 font-bold text-slate-900 text-[11px]">
-                                        <td colSpan={9} className="border border-slate-300 px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
+                                        <td colSpan={9} className="border border-[#000000] px-2 py-1 font-bold uppercase tracking-wider bg-slate-100">
                                           C. Kecerdasan Al-Qur&apos;an
                                         </td>
                                       </tr>
                                       {batchQuran.length === 0 ? (
                                         <tr className="text-[11px]">
-                                          <td colSpan={9} className="border border-slate-300 px-2 py-1.5 text-center text-slate-400 italic">
+                                          <td colSpan={9} className="border border-[#000000] px-2 py-1.5 text-center text-slate-400 italic">
                                             - Tidak ada mata pelajaran kecerdasan al-qur&apos;an -
                                           </td>
                                         </tr>
@@ -4821,19 +5238,19 @@ export default function NilaiManagementPage() {
 
                                           return (
                                             <tr key={item.id} className="text-[11px]">
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center">{idx + 1}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 font-semibold">{item.mapel}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{kkm}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.tugas}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uts}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{item.uas}</td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center">{idx + 1}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{kkm}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.tugas}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.uts}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-mono">{item.uas}</td>
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-blue-800 bg-blue-50/50 font-mono">
                                                 {akhir.nilaiAkhir}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-center font-bold">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-center font-bold">
                                                 {akhir.predikat}
                                               </td>
-                                              <td className="border border-slate-300 px-2 py-1.5 text-slate-600 text-[10px]">
+                                              <td className="border border-[#000000] px-2 py-1.5 text-slate-600 text-[10px]">
                                                 {akhir.catatan || "-"}
                                               </td>
                                             </tr>
@@ -4847,13 +5264,13 @@ export default function NilaiManagementPage() {
                             </tbody>
                             <tfoot>
                               <tr className="bg-slate-50 font-semibold text-[11px]">
-                                <td colSpan={6} className="border border-slate-300 px-3 py-1.5 text-right">
+                                <td colSpan={6} className="border border-[#000000] px-3 py-1.5 text-right">
                                   Rata-Rata Nilai Rapor Akhir Semester (PAS):
                                 </td>
-                                <td className="border border-slate-300 px-2 py-1.5 text-center font-bold text-blue-800 font-mono bg-blue-50">
+                                <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-blue-800 font-mono bg-blue-50">
                                   {akhirAvg}
                                 </td>
-                                <td colSpan={2} className="border border-slate-300 px-3 py-1.5 text-slate-600">
+                                <td colSpan={2} className="border border-[#000000] px-3 py-1.5 text-slate-600">
                                   Predikat:{" "}
                                   <strong>
                                     {akhirAvg >= 88 ? "A (Sangat Baik)" : akhirAvg >= 75 ? "B (Baik)" : "C (Cukup)"}
@@ -4864,21 +5281,44 @@ export default function NilaiManagementPage() {
                           </table>
                         )}
 
-                        {/* Signature Area */}
-                        <div className="grid grid-cols-2 text-center text-xs pt-6 border-0 border-none">
-                          <div>
-                            <p className="text-slate-500">Mengetahui,</p>
-                            <p className="text-slate-500">Wali Kelas {siswa.kelas},</p>
-                            <div className="h-14" />
-                            <p className="font-bold underline">{waliNama}</p>
-                            <p className="text-[10px] text-slate-400">NIP: {waliNip}</p>
+                        {/* Signature Area (3 Kolom: Wali Santri, Wali Kelas, Kepala Sekolah) */}
+                        <div className="pt-6 border-0 border-none text-xs">
+                          {/* Titimangsa Alamat dan Tanggal Rapor */}
+                          <div className="flex justify-end mb-2 pr-4">
+                            <p className="text-slate-800 font-medium">
+                              {raporConfig.tempatRapor}, {raporConfig.tanggalRapor}
+                            </p>
                           </div>
-                          <div>
-                            <p className="text-slate-500">Jakarta, {formatDateIndo(new Date().toISOString().split("T")[0])}</p>
-                            <p className="text-slate-500">Kepala Sekolah,</p>
-                            <div className="h-12" />
-                            <p className="font-bold underline">{profile.kepalaSekolah}</p>
-                            <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
+
+                          <div className="grid grid-cols-3 text-center gap-4">
+                            {/* Kolom 1: Orang Tua / Wali Santri */}
+                            <div>
+                              <p className="text-slate-600">Mengetahui,</p>
+                              <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
+                              <div className="h-14" />
+                              <p className="font-bold underline">
+                                {siswa.namaWali ? `( ${siswa.namaWali} )` : "( ................................................ )"}
+                              </p>
+                              <p className="text-[10px] text-slate-400">Tanda Tangan & Nama Terang</p>
+                            </div>
+
+                            {/* Kolom 2: Wali Kelas */}
+                            <div>
+                              <p className="text-slate-600 invisible">Mengetahui,</p>
+                              <p className="text-slate-800 font-medium">Wali Kelas {siswa.kelas},</p>
+                              <div className="h-14" />
+                              <p className="font-bold underline">{waliNama}</p>
+                              <p className="text-[10px] text-slate-400">NIP: {waliNip}</p>
+                            </div>
+
+                            {/* Kolom 3: Kepala Sekolah */}
+                            <div>
+                              <p className="text-slate-600 invisible">Mengetahui,</p>
+                              <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
+                              <div className="h-14" />
+                              <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                              <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -5033,7 +5473,7 @@ export default function NilaiManagementPage() {
                     <p className="text-[10px] text-slate-400">NIP. 197204151998031002</p>
                   </div>
                   <div>
-                    <p className="text-slate-500">Jakarta, {formatDateIndo(new Date().toISOString().split("T")[0])}</p>
+                    <p className="text-slate-500">{raporConfig.tempatRapor}, {raporConfig.tanggalRapor}</p>
                     <p className="font-bold">Wali Kelas {batchSelectedKelas === "Semua" ? "" : batchSelectedKelas}</p>
                     <div className="h-16" />
                     <p className="font-bold underline text-sm">{teacherScope.teacherName || user?.name || "Wali Kelas"}</p>
