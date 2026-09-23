@@ -55,6 +55,9 @@ import {
   Bold,
   Underline as UnderlineIcon,
   Type,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -331,6 +334,9 @@ export default function NilaiManagementPage() {
     underlineJudulRapor?: boolean;
     fontSizeSubjudulRapor?: number;
     boldSubjudulRapor?: boolean;
+
+    // Kustomisasi Urutan Mata Pelajaran Rapor
+    customMapelOrder?: string[];
   }
 
   const getDefaultRaporConfig = (): RaporConfig => ({
@@ -359,11 +365,14 @@ export default function NilaiManagementPage() {
     underlineJudulRapor: true,
     fontSizeSubjudulRapor: 12,
     boldSubjudulRapor: false,
+
+    // Urutan Mata Pelajaran Default
+    customMapelOrder: [],
   });
 
   const [raporConfig, setRaporConfig] = useState<RaporConfig>(getDefaultRaporConfig);
   const [isRaporSettingsOpen, setIsRaporSettingsOpen] = useState(false);
-  const [activeRaporConfigTab, setActiveRaporConfigTab] = useState<"kop" | "titimangsa" | "judul">("kop");
+  const [activeRaporConfigTab, setActiveRaporConfigTab] = useState<"kop" | "titimangsa" | "judul" | "urutan">("kop");
   const [isInlineTitleEdit, setIsInlineTitleEdit] = useState(false);
 
   // Load saved rapor config from localStorage
@@ -390,6 +399,9 @@ export default function NilaiManagementPage() {
           underlineJudulRapor: parsed.underlineJudulRapor ?? prev.underlineJudulRapor ?? true,
           fontSizeSubjudulRapor: parsed.fontSizeSubjudulRapor ?? prev.fontSizeSubjudulRapor ?? 12,
           boldSubjudulRapor: parsed.boldSubjudulRapor ?? prev.boldSubjudulRapor ?? false,
+          customMapelOrder: Array.isArray(parsed.customMapelOrder)
+            ? parsed.customMapelOrder
+            : prev.customMapelOrder || [],
         }));
       }
     } catch (e) {
@@ -407,6 +419,98 @@ export default function NilaiManagementPage() {
       }
       return next;
     });
+  };
+
+  // Helper mengurutkan daftar record mata pelajaran berdasarkan customMapelOrder
+  const sortRecordsByMapelOrder = <T extends { mapel?: string; nama?: string }>(records: T[]): T[] => {
+    if (!raporConfig.customMapelOrder || raporConfig.customMapelOrder.length === 0) {
+      return records;
+    }
+    const orderMap = new Map<string, number>();
+    raporConfig.customMapelOrder.forEach((name, idx) => {
+      orderMap.set(name.toLowerCase().trim(), idx);
+    });
+    return [...records].sort((a, b) => {
+      const nameA = (a.mapel || a.nama || "").toLowerCase().trim();
+      const nameB = (b.mapel || b.nama || "").toLowerCase().trim();
+      const indexA = orderMap.has(nameA) ? orderMap.get(nameA)! : 9999;
+      const indexB = orderMap.has(nameB) ? orderMap.get(nameB)! : 9999;
+      return indexA - indexB;
+    });
+  };
+
+  // Helper memindahkan posisi mata pelajaran ke atas atau ke bawah dalam kelompoknya
+  const moveMapelInSection = (
+    currentMapel: string,
+    direction: "up" | "down",
+    currentSectionRecords: Array<{ mapel?: string; nama?: string } | string>
+  ) => {
+    const getMapelName = (item: { mapel?: string; nama?: string } | string): string => {
+      if (typeof item === "string") return item;
+      return item.mapel || item.nama || "";
+    };
+
+    const normCurrent = currentMapel.toLowerCase().trim();
+    const sectionNames = currentSectionRecords.map(getMapelName).filter(Boolean);
+
+    const indexInSection = sectionNames.findIndex(
+      (n) => n.toLowerCase().trim() === normCurrent
+    );
+    if (indexInSection === -1) return;
+
+    const targetIndex = direction === "up" ? indexInSection - 1 : indexInSection + 1;
+    if (targetIndex < 0 || targetIndex >= sectionNames.length) return;
+
+    const targetMapel = sectionNames[targetIndex];
+    const normTarget = targetMapel.toLowerCase().trim();
+
+    // Buat daftar lengkap urutan seluruh nama mata pelajaran yang terdata
+    const existingOrder =
+      raporConfig.customMapelOrder && raporConfig.customMapelOrder.length > 0
+        ? [...raporConfig.customMapelOrder]
+        : [];
+
+    const allKnownMapels: string[] = [];
+    const added = new Set<string>();
+
+    for (const name of existingOrder) {
+      const n = name.trim();
+      if (n && !added.has(n.toLowerCase())) {
+        allKnownMapels.push(n);
+        added.add(n.toLowerCase());
+      }
+    }
+    for (const n of sectionNames) {
+      const trimmed = n.trim();
+      if (trimmed && !added.has(trimmed.toLowerCase())) {
+        allKnownMapels.push(trimmed);
+        added.add(trimmed.toLowerCase());
+      }
+    }
+    for (const m of mapelList) {
+      const n = m.nama.trim();
+      if (n && !added.has(n.toLowerCase())) {
+        allKnownMapels.push(n);
+        added.add(n.toLowerCase());
+      }
+    }
+    for (const n of nilaiList) {
+      const nm = n.mapel.trim();
+      if (nm && !added.has(nm.toLowerCase())) {
+        allKnownMapels.push(nm);
+        added.add(nm.toLowerCase());
+      }
+    }
+
+    const posA = allKnownMapels.findIndex((n) => n.toLowerCase() === normCurrent);
+    const posB = allKnownMapels.findIndex((n) => n.toLowerCase() === normTarget);
+
+    if (posA !== -1 && posB !== -1) {
+      const temp = allKnownMapels[posA];
+      allKnownMapels[posA] = allKnownMapels[posB];
+      allKnownMapels[posB] = temp;
+      updateRaporConfig({ customMapelOrder: allKnownMapels });
+    }
   };
 
   const handleLogoUpload = (side: "kiri" | "kanan", e: React.ChangeEvent<HTMLInputElement>) => {
@@ -503,6 +607,18 @@ export default function NilaiManagementPage() {
           >
             <Type className="h-3.5 w-3.5" />
             <span>3. Judul & Format Huruf Rapor</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveRaporConfigTab("urutan")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeRaporConfigTab === "urutan"
+                ? "bg-amber-500 text-white shadow-sm"
+                : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+            }`}
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            <span>4. Urutan Mata Pelajaran</span>
           </button>
         </div>
 
@@ -938,7 +1054,7 @@ export default function NilaiManagementPage() {
               </strong>
             </div>
           </div>
-        ) : (
+        ) : activeRaporConfigTab === "judul" ? (
           /* Tab 3: Judul & Format Huruf Rapor */
           <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -1232,6 +1348,117 @@ export default function NilaiManagementPage() {
                   : `Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${profile.semesterAktif}`}
               </p>
             </div>
+          </div>
+        ) : (
+          /* Tab 4: Urutan Mata Pelajaran Rapor */
+          <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h5 className="font-bold text-slate-800 dark:text-slate-100">
+                  Pengaturan Urutan Mata Pelajaran pada Lembar Rapor
+                </h5>
+                <p className="text-[11px] text-slate-500">
+                  Gunakan tombol <strong>Naik (▲)</strong> atau <strong>Turun (▼)</strong> untuk memindahkan posisi mata pelajaran. Anda juga bisa langsung memindahkan urutan pada tabel lembar rapor.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateRaporConfig({ customMapelOrder: [] })}
+                className="px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                title="Kembalikan urutan mata pelajaran ke bawaan sistem"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Urutan Default</span>
+              </button>
+            </div>
+
+            {/* List Groups */}
+            {(() => {
+              const allWajib = sortRecordsByMapelOrder(
+                mapelList.filter((m) => getMapelSection(m.nama) === "wajib")
+              );
+              const allMulok = sortRecordsByMapelOrder(
+                mapelList.filter((m) => getMapelSection(m.nama) === "mulok")
+              );
+              const allQuran = sortRecordsByMapelOrder(
+                mapelList.filter((m) => getMapelSection(m.nama) === "quran")
+              );
+
+              const renderMapelCategoryReorder = (
+                title: string,
+                categoryRecords: Array<{ id?: string; nama: string; kkm?: number }>,
+                colorBadge: string
+              ) => (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 dark:text-slate-100">
+                      {title} ({categoryRecords.length} Mapel)
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${colorBadge}`}>
+                      Kelompok
+                    </span>
+                  </div>
+                  {categoryRecords.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic py-2 text-center">
+                      Belum ada mata pelajaran dalam kelompok ini.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {categoryRecords.map((item, idx) => (
+                        <div
+                          key={item.id || item.nama}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-amber-400 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 font-black text-[11px] flex items-center justify-center text-slate-600 dark:text-slate-300">
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                              {item.nama}
+                            </span>
+                            {item.kkm && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                KKM: {item.kkm}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => moveMapelInSection(item.nama, "up", categoryRecords)}
+                              className="px-2 py-1 rounded bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700 dark:bg-slate-800 dark:hover:bg-amber-500 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                              title={`Pindahkan "${item.nama}" ke atas`}
+                            >
+                              <ChevronUp className="h-3.5 w-3.5" />
+                              <span>Naik</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === categoryRecords.length - 1}
+                              onClick={() => moveMapelInSection(item.nama, "down", categoryRecords)}
+                              className="px-2 py-1 rounded bg-slate-100 hover:bg-amber-500 hover:text-white text-slate-700 dark:bg-slate-800 dark:hover:bg-amber-500 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                              title={`Pindahkan "${item.nama}" ke bawah`}
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                              <span>Turun</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+
+              return (
+                <div className="space-y-3">
+                  {renderMapelCategoryReorder("A. Muatan Wajib", allWajib, "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300")}
+                  {renderMapelCategoryReorder("B. Muatan Lokal", allMulok, "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300")}
+                  {renderMapelCategoryReorder("C. Kecerdasan Al-Qur'an", allQuran, "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300")}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -5732,6 +5959,20 @@ export default function NilaiManagementPage() {
                   <span>{isInlineTitleEdit ? "Tutup Edit Teks" : "Edit Tulisan"}</span>
                 </button>
 
+                {/* Urutan Mapel Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveRaporConfigTab("urutan");
+                    setIsRaporSettingsOpen(true);
+                  }}
+                  className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 hover:bg-amber-50 text-slate-700 dark:text-slate-200 border border-slate-200 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Atur urutan naik/turun mata pelajaran rapor"
+                >
+                  <ArrowUpDown className="h-3 w-3 text-amber-600" />
+                  <span>Urutan Mapel</span>
+                </button>
+
                 {/* Open Full Settings */}
                 <button
                   type="button"
@@ -5872,9 +6113,9 @@ export default function NilaiManagementPage() {
                     </tr>
                   ) : (
                     (() => {
-                      const wajibRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
-                      const mulokRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
-                      const quranRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "quran");
+                      const wajibRecords = sortRecordsByMapelOrder(studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "wajib"));
+                      const mulokRecords = sortRecordsByMapelOrder(studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "mulok"));
+                      const quranRecords = sortRecordsByMapelOrder(studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "quran"));
 
                       return (
                         <>
@@ -5901,7 +6142,37 @@ export default function NilaiManagementPage() {
                               return (
                                 <tr key={item.id}>
                                   <td className="border border-[#000000] px-3 py-1 text-center">{idx + 1}</td>
-                                  <td className="border border-[#000000] px-3 py-1 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-3 py-1 font-semibold">
+                                    <div className="flex items-center justify-between group/row">
+                                      <span>{item.mapel}</span>
+                                      <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                        <button
+                                          type="button"
+                                          disabled={idx === 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "up", wajibRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Atas`}
+                                        >
+                                          <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={idx === wajibRecords.length - 1}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "down", wajibRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                        >
+                                          <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
                                     {mid.nilaiMid}
@@ -5937,7 +6208,37 @@ export default function NilaiManagementPage() {
                               return (
                                 <tr key={item.id}>
                                   <td className="border border-[#000000] px-3 py-1 text-center">{idx + 1}</td>
-                                  <td className="border border-[#000000] px-3 py-1 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-3 py-1 font-semibold">
+                                    <div className="flex items-center justify-between group/row">
+                                      <span>{item.mapel}</span>
+                                      <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                        <button
+                                          type="button"
+                                          disabled={idx === 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "up", mulokRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Atas`}
+                                        >
+                                          <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={idx === mulokRecords.length - 1}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "down", mulokRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                        >
+                                          <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
                                     {mid.nilaiMid}
@@ -5973,7 +6274,37 @@ export default function NilaiManagementPage() {
                               return (
                                 <tr key={item.id}>
                                   <td className="border border-[#000000] px-3 py-1 text-center">{idx + 1}</td>
-                                  <td className="border border-[#000000] px-3 py-1 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-3 py-1 font-semibold">
+                                    <div className="flex items-center justify-between group/row">
+                                      <span>{item.mapel}</span>
+                                      <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                        <button
+                                          type="button"
+                                          disabled={idx === 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "up", quranRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Atas`}
+                                        >
+                                          <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={idx === quranRecords.length - 1}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "down", quranRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                        >
+                                          <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
                                     {mid.nilaiMid}
@@ -6033,9 +6364,9 @@ export default function NilaiManagementPage() {
                     </tr>
                   ) : (
                     (() => {
-                      const wajibRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
-                      const mulokRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
-                      const quranRecords = studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "quran");
+                      const wajibRecords = sortRecordsByMapelOrder(studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "wajib"));
+                      const mulokRecords = sortRecordsByMapelOrder(studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "mulok"));
+                      const quranRecords = sortRecordsByMapelOrder(studentNilaiRecords.filter((item) => getMapelSection(item.mapel) === "quran"));
 
                       return (
                         <>
@@ -6062,7 +6393,37 @@ export default function NilaiManagementPage() {
                               return (
                                 <tr key={item.id}>
                                   <td className="border border-[#000000] px-3 py-1 text-center">{idx + 1}</td>
-                                  <td className="border border-[#000000] px-3 py-1 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-3 py-1 font-semibold">
+                                    <div className="flex items-center justify-between group/row">
+                                      <span>{item.mapel}</span>
+                                      <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                        <button
+                                          type="button"
+                                          disabled={idx === 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "up", wajibRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Atas`}
+                                        >
+                                          <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={idx === wajibRecords.length - 1}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "down", wajibRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                        >
+                                          <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.tugas}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.uts}</td>
@@ -6104,7 +6465,37 @@ export default function NilaiManagementPage() {
                               return (
                                 <tr key={item.id}>
                                   <td className="border border-[#000000] px-3 py-1 text-center">{idx + 1}</td>
-                                  <td className="border border-[#000000] px-3 py-1 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-3 py-1 font-semibold">
+                                    <div className="flex items-center justify-between group/row">
+                                      <span>{item.mapel}</span>
+                                      <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                        <button
+                                          type="button"
+                                          disabled={idx === 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "up", mulokRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Atas`}
+                                        >
+                                          <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={idx === mulokRecords.length - 1}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "down", mulokRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                        >
+                                          <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.tugas}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.uts}</td>
@@ -6146,7 +6537,37 @@ export default function NilaiManagementPage() {
                               return (
                                 <tr key={item.id}>
                                   <td className="border border-[#000000] px-3 py-1 text-center">{idx + 1}</td>
-                                  <td className="border border-[#000000] px-3 py-1 font-semibold">{item.mapel}</td>
+                                  <td className="border border-[#000000] px-3 py-1 font-semibold">
+                                    <div className="flex items-center justify-between group/row">
+                                      <span>{item.mapel}</span>
+                                      <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                        <button
+                                          type="button"
+                                          disabled={idx === 0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "up", quranRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Atas`}
+                                        >
+                                          <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={idx === quranRecords.length - 1}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveMapelInSection(item.mapel, "down", quranRecords);
+                                          }}
+                                          className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                          title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                        >
+                                          <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.tugas}</td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.uts}</td>
@@ -6727,6 +7148,19 @@ export default function NilaiManagementPage() {
                       <Sliders className="h-4 w-4" />
                       <span>Atur Judul & Kop</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveRaporConfigTab("urutan");
+                        setIsRaporSettingsOpen(true);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                      title="Atur urutan naik/turun mata pelajaran pada rapor"
+                    >
+                      <ArrowUpDown className="h-4 w-4 text-indigo-600" />
+                      <span>Urutan Mapel</span>
+                    </button>
                   </>
                 )}
 
@@ -6876,9 +7310,9 @@ export default function NilaiManagementPage() {
                                 </tr>
                               ) : (
                                 (() => {
-                                  const batchWajib = studentRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
-                                  const batchMulok = studentRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
-                                  const batchQuran = studentRecords.filter((item) => getMapelSection(item.mapel) === "quran");
+                                  const batchWajib = sortRecordsByMapelOrder(studentRecords.filter((item) => getMapelSection(item.mapel) === "wajib"));
+                                  const batchMulok = sortRecordsByMapelOrder(studentRecords.filter((item) => getMapelSection(item.mapel) === "mulok"));
+                                  const batchQuran = sortRecordsByMapelOrder(studentRecords.filter((item) => getMapelSection(item.mapel) === "quran"));
 
                                   return (
                                     <>
@@ -6905,7 +7339,37 @@ export default function NilaiManagementPage() {
                                           return (
                                             <tr key={item.id} className="text-[11px]">
                                               <td className="border border-[#000000] px-2 py-1 text-center">{idx + 1}</td>
-                                              <td className="border border-[#000000] px-2 py-1 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1 font-semibold">
+                                                <div className="flex items-center justify-between group/row">
+                                                  <span>{item.mapel}</span>
+                                                  <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "up", batchWajib);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Atas`}
+                                                    >
+                                                      <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === batchWajib.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "down", batchWajib);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                                    >
+                                                      <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
                                                 {mid.nilaiMid}
@@ -6941,7 +7405,37 @@ export default function NilaiManagementPage() {
                                           return (
                                             <tr key={item.id} className="text-[11px]">
                                               <td className="border border-[#000000] px-2 py-1 text-center">{idx + 1}</td>
-                                              <td className="border border-[#000000] px-2 py-1 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1 font-semibold">
+                                                <div className="flex items-center justify-between group/row">
+                                                  <span>{item.mapel}</span>
+                                                  <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "up", batchMulok);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Atas`}
+                                                    >
+                                                      <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === batchMulok.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "down", batchMulok);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                                    >
+                                                      <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
                                                 {mid.nilaiMid}
@@ -6977,7 +7471,37 @@ export default function NilaiManagementPage() {
                                           return (
                                             <tr key={item.id} className="text-[11px]">
                                               <td className="border border-[#000000] px-2 py-1 text-center">{idx + 1}</td>
-                                              <td className="border border-[#000000] px-2 py-1 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1 font-semibold">
+                                                <div className="flex items-center justify-between group/row">
+                                                  <span>{item.mapel}</span>
+                                                  <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "up", batchQuran);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Atas`}
+                                                    >
+                                                      <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === batchQuran.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "down", batchQuran);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                                    >
+                                                      <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
                                                 {mid.nilaiMid}
@@ -7032,9 +7556,9 @@ export default function NilaiManagementPage() {
                                 </tr>
                               ) : (
                                 (() => {
-                                  const batchWajib = studentRecords.filter((item) => getMapelSection(item.mapel) === "wajib");
-                                  const batchMulok = studentRecords.filter((item) => getMapelSection(item.mapel) === "mulok");
-                                  const batchQuran = studentRecords.filter((item) => getMapelSection(item.mapel) === "quran");
+                                  const batchWajib = sortRecordsByMapelOrder(studentRecords.filter((item) => getMapelSection(item.mapel) === "wajib"));
+                                  const batchMulok = sortRecordsByMapelOrder(studentRecords.filter((item) => getMapelSection(item.mapel) === "mulok"));
+                                  const batchQuran = sortRecordsByMapelOrder(studentRecords.filter((item) => getMapelSection(item.mapel) === "quran"));
 
                                   return (
                                     <>
@@ -7061,7 +7585,37 @@ export default function NilaiManagementPage() {
                                           return (
                                             <tr key={item.id} className="text-[11px]">
                                               <td className="border border-[#000000] px-2 py-1 text-center">{idx + 1}</td>
-                                              <td className="border border-[#000000] px-2 py-1 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1 font-semibold">
+                                                <div className="flex items-center justify-between group/row">
+                                                  <span>{item.mapel}</span>
+                                                  <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "up", batchWajib);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Atas`}
+                                                    >
+                                                      <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === batchWajib.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "down", batchWajib);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                                    >
+                                                      <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.tugas}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.uts}</td>
@@ -7103,7 +7657,37 @@ export default function NilaiManagementPage() {
                                           return (
                                             <tr key={item.id} className="text-[11px]">
                                               <td className="border border-[#000000] px-2 py-1 text-center">{idx + 1}</td>
-                                              <td className="border border-[#000000] px-2 py-1 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1 font-semibold">
+                                                <div className="flex items-center justify-between group/row">
+                                                  <span>{item.mapel}</span>
+                                                  <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "up", batchMulok);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Atas`}
+                                                    >
+                                                      <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === batchMulok.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "down", batchMulok);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                                    >
+                                                      <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.tugas}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.uts}</td>
@@ -7145,7 +7729,37 @@ export default function NilaiManagementPage() {
                                           return (
                                             <tr key={item.id} className="text-[11px]">
                                               <td className="border border-[#000000] px-2 py-1 text-center">{idx + 1}</td>
-                                              <td className="border border-[#000000] px-2 py-1 font-semibold">{item.mapel}</td>
+                                              <td className="border border-[#000000] px-2 py-1 font-semibold">
+                                                <div className="flex items-center justify-between group/row">
+                                                  <span>{item.mapel}</span>
+                                                  <div className="flex items-center gap-0.5 print:hidden opacity-30 group-hover/row:opacity-100 transition-opacity">
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "up", batchQuran);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Atas`}
+                                                    >
+                                                      <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      disabled={idx === batchQuran.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveMapelInSection(item.mapel, "down", batchQuran);
+                                                      }}
+                                                      className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 disabled:opacity-20 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-colors shadow-2xs"
+                                                      title={`Pindahkan "${item.mapel}" ke Bawah`}
+                                                    >
+                                                      <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.tugas}</td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{item.uts}</td>
