@@ -329,8 +329,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
-  // Automatic Push Database States
-  const [isAutoPushEnabled, setIsAutoPushEnabled] = useState<boolean>(true);
+  // Automatic Push Database States (Default NONAKTIF/FALSE)
+  const [isAutoPushEnabled, setIsAutoPushEnabled] = useState<boolean>(false);
   const [isAutoPushing, setIsAutoPushing] = useState<boolean>(false);
   const [lastAutoPushTime, setLastAutoPushTime] = useState<Date | null>(null);
   const [autoPushStatus, setAutoPushStatus] = useState<"idle" | "pushing" | "success" | "error">("idle");
@@ -599,9 +599,19 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       });
       setMutabaahList(mergedMutabaah);
 
-      const savedAutoPush = localStorage.getItem("sim_auto_push_db_enabled");
-      if (savedAutoPush !== null) {
-        setIsAutoPushEnabled(savedAutoPush === "true");
+      // Nonaktifkan automatic push ke Supabase secara default
+      const autoPushResetKey = "sim_auto_push_db_disabled_v1";
+      if (typeof window !== "undefined" && localStorage.getItem(autoPushResetKey) !== "true") {
+        setIsAutoPushEnabled(false);
+        localStorage.setItem("sim_auto_push_db_enabled", "false");
+        localStorage.setItem(autoPushResetKey, "true");
+      } else {
+        const savedAutoPush = localStorage.getItem("sim_auto_push_db_enabled");
+        if (savedAutoPush !== null) {
+          setIsAutoPushEnabled(savedAutoPush === "true");
+        } else {
+          setIsAutoPushEnabled(false);
+        }
       }
     } catch (e) {
       console.warn("Could not read from local storage", e);
@@ -676,15 +686,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     return () => clearInterval(interval);
   }, [isAutoPushEnabled]);
 
-  // Helper for background Supabase persistence without blocking UI
+  // Helper for background Supabase persistence without blocking UI (hanya berjalan jika isAutoPushEnabled aktif)
   const persistSupabase = (action: () => Promise<boolean | any>) => {
-    if (SupabaseSchoolService.isConfigured()) {
+    if (isAutoPushEnabled && SupabaseSchoolService.isConfigured()) {
       action().catch((err) => {
         console.warn("[Supabase] Background persistence warning:", err);
       });
-      if (isAutoPushEnabled) {
-        triggerAutoPush("action-mutation");
-      }
     }
   };
 
@@ -982,19 +989,22 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     latestDataRef.current.profile = newProfile;
     setProfile(newProfile);
     saveState("profile", newProfile);
-    try {
-      const ok = await SupabaseSchoolService.updateProfile(newProfile);
-      if (ok) {
-        setLastSyncTime(new Date());
-        setLastAutoPushTime(new Date());
-        setAutoPushStatus("success");
-        setIsSupabaseConnected(true);
+    if (isAutoPushEnabled && SupabaseSchoolService.isConfigured()) {
+      try {
+        const ok = await SupabaseSchoolService.updateProfile(newProfile);
+        if (ok) {
+          setLastSyncTime(new Date());
+          setLastAutoPushTime(new Date());
+          setAutoPushStatus("success");
+          setIsSupabaseConnected(true);
+        }
+        return ok;
+      } catch (err) {
+        console.warn("[updateProfile] Error updating profile to Supabase:", err);
+        return false;
       }
-      return ok;
-    } catch (err) {
-      console.warn("[updateProfile] Error updating profile to Supabase:", err);
-      return false;
     }
+    return true;
   };
 
   // Siswa Actions
