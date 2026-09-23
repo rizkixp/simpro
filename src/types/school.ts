@@ -78,6 +78,7 @@ export interface JadwalPelajaran {
 }
 
 export type StatusKehadiran = "Hadir" | "Sakit" | "Izin" | "Alpa";
+export type MetodePresensi = "manual" | "face" | "barcode" | "qr";
 
 export interface PresensiRecord {
   id: string;
@@ -87,6 +88,12 @@ export interface PresensiRecord {
   tanggal: string; // YYYY-MM-DD
   status: StatusKehadiran;
   keterangan?: string;
+  waktuMasuk?: string; // HH:mm:ss
+  waktuPulang?: string; // HH:mm:ss
+  metode?: MetodePresensi;
+  terlambat?: boolean;
+  fotoSnapshot?: string;
+  notifWaTerkirim?: boolean;
 }
 
 export type JenisRapor = "tengah" | "akhir";

@@ -16,6 +16,7 @@ import {
   Pengumuman,
   SchoolProfile,
   StatusKehadiran,
+  MetodePresensi,
   TabunganSiswa,
   TransaksiTabungan,
   JenisTagihan,
@@ -165,7 +166,20 @@ interface SchoolDataContextType {
   bulkDeleteJadwal: (ids: string[]) => void;
   resetJadwalToDefault: () => void;
   presensiList: PresensiRecord[];
-  updatePresensi: (siswaId: string, status: StatusKehadiran, keterangan?: string, tanggal?: string) => void;
+  updatePresensi: (
+    siswaId: string,
+    status: StatusKehadiran,
+    keterangan?: string,
+    tanggal?: string,
+    extra?: {
+      waktuMasuk?: string;
+      waktuPulang?: string;
+      metode?: MetodePresensi;
+      terlambat?: boolean;
+      fotoSnapshot?: string;
+      notifWaTerkirim?: boolean;
+    }
+  ) => void;
   nilaiList: NilaiSiswa[];
   saveNilai: (nilai: Omit<NilaiSiswa, "id"> & { id?: string }) => void;
   bulkSaveNilai: (items: (Omit<NilaiSiswa, "id"> & { id?: string })[]) => void;
@@ -1864,7 +1878,15 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     siswaId: string,
     status: StatusKehadiran,
     keterangan?: string,
-    tanggal?: string
+    tanggal?: string,
+    extra?: {
+      waktuMasuk?: string;
+      waktuPulang?: string;
+      metode?: MetodePresensi;
+      terlambat?: boolean;
+      fotoSnapshot?: string;
+      notifWaTerkirim?: boolean;
+    }
   ) => {
     const targetDate = tanggal || new Date().toISOString().split("T")[0];
     const existingIndex = presensiList.findIndex(
@@ -1877,10 +1899,17 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
     if (existingIndex >= 0) {
       updated = [...presensiList];
+      const prev = updated[existingIndex];
       updated[existingIndex] = {
-        ...updated[existingIndex],
+        ...prev,
         status,
-        keterangan: keterangan !== undefined ? keterangan : updated[existingIndex].keterangan,
+        keterangan: keterangan !== undefined ? keterangan : prev.keterangan,
+        waktuMasuk: extra?.waktuMasuk || prev.waktuMasuk,
+        waktuPulang: extra?.waktuPulang || prev.waktuPulang,
+        metode: extra?.metode || prev.metode,
+        terlambat: extra?.terlambat !== undefined ? extra.terlambat : prev.terlambat,
+        fotoSnapshot: extra?.fotoSnapshot || prev.fotoSnapshot,
+        notifWaTerkirim: extra?.notifWaTerkirim !== undefined ? extra.notifWaTerkirim : prev.notifWaTerkirim,
       };
     } else {
       const newPresensi: PresensiRecord = {
@@ -1891,6 +1920,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         tanggal: targetDate,
         status,
         keterangan,
+        waktuMasuk: extra?.waktuMasuk,
+        waktuPulang: extra?.waktuPulang,
+        metode: extra?.metode,
+        terlambat: extra?.terlambat,
+        fotoSnapshot: extra?.fotoSnapshot,
+        notifWaTerkirim: extra?.notifWaTerkirim,
       };
       updated = [newPresensi, ...presensiList];
     }

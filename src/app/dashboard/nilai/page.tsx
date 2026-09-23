@@ -351,17 +351,35 @@ export default function NilaiManagementPage() {
     fontSizeSubjudulRapor?: number;
     boldSubjudulRapor?: boolean;
 
-    // 4. Format & Pengaturan Rapor Lainnya (Font Size, Spacing, Columns)
-    fontFamilyRapor?: "sans" | "serif" | "mono";
+    // 4. Format & Pengaturan Rapor Lainnya (Font Family, Font Size, Scale, Spacing, Columns)
+    fontFamilyRapor?: string;
+    customFontName?: string;
+    skalaUkuranRapor?: number;
+    fontSizeHeaderTabel?: number;
     fontSizeTabelNilai?: number;
     fontSizeIdentitas?: number;
+    fontSizeCatatanGuru?: number;
+    fontSizePresensi?: number;
+    fontSizeTitimangsa?: number;
     paddingTabel?: "kompak" | "sedang" | "longgar";
     showKkm?: boolean;
     showPredikat?: boolean;
     showCatatanGuru?: boolean;
     showPresensi?: boolean;
 
-    // 5. Kustomisasi Urutan Mata Pelajaran Rapor
+    // 5. Tabel KKM & Interval Predikat Nilai
+    tampilkanTabelKkm?: boolean;
+    nilaiStandarKkm?: number;
+    fontSizeTabelKkm?: number;
+    judulTabelKkm?: string;
+
+    // 6. Ukuran & Ruang Tanda Tangan
+    tinggiRuangTtd?: number;
+    fontSizeNamaTtd?: number;
+    boldNamaTtd?: boolean;
+    underlineNamaTtd?: boolean;
+
+    // 7. Kustomisasi Urutan Mata Pelajaran Rapor
     customMapelOrder?: string[];
   }
 
@@ -402,14 +420,32 @@ export default function NilaiManagementPage() {
     fontSizeSubjudulRapor: 12,
     boldSubjudulRapor: false,
 
-    fontFamilyRapor: "sans",
+    fontFamilyRapor: "Times New Roman",
+    customFontName: "",
+    skalaUkuranRapor: 100,
+    fontSizeHeaderTabel: 11,
     fontSizeTabelNilai: 11,
     fontSizeIdentitas: 12,
+    fontSizeCatatanGuru: 10,
+    fontSizePresensi: 10,
+    fontSizeTitimangsa: 11,
     paddingTabel: "sedang",
     showKkm: true,
     showPredikat: true,
     showCatatanGuru: true,
     showPresensi: true,
+
+    // Tabel KKM & Interval Predikat Nilai Default
+    tampilkanTabelKkm: true,
+    nilaiStandarKkm: 75,
+    fontSizeTabelKkm: 10,
+    judulTabelKkm: "Kriteria Ketuntasan Minimal (KKM)",
+
+    // Ukuran & Ruang Tanda Tangan Default
+    tinggiRuangTtd: 64,
+    fontSizeNamaTtd: 12,
+    boldNamaTtd: true,
+    underlineNamaTtd: true,
 
     // Urutan Mata Pelajaran Default
     customMapelOrder: [],
@@ -466,9 +502,15 @@ export default function NilaiManagementPage() {
           underlineJudulRapor: parsed.underlineJudulRapor ?? prev.underlineJudulRapor ?? true,
           fontSizeSubjudulRapor: parsed.fontSizeSubjudulRapor ?? prev.fontSizeSubjudulRapor ?? 12,
           boldSubjudulRapor: parsed.boldSubjudulRapor ?? prev.boldSubjudulRapor ?? false,
-          fontFamilyRapor: parsed.fontFamilyRapor || prev.fontFamilyRapor || "sans",
+          fontFamilyRapor: parsed.fontFamilyRapor || prev.fontFamilyRapor || "Times New Roman",
+          customFontName: parsed.customFontName ?? prev.customFontName ?? "",
+          skalaUkuranRapor: parsed.skalaUkuranRapor || prev.skalaUkuranRapor || 100,
+          fontSizeHeaderTabel: parsed.fontSizeHeaderTabel || prev.fontSizeHeaderTabel || 11,
           fontSizeTabelNilai: parsed.fontSizeTabelNilai || prev.fontSizeTabelNilai || 11,
           fontSizeIdentitas: parsed.fontSizeIdentitas || prev.fontSizeIdentitas || 12,
+          fontSizeCatatanGuru: parsed.fontSizeCatatanGuru || prev.fontSizeCatatanGuru || 10,
+          fontSizePresensi: parsed.fontSizePresensi || prev.fontSizePresensi || 10,
+          fontSizeTitimangsa: parsed.fontSizeTitimangsa || prev.fontSizeTitimangsa || 11,
           paddingTabel: parsed.paddingTabel || prev.paddingTabel || "sedang",
           showKkm: parsed.showKkm ?? prev.showKkm ?? true,
           showPredikat: parsed.showPredikat ?? prev.showPredikat ?? true,
@@ -477,12 +519,122 @@ export default function NilaiManagementPage() {
           customMapelOrder: Array.isArray(parsed.customMapelOrder)
             ? parsed.customMapelOrder
             : prev.customMapelOrder || [],
+          tampilkanTabelKkm: parsed.tampilkanTabelKkm ?? prev.tampilkanTabelKkm ?? true,
+          nilaiStandarKkm: parsed.nilaiStandarKkm ?? prev.nilaiStandarKkm ?? 75,
+          fontSizeTabelKkm: parsed.fontSizeTabelKkm ?? prev.fontSizeTabelKkm ?? 10,
+          judulTabelKkm: parsed.judulTabelKkm ?? prev.judulTabelKkm ?? "Kriteria Ketuntasan Minimal (KKM)",
+          tinggiRuangTtd: parsed.tinggiRuangTtd ?? prev.tinggiRuangTtd ?? 64,
+          fontSizeNamaTtd: parsed.fontSizeNamaTtd ?? prev.fontSizeNamaTtd ?? 12,
+          boldNamaTtd: parsed.boldNamaTtd ?? prev.boldNamaTtd ?? true,
+          underlineNamaTtd: parsed.underlineNamaTtd ?? prev.underlineNamaTtd ?? true,
         }));
       }
     } catch (e) {
       console.warn("Failed to load simpro_rapor_config:", e);
     }
   }, [profile?.namaSekolah]);
+
+  // Daftar Pilihan Jenis Tulisan (Font Family) Resmi Rapor
+  const RAPOR_FONT_OPTIONS = [
+    {
+      id: "Times New Roman",
+      label: "Times New Roman",
+      category: "Standar Kedinasan (Serif)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-serif",
+      css: "'Times New Roman', Times, 'Liberation Serif', serif",
+    },
+    {
+      id: "Arial",
+      label: "Arial",
+      category: "Modern Bersih (Sans)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-sans",
+      css: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
+    },
+    {
+      id: "Calibri",
+      label: "Calibri",
+      category: "Kantor & Lembaga (Sans)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-sans",
+      css: "Calibri, 'Segoe UI', Candara, Optima, sans-serif",
+    },
+    {
+      id: "Georgia",
+      label: "Georgia",
+      category: "Elegan & Formal (Serif)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-serif",
+      css: "Georgia, Cambria, 'Times New Roman', Times, serif",
+    },
+    {
+      id: "Garamond",
+      label: "Garamond",
+      category: "Klasik Akademik (Serif)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-serif",
+      css: "Garamond, 'Baskerville', 'Baskerville Old Face', 'Hoefler Text', serif",
+    },
+    {
+      id: "Tahoma",
+      label: "Tahoma",
+      category: "Kompak & Padat (Sans)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-sans",
+      css: "Tahoma, Verdana, Segoe, sans-serif",
+    },
+    {
+      id: "Verdana",
+      label: "Verdana",
+      category: "Sangat Jelas Terbaca (Sans)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-sans",
+      css: "Verdana, Geneva, Tahoma, sans-serif",
+    },
+    {
+      id: "Trebuchet MS",
+      label: "Trebuchet MS",
+      category: "Modern Dinamis (Sans)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-sans",
+      css: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', Tahoma, sans-serif",
+    },
+    {
+      id: "Bookman Old Style",
+      label: "Bookman Old Style",
+      category: "Formal Piagam (Serif)",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-serif",
+      css: "'Bookman Old Style', 'Book Antiqua', Palatino, serif",
+    },
+    {
+      id: "Courier New",
+      label: "Courier New",
+      category: "Monospace / Gaya Ketik",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-mono",
+      css: "'Courier New', Courier, monospace",
+    },
+    {
+      id: "sans",
+      label: "Inter / Sistem Sans",
+      category: "Standar Web Modern",
+      sample: "Laporan Capaian Hasil Belajar Peserta Didik",
+      fontClass: "font-sans",
+      css: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    },
+  ];
+
+  const getFontFamilyCss = (fontFamily?: string): string => {
+    if (!fontFamily) return "'Times New Roman', Times, 'Liberation Serif', serif";
+    const matched = RAPOR_FONT_OPTIONS.find((f) => f.id.toLowerCase() === fontFamily.toLowerCase());
+    if (matched) return matched.css;
+    if (fontFamily === "serif") return "'Times New Roman', Times, 'Liberation Serif', serif";
+    if (fontFamily === "mono") return "'Courier New', Courier, monospace";
+    if (fontFamily === "sans") return "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    return `"${fontFamily}", ui-sans-serif, system-ui, sans-serif`;
+  };
 
   const updateRaporConfig = (updates: Partial<RaporConfig>) => {
     setRaporConfig((prev) => {
@@ -624,12 +776,9 @@ export default function NilaiManagementPage() {
       window.print();
       return;
     }
-    const fontCss =
-      raporConfig.fontFamilyRapor === "serif"
-        ? "font-family: 'Times New Roman', Times, serif;"
-        : raporConfig.fontFamilyRapor === "mono"
-        ? "font-family: 'Courier New', Courier, monospace;"
-        : "font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;";
+    const activeFont = raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor;
+    const fontCss = `font-family: ${getFontFamilyCss(activeFont)};`;
+    const docScale = (raporConfig.skalaUkuranRapor || 100) / 100;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -650,6 +799,9 @@ export default function NilaiManagementPage() {
               ${fontCss}
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
+            }
+            .rapor-print-wrapper {
+              zoom: ${docScale};
             }
             .rapor-print-table {
               width: 100%;
@@ -680,7 +832,7 @@ export default function NilaiManagementPage() {
           </style>
         </head>
         <body>
-          <div style="padding: 12px;">
+          <div class="rapor-print-wrapper" style="padding: 12px;">
             ${previewEl.innerHTML}
           </div>
           <script>
@@ -1736,6 +1888,78 @@ export default function NilaiManagementPage() {
             )}
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // Komponen Tabel KKM & Interval Predikat Nilai Rapor
+  const renderTabelKkmComponent = (isSmall = false) => {
+    if (raporConfig.tampilkanTabelKkm === false) return null;
+
+    const baseKkm = Math.max(1, Math.min(99, Number(raporConfig.nilaiStandarKkm) || 75));
+    const kkmFontSize = isSmall
+      ? Math.max(8, Math.round((raporConfig.fontSizeTabelKkm || 10) * 0.9))
+      : (raporConfig.fontSizeTabelKkm || 10);
+    const title = raporConfig.judulTabelKkm || "Kriteria Ketuntasan Minimal (KKM)";
+
+    // Rumus interval predikat kurikulum: interval = (100 - KKM) / 3
+    const interval = Math.max(1, Math.round((100 - baseKkm) / 3));
+    const minC = baseKkm;
+    const maxC = Math.min(99, baseKkm + interval - 1);
+    const minB = maxC + 1;
+    const maxB = Math.min(99, minB + interval - 1);
+    const minA = Math.min(100, maxB + 1);
+
+    const predikats = [
+      { predikat: "A", rentang: `${minA} - 100`, keterangan: "Sangat Baik" },
+      { predikat: "B", rentang: `${minB} - ${maxB}`, keterangan: "Baik" },
+      { predikat: "C", rentang: `${minC} - ${maxC}`, keterangan: "Cukup" },
+      { predikat: "D", rentang: `< ${baseKkm}`, keterangan: "Perlu Bimbingan" },
+    ];
+
+    return (
+      <div className="w-full sm:w-80">
+        <table
+          className="rapor-print-table w-full border-collapse border border-[#000000]"
+          style={{ fontSize: `${kkmFontSize}px` }}
+        >
+          <thead>
+            <tr className="bg-slate-100 text-slate-900 font-bold">
+              <th
+                colSpan={3}
+                className="border border-[#000000] px-3 py-1 text-left uppercase tracking-wider"
+                style={{ fontSize: `${Math.max(8, kkmFontSize - 1)}px` }}
+              >
+                <div className="flex items-center justify-between">
+                  <span>{title}</span>
+                  <span className="font-mono text-[9px] bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-800 dark:text-slate-100 border border-slate-400 font-bold">
+                    KKM: {baseKkm}
+                  </span>
+                </div>
+              </th>
+            </tr>
+            <tr className="bg-slate-50 text-slate-800 font-bold text-center">
+              <th className="border border-[#000000] px-2 py-0.5 w-14">Predikat</th>
+              <th className="border border-[#000000] px-2 py-0.5 w-24">Rentang</th>
+              <th className="border border-[#000000] px-2 py-0.5 text-left">Keterangan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {predikats.map((row) => (
+              <tr key={row.predikat} className="text-center">
+                <td className="border border-[#000000] px-2 py-0.5 font-bold font-mono text-slate-900">
+                  {row.predikat}
+                </td>
+                <td className="border border-[#000000] px-2 py-0.5 font-mono text-slate-800">
+                  {row.rentang}
+                </td>
+                <td className="border border-[#000000] px-2 py-0.5 text-left font-medium text-slate-800">
+                  {row.keterangan}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -5848,7 +6072,22 @@ export default function NilaiManagementPage() {
             <span>TUTUP</span>
           </button>
 
-          <div className="w-full max-w-4xl bg-white text-slate-900 rounded-2xl p-6 sm:p-10 shadow-xl relative mt-1 mb-8 border-0 border-none print:m-0 print:p-0 print:max-w-none print:w-full print:shadow-none print:rounded-none print:border-none rapor-print-card">
+          <div
+            className="w-full max-w-4xl bg-white text-slate-900 rounded-2xl p-6 sm:p-10 shadow-xl relative mt-1 mb-8 border-0 border-none print:m-0 print:p-0 print:max-w-none print:w-full print:shadow-none print:rounded-none print:border-none rapor-print-card"
+            style={{
+              fontFamily: getFontFamilyCss(raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor),
+            }}
+          >
+            {/* Dynamic Print Styles for Typography & Document Scale */}
+            <style>{`
+              @media print {
+                .rapor-print-card {
+                  zoom: ${(raporConfig.skalaUkuranRapor || 100) / 100} !important;
+                  font-family: ${getFontFamilyCss(raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor)} !important;
+                }
+              }
+            `}</style>
+
             {/* Action Bar (No Print) */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-6 no-print">
               {/* Type Switcher & Student Stepper in Print Modal */}
@@ -6051,12 +6290,33 @@ export default function NilaiManagementPage() {
             <div className="text-center mb-5">
               {/* Quick Format & Edit Bar (No Print) */}
               <div className="mb-2.5 print:hidden inline-flex flex-wrap items-center justify-center gap-1.5 p-1 px-3 rounded-full bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800 dark:hover:bg-slate-700/70 border border-slate-300 dark:border-slate-600 shadow-xs transition-all text-xs">
+                {/* Quick Font Selector */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                    <Type className="h-3 w-3 text-indigo-500" />
+                    <span>Font:</span>
+                  </span>
+                  <select
+                    value={raporConfig.fontFamilyRapor || "Times New Roman"}
+                    onChange={(e) => updateRaporConfig({ fontFamilyRapor: e.target.value })}
+                    className="text-[11px] font-bold py-0.5 px-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    title="Pilih Jenis Font Tulisan Dokumen Rapor"
+                  >
+                    {RAPOR_FONT_OPTIONS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-600 mx-0.5" />
+
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
-                  <Type className="h-3 w-3" />
-                  <span>Format Judul:</span>
+                  <span>Judul:</span>
                 </span>
 
-                {/* Font Size - */}
+                {/* Font Size Judul - */}
                 <button
                   type="button"
                   onClick={() =>
@@ -6072,7 +6332,7 @@ export default function NilaiManagementPage() {
                 <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 min-w-[34px] text-center">
                   {raporConfig.fontSizeJudulRapor || 16}px
                 </span>
-                {/* Font Size + */}
+                {/* Font Size Judul + */}
                 <button
                   type="button"
                   onClick={() =>
@@ -6082,6 +6342,40 @@ export default function NilaiManagementPage() {
                   }
                   className="w-5 h-5 rounded-md bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
                   title="Perbesar Ukuran Huruf Judul"
+                >
+                  +
+                </button>
+
+                <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-600 mx-0.5" />
+
+                {/* Font Size Tabel - / + */}
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                  <span>Tabel:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      fontSizeTabelNilai: Math.max(8, (raporConfig.fontSizeTabelNilai || 11) - 1),
+                    })
+                  }
+                  className="w-5 h-5 rounded-md bg-white dark:bg-slate-900 hover:bg-blue-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                  title="Perkecil Ukuran Huruf Tabel Nilai"
+                >
+                  -
+                </button>
+                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 min-w-[30px] text-center">
+                  {raporConfig.fontSizeTabelNilai || 11}px
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      fontSizeTabelNilai: Math.min(16, (raporConfig.fontSizeTabelNilai || 11) + 1),
+                    })
+                  }
+                  className="w-5 h-5 rounded-md bg-white dark:bg-slate-900 hover:bg-blue-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                  title="Perbesar Ukuran Huruf Tabel Nilai"
                 >
                   +
                 </button>
@@ -6128,6 +6422,40 @@ export default function NilaiManagementPage() {
 
                 <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-600 mx-0.5" />
 
+                {/* Ruang TTD Quick Control */}
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                  <span>Ruang TTD:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      tinggiRuangTtd: Math.max(30, (raporConfig.tinggiRuangTtd || 64) - 10),
+                    })
+                  }
+                  className="w-5 h-5 rounded-md bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                  title="Perkecil Ruang Tanda Tangan"
+                >
+                  -
+                </button>
+                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 min-w-[34px] text-center font-mono">
+                  {raporConfig.tinggiRuangTtd || 64}px
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      tinggiRuangTtd: Math.min(180, (raporConfig.tinggiRuangTtd || 64) + 10),
+                    })
+                  }
+                  className="w-5 h-5 rounded-md bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                  title="Perbesar Ruang Tanda Tangan"
+                >
+                  +
+                </button>
+
+                <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-600 mx-0.5" />
+
                 {/* Edit Text Toggle */}
                 <button
                   type="button"
@@ -6165,10 +6493,21 @@ export default function NilaiManagementPage() {
                     setIsRaporSettingsOpen(true);
                   }}
                   className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-200 border border-slate-200 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                  title="Buka panel pengaturan lengkap judul & kop"
+                  title="Buka panel pengaturan cepat judul & kop"
                 >
                   <Sliders className="h-3 w-3" />
-                  <span>Atur Lengkap</span>
+                  <span>Atur Cepat</span>
+                </button>
+
+                {/* Format Rapor (Full Modal) Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsFormatRaporModalOpen(true)}
+                  className="px-2.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all"
+                  title="Buka Format Rapor Komprehensif (Kop, Judul, Font, Ukuran & Pratinjau)"
+                >
+                  <Sliders className="h-3 w-3" />
+                  <span>Format Rapor</span>
                 </button>
               </div>
 
@@ -6266,7 +6605,10 @@ export default function NilaiManagementPage() {
             </div>
 
             {/* Student & Class Info Box */}
-            <div className="grid grid-cols-2 gap-4 text-xs mb-5 py-2 border-0 border-none bg-transparent">
+            <div
+              className="grid grid-cols-2 gap-4 mb-5 py-2 border-0 border-none bg-transparent"
+              style={{ fontSize: `${raporConfig.fontSizeIdentitas || 11}px` }}
+            >
               <div>
                 <p className="text-slate-600">Nama Peserta Didik: <strong className="text-slate-900">{raporSiswa.nama}</strong></p>
               </div>
@@ -6278,9 +6620,15 @@ export default function NilaiManagementPage() {
             {/* Table of Grades */}
             {raporPrintType === "tengah" ? (
               // Table for Rapor Tengah Semester (PTS)
-              <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-4">
+              <table
+                className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4"
+                style={{ fontSize: `${raporConfig.fontSizeTabelNilai || 11}px` }}
+              >
                 <thead>
-                  <tr className="bg-slate-100 text-slate-800 font-bold">
+                  <tr
+                    className="bg-slate-100 text-slate-800 font-bold"
+                    style={{ fontSize: `${raporConfig.fontSizeHeaderTabel || 11}px` }}
+                  >
                     <th className="border border-[#000000] px-3 py-1.5 text-center w-10">No</th>
                     <th className="border border-[#000000] px-3 py-1.5">Mata Pelajaran</th>
                     <th className="border border-[#000000] px-2 py-1.5 text-center w-16">KKM</th>
@@ -6525,9 +6873,15 @@ export default function NilaiManagementPage() {
               </table>
             ) : (
               // Table for Rapor Akhir Semester (PAS)
-              <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-4">
+              <table
+                className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4"
+                style={{ fontSize: `${raporConfig.fontSizeTabelNilai || 11}px` }}
+              >
                 <thead>
-                  <tr className="bg-slate-100 text-slate-800 font-bold">
+                  <tr
+                    className="bg-slate-100 text-slate-800 font-bold"
+                    style={{ fontSize: `${raporConfig.fontSizeHeaderTabel || 11}px` }}
+                  >
                     <th className="border border-[#000000] px-3 py-1.5 text-center w-10">No</th>
                     <th className="border border-[#000000] px-3 py-1.5">Mata Pelajaran</th>
                     <th className="border border-[#000000] px-2 py-1.5 text-center w-14">KKM</th>
@@ -6618,7 +6972,10 @@ export default function NilaiManagementPage() {
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold">
                                     {akhir.predikat}
                                   </td>
-                                  <td className="border border-[#000000] px-3 py-1 text-slate-600 text-[11px]">
+                                  <td
+                                    className="border border-[#000000] px-3 py-1 text-slate-600"
+                                    style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}
+                                  >
                                     {akhir.catatan || "-"}
                                   </td>
                                 </tr>
@@ -6690,7 +7047,10 @@ export default function NilaiManagementPage() {
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold">
                                     {akhir.predikat}
                                   </td>
-                                  <td className="border border-[#000000] px-3 py-1 text-slate-600 text-[11px]">
+                                  <td
+                                    className="border border-[#000000] px-3 py-1 text-slate-600"
+                                    style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}
+                                  >
                                     {akhir.catatan || "-"}
                                   </td>
                                 </tr>
@@ -6762,7 +7122,10 @@ export default function NilaiManagementPage() {
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold">
                                     {akhir.predikat}
                                   </td>
-                                  <td className="border border-[#000000] px-3 py-1 text-slate-600 text-[11px]">
+                                  <td
+                                    className="border border-[#000000] px-3 py-1 text-slate-600"
+                                    style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}
+                                  >
                                     {akhir.catatan || "-"}
                                   </td>
                                 </tr>
@@ -6797,16 +7160,23 @@ export default function NilaiManagementPage() {
               </table>
             )}
 
-            {/* Tabel Ketidakhadiran (Presensi Siswa) */}
-            {(() => {
-              const att = getStudentAttendance(raporSiswa.id, raporSiswa.nama);
-              return (
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+            {/* Tabel Ketidakhadiran (Presensi Siswa) & Tabel KKM */}
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+              {raporConfig.showPresensi !== false && (() => {
+                const att = getStudentAttendance(raporSiswa.id, raporSiswa.nama);
+                return (
                   <div className="w-full sm:w-72">
-                    <table className="rapor-print-table w-full text-xs border-collapse border border-[#000000]">
+                    <table
+                      className="rapor-print-table w-full border-collapse border border-[#000000]"
+                      style={{ fontSize: `${raporConfig.fontSizePresensi || 11}px` }}
+                    >
                       <thead>
                         <tr className="bg-slate-100 text-slate-900 font-bold">
-                          <th colSpan={2} className="border border-[#000000] px-3 py-1 text-left uppercase tracking-wider text-[11px]">
+                          <th
+                            colSpan={2}
+                            className="border border-[#000000] px-3 py-1 text-left uppercase tracking-wider"
+                            style={{ fontSize: `${(raporConfig.fontSizePresensi || 11) - 1}px` }}
+                          >
                             Ketidakhadiran
                           </th>
                         </tr>
@@ -6839,9 +7209,12 @@ export default function NilaiManagementPage() {
                       </tbody>
                     </table>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
+
+              {/* Tabel KKM & Interval Predikat */}
+              {renderTabelKkmComponent()}
+            </div>
 
             {/* Signature Area */}
             {(() => {
@@ -6868,7 +7241,10 @@ export default function NilaiManagementPage() {
                 raporConfig.labelKepalaSekolah?.trim() || "Kepala Sekolah";
 
               return (
-                <div className="pt-6 border-0 border-none text-xs">
+                <div
+                  className="pt-6 border-0 border-none"
+                  style={{ fontSize: `${raporConfig.fontSizeTitimangsa || 11}px` }}
+                >
                   {/* Titimangsa Alamat dan Tanggal Rapor */}
                   <div className="flex justify-end mb-2 pr-4">
                     <p className="text-slate-800 font-medium">
@@ -6883,10 +7259,20 @@ export default function NilaiManagementPage() {
                         <>
                           <p className="text-slate-600">Mengetahui,</p>
                           <p className="text-slate-800 font-medium">{kepsekLabel},</p>
-                          <div className="h-16" />
-                          <p className="font-bold underline">{kepsekNama}</p>
+                          <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                          <p
+                            style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                            className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                              raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                            }`}
+                          >
+                            {kepsekNama}
+                          </p>
                           {raporConfig.nipKepalaSekolah && (
-                            <p className="text-[10px] text-slate-600 mt-0.5">
+                            <p
+                              className="text-slate-600 mt-0.5"
+                              style={{ fontSize: `${Math.max(8, (raporConfig.fontSizeTitimangsa || 11) - 2)}px` }}
+                            >
                               NIP. {raporConfig.nipKepalaSekolah}
                             </p>
                           )}
@@ -6900,8 +7286,15 @@ export default function NilaiManagementPage() {
                         <>
                           <p className="text-slate-600 invisible">Mengetahui,</p>
                           <p className="text-slate-800 font-medium">Wali Kelas,</p>
-                          <div className="h-16" />
-                          <p className="font-bold underline">{waliNama}</p>
+                          <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                          <p
+                            style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                            className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                              raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                            }`}
+                          >
+                            {waliNama}
+                          </p>
                         </>
                       )}
                     </div>
@@ -6912,8 +7305,13 @@ export default function NilaiManagementPage() {
                         <>
                           <p className="text-slate-600 invisible">Mengetahui,</p>
                           <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
-                          <div className="h-16" />
-                          <p className="font-bold underline">
+                          <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                          <p
+                            style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                            className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                              raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                            }`}
+                          >
                             {raporSiswa.namaWali || "................................................"}
                           </p>
                         </>
@@ -7276,6 +7674,26 @@ export default function NilaiManagementPage() {
                       <span>Simpan / Ekspor PDF</span>
                     </button>
 
+                    {/* Quick Font Selector */}
+                    <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                        <Type className="h-3 w-3 text-indigo-500" />
+                        <span>Font:</span>
+                      </span>
+                      <select
+                        value={raporConfig.fontFamilyRapor || "Times New Roman"}
+                        onChange={(e) => updateRaporConfig({ fontFamilyRapor: e.target.value })}
+                        className="text-[11px] font-bold py-0.5 px-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-none"
+                        title="Pilih Jenis Font Tulisan Dokumen Rapor"
+                      >
+                        {RAPOR_FONT_OPTIONS.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
                       <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
                         <Type className="h-3 w-3" />
@@ -7371,6 +7789,17 @@ export default function NilaiManagementPage() {
                       <ArrowUpDown className="h-4 w-4 text-indigo-600" />
                       <span>Urutan Mapel</span>
                     </button>
+
+                    {/* Format Rapor (Full Modal) Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsFormatRaporModalOpen(true)}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-amber-500/20 transition-all cursor-pointer"
+                      title="Buka Format Rapor Komprehensif (Kop, Judul, Font, Ukuran & Pratinjau)"
+                    >
+                      <Sliders className="h-4 w-4" />
+                      <span>Format Rapor</span>
+                    </button>
                   </>
                 )}
 
@@ -7394,6 +7823,15 @@ export default function NilaiManagementPage() {
             {/* ========================================================= */}
             {batchRaporViewMode === "bundel" && (
               <div className="space-y-12 print:space-y-0">
+                {/* Dynamic Print Styles for Batch Printing Typography & Scaling */}
+                <style>{`
+                  @media print {
+                    .batch-rapor-sheet {
+                      zoom: ${(raporConfig.skalaUkuranRapor || 100) / 100} !important;
+                      font-family: ${getFontFamilyCss(raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor)} !important;
+                    }
+                  }
+                `}</style>
                 {batchStudents.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
                     Tidak ada siswa yang ditemukan untuk kelas yang dipilih.
@@ -7443,8 +7881,12 @@ export default function NilaiManagementPage() {
                     return (
                       <div
                         key={siswa.id}
-                        style={{ pageBreakAfter: "always", breakAfter: "page" }}
-                        className="p-6 sm:p-8 bg-white border-0 border-none print:border-none print:p-0 print:m-0"
+                        style={{
+                          pageBreakAfter: "always",
+                          breakAfter: "page",
+                          fontFamily: getFontFamilyCss(raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor),
+                        }}
+                        className="p-6 sm:p-8 bg-white border-0 border-none print:border-none print:p-0 print:m-0 batch-rapor-sheet"
                       >
                         {/* Kop Surat */}
                         {renderOfficialLetterhead(true)}
@@ -7490,7 +7932,10 @@ export default function NilaiManagementPage() {
                         </div>
 
                         {/* Student Info Box */}
-                        <div className="grid grid-cols-2 gap-3 text-xs mb-4 py-2 border-0 border-none bg-transparent">
+                        <div
+                          className="grid grid-cols-2 gap-3 mb-4 py-2 border-0 border-none bg-transparent"
+                          style={{ fontSize: `${raporConfig.fontSizeIdentitas || 11}px` }}
+                        >
                           <div>
                             <p className="text-slate-600">Nama Peserta Didik: <strong className="text-slate-900">{siswa.nama}</strong></p>
                           </div>
@@ -7501,9 +7946,15 @@ export default function NilaiManagementPage() {
 
                         {/* Table of Grades */}
                         {batchRaporType === "tengah" ? (
-                          <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-4">
+                          <table
+                            className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4"
+                            style={{ fontSize: `${raporConfig.fontSizeTabelNilai || 11}px` }}
+                          >
                             <thead>
-                              <tr className="bg-slate-100 text-slate-800 font-bold text-[11px]">
+                              <tr
+                                className="bg-slate-100 text-slate-800 font-bold"
+                                style={{ fontSize: `${raporConfig.fontSizeHeaderTabel || 11}px` }}
+                              >
                                 <th className="border border-[#000000] px-2 py-1 text-center w-8">No</th>
                                 <th className="border border-[#000000] px-2 py-1">Mata Pelajaran</th>
                                 <th className="border border-[#000000] px-2 py-1 text-center w-12">KKM</th>
@@ -7743,9 +8194,15 @@ export default function NilaiManagementPage() {
                             </tfoot>
                           </table>
                         ) : (
-                          <table className="rapor-print-table w-full text-xs text-left border-collapse border border-[#000000] mb-4">
+                          <table
+                            className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4"
+                            style={{ fontSize: `${raporConfig.fontSizeTabelNilai || 11}px` }}
+                          >
                             <thead>
-                              <tr className="bg-slate-100 text-slate-800 font-bold text-[11px]">
+                              <tr
+                                className="bg-slate-100 text-slate-800 font-bold"
+                                style={{ fontSize: `${raporConfig.fontSizeHeaderTabel || 11}px` }}
+                              >
                                 <th className="border border-[#000000] px-2 py-1 text-center w-8">No</th>
                                 <th className="border border-[#000000] px-2 py-1">Mata Pelajaran</th>
                                 <th className="border border-[#000000] px-2 py-1 text-center w-12">KKM</th>
@@ -7836,7 +8293,10 @@ export default function NilaiManagementPage() {
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold">
                                                 {akhir.predikat}
                                               </td>
-                                              <td className="border border-[#000000] px-2 py-1 text-slate-600 text-[10px]">
+                                              <td
+                                                className="border border-[#000000] px-2 py-1 text-slate-600"
+                                                style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}
+                                              >
                                                 {akhir.catatan || "-"}
                                               </td>
                                             </tr>
@@ -7908,7 +8368,10 @@ export default function NilaiManagementPage() {
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold">
                                                 {akhir.predikat}
                                               </td>
-                                              <td className="border border-[#000000] px-2 py-1 text-slate-600 text-[10px]">
+                                              <td
+                                                className="border border-[#000000] px-2 py-1 text-slate-600"
+                                                style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}
+                                              >
                                                 {akhir.catatan || "-"}
                                               </td>
                                             </tr>
@@ -7980,7 +8443,10 @@ export default function NilaiManagementPage() {
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold">
                                                 {akhir.predikat}
                                               </td>
-                                              <td className="border border-[#000000] px-2 py-1 text-slate-600 text-[10px]">
+                                              <td
+                                                className="border border-[#000000] px-2 py-1 text-slate-600"
+                                                style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}
+                                              >
                                                 {akhir.catatan || "-"}
                                               </td>
                                             </tr>
@@ -8011,49 +8477,64 @@ export default function NilaiManagementPage() {
                           </table>
                         )}
 
-                        {/* Tabel Ketidakhadiran (Presensi Siswa) */}
+                        {/* Tabel Ketidakhadiran (Presensi Siswa) & Tabel KKM */}
                         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-                          <div className="w-full sm:w-72">
-                            <table className="rapor-print-table w-full text-xs border-collapse border border-[#000000]">
-                              <thead>
-                                <tr className="bg-slate-100 text-slate-900 font-bold">
-                                  <th colSpan={2} className="border border-[#000000] px-3 py-1 text-left uppercase tracking-wider text-[11px]">
-                                    Ketidakhadiran
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">
-                                    1. Sakit
-                                  </td>
-                                  <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">
-                                    {att.sakit} hari
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">
-                                    2. Izin
-                                  </td>
-                                  <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">
-                                    {att.izin} hari
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">
-                                    3. Tanpa Keterangan
-                                  </td>
-                                  <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">
-                                    {att.alpa} hari
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
+                          {raporConfig.showPresensi !== false && (
+                            <div className="w-full sm:w-72">
+                              <table
+                                className="rapor-print-table w-full border-collapse border border-[#000000]"
+                                style={{ fontSize: `${raporConfig.fontSizePresensi || 11}px` }}
+                              >
+                                <thead>
+                                  <tr className="bg-slate-100 text-slate-900 font-bold">
+                                    <th
+                                      colSpan={2}
+                                      className="border border-[#000000] px-3 py-1 text-left uppercase tracking-wider"
+                                      style={{ fontSize: `${(raporConfig.fontSizePresensi || 11) - 1}px` }}
+                                    >
+                                      Ketidakhadiran
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr>
+                                    <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">
+                                      1. Sakit
+                                    </td>
+                                    <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">
+                                      {att.sakit} hari
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">
+                                      2. Izin
+                                    </td>
+                                    <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">
+                                      {att.izin} hari
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">
+                                      3. Tanpa Keterangan
+                                    </td>
+                                    <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">
+                                      {att.alpa} hari
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Tabel KKM & Interval Predikat */}
+                          {renderTabelKkmComponent()}
                         </div>
 
                         {/* Signature Area (3 Kolom: Kepala Sekolah, Wali Kelas, Orang Tua / Wali Santri) */}
-                        <div className="pt-6 border-0 border-none text-xs">
+                        <div
+                          className="pt-6 border-0 border-none"
+                          style={{ fontSize: `${raporConfig.fontSizeTitimangsa || 11}px` }}
+                        >
                           {/* Titimangsa Alamat dan Tanggal Rapor */}
                           <div className="flex justify-end mb-2 pr-4">
                             <p className="text-slate-800 font-medium">
@@ -8073,12 +8554,20 @@ export default function NilaiManagementPage() {
                                   <p className="text-slate-800 font-medium">
                                     {raporConfig.labelKepalaSekolah || "Kepala Sekolah"},
                                   </p>
-                                  <div className="h-14" />
-                                  <p className="font-bold underline">
+                                  <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                                  <p
+                                    style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                                    className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                                      raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                                    }`}
+                                  >
                                     {raporConfig.customKepalaSekolah || profile.kepalaSekolah}
                                   </p>
                                   {raporConfig.nipKepalaSekolah && (
-                                    <p className="text-[10px] text-slate-600 mt-0.5">
+                                    <p
+                                      className="text-slate-600 mt-0.5"
+                                      style={{ fontSize: `${Math.max(8, (raporConfig.fontSizeTitimangsa || 11) - 2)}px` }}
+                                    >
                                       NIP. {raporConfig.nipKepalaSekolah}
                                     </p>
                                   )}
@@ -8092,8 +8581,15 @@ export default function NilaiManagementPage() {
                                 <>
                                   <p className="text-slate-600 invisible">Mengetahui,</p>
                                   <p className="text-slate-800 font-medium">Wali Kelas,</p>
-                                  <div className="h-14" />
-                                  <p className="font-bold underline">{waliNama}</p>
+                                  <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                                  <p
+                                    style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                                    className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                                      raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                                    }`}
+                                  >
+                                    {waliNama}
+                                  </p>
                                 </>
                               )}
                             </div>
@@ -8104,8 +8600,13 @@ export default function NilaiManagementPage() {
                                 <>
                                   <p className="text-slate-600 invisible">Mengetahui,</p>
                                   <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
-                                  <div className="h-14" />
-                                  <p className="font-bold underline">
+                                  <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                                  <p
+                                    style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                                    className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                                      raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                                    }`}
+                                  >
                                     {siswa.namaWali || "................................................"}
                                   </p>
                                 </>
@@ -9117,12 +9618,9 @@ export default function NilaiManagementPage() {
           ? raporConfig.subjudulRapor
           : `Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${formatPreviewSemester}`;
 
-        const previewFontFamily =
-          raporConfig.fontFamilyRapor === "serif"
-            ? "'Times New Roman', Times, serif"
-            : raporConfig.fontFamilyRapor === "mono"
-            ? "'Courier New', Courier, monospace"
-            : "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        const previewFontFamily = getFontFamilyCss(
+          raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor
+        );
 
         const previewCellPadding =
           raporConfig.paddingTabel === "kompak"
@@ -9282,8 +9780,8 @@ export default function NilaiManagementPage() {
                           : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
                       }`}
                     >
-                      <Sliders className="h-3.5 w-3.5" />
-                      <span>Font & Tabel</span>
+                      <Type className="h-3.5 w-3.5" />
+                      <span>Jenis & Ukuran Tulisan</span>
                     </button>
 
                     <button
@@ -9790,91 +10288,751 @@ export default function NilaiManagementPage() {
                             </label>
                           </div>
                         </div>
+
+                        {/* Ukuran & Ruang Tanda Tangan (Spasi & Huruf TTD) */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-700 dark:text-slate-200 block">
+                              Ukuran & Ruang Tanda Tangan:
+                            </span>
+                            <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200/50">
+                              Tinggi Spasi: {raporConfig.tinggiRuangTtd || 64}px
+                            </span>
+                          </div>
+
+                          {/* Ruang Kosong TTD (Preset & Stepper) */}
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] text-slate-500 font-medium">
+                                Ruang Kosong Tanda Tangan & Cap / Stempel Basah
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRaporConfig({
+                                      tinggiRuangTtd: Math.max(30, (raporConfig.tinggiRuangTtd || 64) - 10),
+                                    })
+                                  }
+                                  className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-xs cursor-pointer"
+                                  title="Perkecil Ruang TTD"
+                                >
+                                  -
+                                </button>
+                                <span className="font-mono font-bold text-amber-600 min-w-[36px] text-center text-xs">
+                                  {raporConfig.tinggiRuangTtd || 64}px
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRaporConfig({
+                                      tinggiRuangTtd: Math.min(180, (raporConfig.tinggiRuangTtd || 64) + 10),
+                                    })
+                                  }
+                                  className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-xs cursor-pointer"
+                                  title="Perbesar Ruang TTD"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Preset Buttons */}
+                            <div className="grid grid-cols-5 gap-1.5 pt-1">
+                              {[
+                                { label: "Kompak", val: 48 },
+                                { label: "Standar", val: 64 },
+                                { label: "Sedang", val: 90 },
+                                { label: "Besar", val: 120 },
+                                { label: "Jumbo", val: 150 },
+                              ].map((preset) => (
+                                <button
+                                  key={preset.val}
+                                  type="button"
+                                  onClick={() => updateRaporConfig({ tinggiRuangTtd: preset.val })}
+                                  className={`py-1.5 px-1 rounded-lg text-center font-bold text-[10px] border transition-all cursor-pointer ${
+                                    (raporConfig.tinggiRuangTtd || 64) === preset.val
+                                      ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                                      : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <div>{preset.label}</div>
+                                  <div className="font-mono text-[9px] opacity-80">{preset.val}px</div>
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-slate-400 italic">
+                              Pilih "Besar" (120px) atau "Jumbo" (150px) jika membutuhkan ruang yang leluasa untuk tanda tangan basah & stempel sekolah.
+                            </p>
+                          </div>
+
+                          {/* Huruf Nama Penandatangan */}
+                          <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px] block">
+                                Ukuran Huruf Nama Penandatangan:
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                Berlaku untuk Kepala Sekolah, Wali Kelas, & Orang Tua
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {/* Font Size Stepper */}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRaporConfig({
+                                      fontSizeNamaTtd: Math.max(9, (raporConfig.fontSizeNamaTtd || 12) - 1),
+                                    })
+                                  }
+                                  className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-xs cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <span className="font-mono font-bold text-amber-600 min-w-[32px] text-center text-xs">
+                                  {raporConfig.fontSizeNamaTtd || 12}px
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateRaporConfig({
+                                      fontSizeNamaTtd: Math.min(18, (raporConfig.fontSizeNamaTtd || 12) + 1),
+                                    })
+                                  }
+                                  className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-xs cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              {/* Bold Toggle */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateRaporConfig({ boldNamaTtd: !(raporConfig.boldNamaTtd !== false) })
+                                }
+                                className={`px-2 py-1 rounded text-xs font-bold border cursor-pointer ${
+                                  raporConfig.boldNamaTtd !== false
+                                    ? "bg-amber-500 text-white border-amber-600 font-black"
+                                    : "bg-white dark:bg-slate-900 text-slate-600 border-slate-200"
+                                }`}
+                                title="Tebalkan Nama Penandatangan"
+                              >
+                                B
+                              </button>
+
+                              {/* Underline Toggle */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateRaporConfig({ underlineNamaTtd: !(raporConfig.underlineNamaTtd !== false) })
+                                }
+                                className={`px-2 py-1 rounded text-xs font-bold border cursor-pointer ${
+                                  raporConfig.underlineNamaTtd !== false
+                                    ? "bg-amber-500 text-white border-amber-600 font-black underline"
+                                    : "bg-white dark:bg-slate-900 text-slate-600 border-slate-200"
+                                }`}
+                                title="Garis Bawahi Nama Penandatangan"
+                              >
+                                U
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
 
-                    {/* TAB 4: FORMAT & TABEL RAPOR */}
+                    {/* TAB 4: JENIS & UKURAN TULISAN RAPOR */}
                     {formatRaporActiveTab === "format" && (
                       <div className="space-y-4 text-xs">
-                        {/* Font Family */}
-                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Jenis Huruf Rapor (Font Family):</span>
-                          <div className="grid grid-cols-3 gap-2">
+                        {/* 1. KARTU PILIHAN JENIS TULISAN (FONT FAMILY) */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-slate-800 dark:text-slate-100 block">
+                                1. Jenis Tulisan Dokumen (Font Family)
+                              </span>
+                              <span className="text-[11px] text-slate-500">
+                                Pilih jenis huruf resmi untuk seluruh teks pada lembar rapor.
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                              {raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor || "Times New Roman"}
+                            </span>
+                          </div>
+
+                          {/* Grid Kartu Font Populer */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
+                            {RAPOR_FONT_OPTIONS.map((f) => {
+                              const isSelected =
+                                !raporConfig.customFontName?.trim() &&
+                                (raporConfig.fontFamilyRapor || "Times New Roman").toLowerCase() === f.id.toLowerCase();
+                              return (
+                                <button
+                                  key={f.id}
+                                  type="button"
+                                  onClick={() =>
+                                    updateRaporConfig({
+                                      fontFamilyRapor: f.id,
+                                      customFontName: "",
+                                    })
+                                  }
+                                  className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all relative ${
+                                    isSelected
+                                      ? "bg-amber-500/10 border-amber-500 dark:border-amber-500 shadow-2xs ring-1 ring-amber-500"
+                                      : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="font-bold text-slate-800 dark:text-slate-100 text-xs">
+                                      {f.label}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                                        {f.category}
+                                      </span>
+                                      {isSelected && (
+                                        <Check className="h-3.5 w-3.5 text-amber-600 font-black shrink-0" />
+                                      )}
+                                    </div>
+                                  </div>
+                                  <p
+                                    style={{ fontFamily: f.css }}
+                                    className="text-[12px] text-slate-600 dark:text-slate-300 line-clamp-1 italic"
+                                  >
+                                    {f.sample}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Opsi Font Kustom */}
+                          <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                              Atau Ketik Nama Font Kustom / Lokal:
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={raporConfig.customFontName || ""}
+                                onChange={(e) => updateRaporConfig({ customFontName: e.target.value })}
+                                placeholder="Contoh: Cambria, Palatino Linotype, Century Gothic..."
+                                className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                              />
+                              {raporConfig.customFontName && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateRaporConfig({ customFontName: "" })}
+                                  className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer"
+                                >
+                                  Hapus
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. SKALA UKURAN DOKUMEN GLOBAL (A4 AUTO-FIT) */}
+                        <div className="p-3.5 rounded-xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-300/80 dark:border-amber-700/60 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-slate-800 dark:text-slate-100 block">
+                                2. Skala Ukuran Dokumen Global (A4 Auto-Fit)
+                              </span>
+                              <span className="text-[11px] text-slate-500">
+                                Kecilkan skala dokumen jika jumlah mata pelajaran banyak agar pas 1 halaman cetak A4.
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-amber-300 dark:border-amber-700">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateRaporConfig({
+                                    skalaUkuranRapor: Math.max(80, (raporConfig.skalaUkuranRapor || 100) - 5),
+                                  })
+                                }
+                                className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center cursor-pointer text-xs"
+                                title="Kecilkan Skala"
+                              >
+                                -
+                              </button>
+                              <span className="font-mono font-bold text-amber-700 dark:text-amber-400 w-10 text-center text-xs">
+                                {raporConfig.skalaUkuranRapor || 100}%
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateRaporConfig({
+                                    skalaUkuranRapor: Math.min(115, (raporConfig.skalaUkuranRapor || 100) + 5),
+                                  })
+                                }
+                                className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center cursor-pointer text-xs"
+                                title="Perbesar Skala"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Preset Cepat Skala */}
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                             {[
-                              { id: "sans", label: "Sans-Serif (Modern)", font: "font-sans" },
-                              { id: "serif", label: "Serif (Resmi / Times)", font: "font-serif" },
-                              { id: "mono", label: "Monospace (Ketik)", font: "font-mono" },
-                            ].map((f) => (
+                              { sc: 85, label: "85%", desc: "Super Kompak" },
+                              { sc: 90, label: "90%", desc: "Kompak" },
+                              { sc: 95, label: "95%", desc: "Ringkas" },
+                              { sc: 100, label: "100%", desc: "Standar" },
+                              { sc: 105, label: "105%", desc: "Besar" },
+                              { sc: 110, label: "110%", desc: "Ekstra" },
+                            ].map((p) => (
                               <button
-                                key={f.id}
+                                key={p.sc}
                                 type="button"
-                                onClick={() => updateRaporConfig({ fontFamilyRapor: f.id as any })}
-                                className={`py-2 px-2.5 rounded-lg border text-center cursor-pointer transition-all ${
-                                  (raporConfig.fontFamilyRapor || "sans") === f.id
-                                    ? "bg-amber-500 text-white border-amber-600 shadow-2xs font-bold"
-                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-                                }`}
-                              >
-                                <span className={`block text-xs ${f.font}`}>{f.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Ukuran Font Tabel Nilai */}
-                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-700 dark:text-slate-200">Ukuran Font Tabel Nilai:</span>
-                            <span className="font-mono font-bold text-amber-600">{raporConfig.fontSizeTabelNilai || 11}px</span>
-                          </div>
-                          <div className="grid grid-cols-5 gap-1.5">
-                            {[9, 10, 11, 12, 13].map((sz) => (
-                              <button
-                                key={sz}
-                                type="button"
-                                onClick={() => updateRaporConfig({ fontSizeTabelNilai: sz })}
-                                className={`py-1.5 rounded-lg border text-center text-[11px] cursor-pointer ${
-                                  (raporConfig.fontSizeTabelNilai || 11) === sz
+                                onClick={() => updateRaporConfig({ skalaUkuranRapor: p.sc })}
+                                className={`py-1.5 px-1 rounded-lg border text-center cursor-pointer transition-all ${
+                                  (raporConfig.skalaUkuranRapor || 100) === p.sc
                                     ? "bg-amber-500 text-white border-amber-600 font-bold shadow-2xs"
-                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50"
                                 }`}
                               >
-                                {sz}px {sz === 11 ? "(Std)" : ""}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-[10px] text-slate-400">
-                            Pilih 9px atau 10px jika jumlah mata pelajaran banyak agar pas dalam 1 halaman cetak A4.
-                          </p>
-                        </div>
-
-                        {/* Ukuran Font Identitas Siswa */}
-                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-700 dark:text-slate-200">Ukuran Font Identitas Siswa:</span>
-                            <span className="font-mono font-bold text-amber-600">{raporConfig.fontSizeIdentitas || 12}px</span>
-                          </div>
-                          <div className="grid grid-cols-5 gap-1.5">
-                            {[10, 11, 12, 13, 14].map((sz) => (
-                              <button
-                                key={sz}
-                                type="button"
-                                onClick={() => updateRaporConfig({ fontSizeIdentitas: sz })}
-                                className={`py-1.5 rounded-lg border text-center text-[11px] cursor-pointer ${
-                                  (raporConfig.fontSizeIdentitas || 12) === sz
-                                    ? "bg-amber-500 text-white border-amber-600 font-bold shadow-2xs"
-                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-                                }`}
-                              >
-                                {sz}px {sz === 12 ? "(Std)" : ""}
+                                <span className="block text-[11px] font-bold">{p.label}</span>
+                                <span className="block text-[9px] opacity-80">{p.desc}</span>
                               </button>
                             ))}
                           </div>
                         </div>
 
-                        {/* Kepadatan Baris Tabel (Padding) */}
+                        {/* 3. PENGATURAN DETAIL UKURAN HURUF TIAP BAGIAN */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <span className="font-bold text-slate-800 dark:text-slate-100 block">
+                            3. Pengaturan Detail Ukuran Huruf Tiap Bagian:
+                          </span>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* A. Tabel Nilai: Isi Baris */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Isi Baris Nilai & Mapel
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeTabelNilai: Math.max(8, (raporConfig.fontSizeTabelNilai || 11) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizeTabelNilai || 11}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeTabelNilai: Math.min(14, (raporConfig.fontSizeTabelNilai || 11) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[9, 10, 11, 12, 13].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizeTabelNilai: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizeTabelNilai || 11) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* B. Header Kolom Tabel */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Header Kolom Tabel
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeHeaderTabel: Math.max(8, (raporConfig.fontSizeHeaderTabel || 11) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizeHeaderTabel || 11}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeHeaderTabel: Math.min(14, (raporConfig.fontSizeHeaderTabel || 11) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[9, 10, 11, 12, 13].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizeHeaderTabel: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizeHeaderTabel || 11) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* C. Identitas Siswa */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Identitas Siswa & Kelas
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeIdentitas: Math.max(9, (raporConfig.fontSizeIdentitas || 12) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizeIdentitas || 12}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeIdentitas: Math.min(16, (raporConfig.fontSizeIdentitas || 12) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[10, 11, 12, 13, 14].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizeIdentitas: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizeIdentitas || 12) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* D. Catatan Capaian Guru */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Catatan / Capaian Guru
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeCatatanGuru: Math.max(8, (raporConfig.fontSizeCatatanGuru || 10) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizeCatatanGuru || 10}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeCatatanGuru: Math.min(13, (raporConfig.fontSizeCatatanGuru || 10) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[8, 9, 10, 11, 12].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizeCatatanGuru: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizeCatatanGuru || 10) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* E. Tabel Presensi / Kehadiran */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Tabel Presensi / Kehadiran
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizePresensi: Math.max(8, (raporConfig.fontSizePresensi || 10) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizePresensi || 10}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizePresensi: Math.min(13, (raporConfig.fontSizePresensi || 10) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[8, 9, 10, 11, 12].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizePresensi: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizePresensi || 10) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* F. Titimangsa & Tanda Tangan */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Titimangsa & Tanda Tangan
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeTitimangsa: Math.max(9, (raporConfig.fontSizeTitimangsa || 11) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizeTitimangsa || 11}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeTitimangsa: Math.min(14, (raporConfig.fontSizeTitimangsa || 11) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[9, 10, 11, 12, 13].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizeTitimangsa: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizeTitimangsa || 11) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* G. Tabel KKM & Interval Predikat */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Tabel KKM & Interval Predikat
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeTabelKkm: Math.max(8, (raporConfig.fontSizeTabelKkm || 10) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizeTabelKkm || 10}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeTabelKkm: Math.min(14, (raporConfig.fontSizeTabelKkm || 10) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[8, 9, 10, 11, 12].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizeTabelKkm: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizeTabelKkm || 10) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* H. Nama Penandatangan Rapor */}
+                            <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-700 dark:text-slate-200 text-[11px]">
+                                  Nama Penandatangan TTD
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeNamaTtd: Math.max(9, (raporConfig.fontSizeNamaTtd || 12) - 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-mono font-bold text-amber-600 min-w-[28px] text-center text-xs">
+                                    {raporConfig.fontSizeNamaTtd || 12}px
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateRaporConfig({
+                                        fontSizeNamaTtd: Math.min(18, (raporConfig.fontSizeNamaTtd || 12) + 1),
+                                      })
+                                    }
+                                    className="w-4 h-4 rounded bg-slate-100 dark:bg-slate-800 hover:bg-amber-500 hover:text-white font-bold flex items-center justify-center text-[10px] cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                {[10, 11, 12, 13, 14].map((sz) => (
+                                  <button
+                                    key={sz}
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ fontSizeNamaTtd: sz })}
+                                    className={`flex-1 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                      (raporConfig.fontSizeNamaTtd || 12) === sz
+                                        ? "bg-amber-500 text-white border-amber-600"
+                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                    }`}
+                                  >
+                                    {sz}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 4. KEPADATAN BARIS TABEL (PADDING) */}
                         <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
-                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Kepadatan Baris Tabel (Spasi):</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-100 block">
+                            4. Kepadatan Spasi Baris Tabel (Row Spacing):
+                          </span>
                           <div className="grid grid-cols-3 gap-2">
                             {[
                               { id: "kompak", label: "Kompak / Rapat", desc: "py-1" },
@@ -9897,9 +11055,11 @@ export default function NilaiManagementPage() {
                           </div>
                         </div>
 
-                        {/* Komponen Kolom Rapor */}
+                        {/* 5. KOMPONEN KOLOM RAPOR */}
                         <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2.5">
-                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Komponen Kolom & Rekap Rapor:</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-100 block">
+                            5. Komponen Kolom & Rekap Rapor:
+                          </span>
                           <div className="space-y-2">
                             <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
                               <span className="font-medium text-slate-700 dark:text-slate-200">Tampilkan Kolom KKM / KKTP</span>
@@ -9940,6 +11100,85 @@ export default function NilaiManagementPage() {
                                 className="rounded text-amber-500 w-4 h-4 cursor-pointer"
                               />
                             </label>
+
+                            <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                              <div>
+                                <span className="font-medium text-slate-700 dark:text-slate-200 block">
+                                  Tampilkan Tabel KKM & Interval Predikat (A, B, C, D)
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  Menampilkan tabel acuan interval nilai di samping rekap ketidakhadiran
+                                </span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.tampilkanTabelKkm ?? true}
+                                onChange={(e) => updateRaporConfig({ tampilkanTabelKkm: e.target.checked })}
+                                className="rounded text-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+
+                            {/* Pengaturan Nilai & Judul KKM jika aktif */}
+                            {(raporConfig.tampilkanTabelKkm ?? true) && (
+                              <div className="p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 space-y-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                  <div>
+                                    <label className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold block mb-1">
+                                      Nilai Standar KKM Acuan:
+                                    </label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        min={40}
+                                        max={95}
+                                        value={raporConfig.nilaiStandarKkm ?? 75}
+                                        onChange={(e) =>
+                                          updateRaporConfig({
+                                            nilaiStandarKkm: Math.max(40, Math.min(95, Number(e.target.value) || 75)),
+                                          })
+                                        }
+                                        className="w-20 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold font-mono"
+                                      />
+                                      <div className="flex gap-1">
+                                        {[70, 75, 80, 85].map((kVal) => (
+                                          <button
+                                            key={kVal}
+                                            type="button"
+                                            onClick={() => updateRaporConfig({ nilaiStandarKkm: kVal })}
+                                            className={`px-2 py-1 rounded text-[10px] font-bold border cursor-pointer ${
+                                              (raporConfig.nilaiStandarKkm ?? 75) === kVal
+                                                ? "bg-amber-500 text-white border-amber-600 shadow-2xs"
+                                                : "bg-white dark:bg-slate-900 text-slate-600 border-slate-200"
+                                            }`}
+                                          >
+                                            {kVal}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                      Interval A, B, C, & D dihitung otomatis berdasarkan acuan ini.
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold block mb-1">
+                                      Judul Header Tabel KKM:
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={raporConfig.judulTabelKkm ?? "Kriteria Ketuntasan Minimal (KKM)"}
+                                      onChange={(e) => updateRaporConfig({ judulTabelKkm: e.target.value })}
+                                      placeholder="Kriteria Ketuntasan Minimal (KKM)"
+                                      className="w-full px-2.5 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                      Dapat diganti misal "Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)".
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -10083,8 +11322,49 @@ export default function NilaiManagementPage() {
                       </div>
                     </div>
 
-                    {/* Data Source & Zoom */}
-                    <div className="flex items-center gap-3">
+                    {/* Data Source & Font & Scale & Zoom */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {/* Font Family Quick Select */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-500 hidden xl:inline">Font:</span>
+                        <select
+                          value={raporConfig.customFontName ? "custom" : (raporConfig.fontFamilyRapor || "Times New Roman")}
+                          onChange={(e) => {
+                            if (e.target.value !== "custom") {
+                              updateRaporConfig({ fontFamilyRapor: e.target.value, customFontName: "" });
+                            }
+                          }}
+                          className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold cursor-pointer max-w-[130px] truncate"
+                          title="Ganti Jenis Huruf Dokumen Rapor"
+                        >
+                          {RAPOR_FONT_OPTIONS.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.label}
+                            </option>
+                          ))}
+                          {raporConfig.customFontName && (
+                            <option value="custom">Kustom: {raporConfig.customFontName}</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Skala Dokumen Global */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-500 hidden xl:inline">Skala:</span>
+                        <select
+                          value={raporConfig.skalaUkuranRapor || 100}
+                          onChange={(e) => updateRaporConfig({ skalaUkuranRapor: Number(e.target.value) })}
+                          className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold cursor-pointer"
+                          title="Skala Ukuran Dokumen A4 Rapor"
+                        >
+                          {[85, 90, 95, 100, 105, 110].map((sc) => (
+                            <option key={sc} value={sc}>
+                              {sc}% {sc === 100 ? "(Std)" : sc < 100 ? "(Kompak)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       {/* Sumber Data */}
                       <div className="flex items-center gap-1.5">
                         <span className="text-[11px] text-slate-500 hidden xl:inline">Data:</span>
@@ -10149,7 +11429,7 @@ export default function NilaiManagementPage() {
                     <div
                       id="format-rapor-preview-paper"
                       style={{
-                        transform: `scale(${formatPreviewZoom / 100})`,
+                        transform: `scale(${(formatPreviewZoom / 100) * ((raporConfig.skalaUkuranRapor || 100) / 100)})`,
                         transformOrigin: "top center",
                         fontFamily: previewFontFamily,
                       }}
@@ -10203,7 +11483,7 @@ export default function NilaiManagementPage() {
                           className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4 text-black"
                         >
                           <thead>
-                            <tr className="bg-slate-100 text-slate-900 font-bold">
+                            <tr className="bg-slate-100 text-slate-900 font-bold" style={{ fontSize: `${raporConfig.fontSizeHeaderTabel || 11}px` }}>
                               <th className={`border border-[#000000] ${previewCellPadding} text-center w-10`}>No</th>
                               <th className={`border border-[#000000] ${previewCellPadding}`}>Mata Pelajaran</th>
                               {raporConfig.showKkm !== false && (
@@ -10241,7 +11521,7 @@ export default function NilaiManagementPage() {
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
                                     {raporConfig.showCatatanGuru !== false && (
-                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                      <td className={`border border-[#000000] ${previewCellPadding} leading-tight`} style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}>{item.catatan}</td>
                                     )}
                                   </tr>
                                 ))}
@@ -10268,7 +11548,7 @@ export default function NilaiManagementPage() {
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
                                     {raporConfig.showCatatanGuru !== false && (
-                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                      <td className={`border border-[#000000] ${previewCellPadding} leading-tight`} style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}>{item.catatan}</td>
                                     )}
                                   </tr>
                                 ))}
@@ -10295,7 +11575,7 @@ export default function NilaiManagementPage() {
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
                                     {raporConfig.showCatatanGuru !== false && (
-                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                      <td className={`border border-[#000000] ${previewCellPadding} leading-tight`} style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}>{item.catatan}</td>
                                     )}
                                   </tr>
                                 ))}
@@ -10310,7 +11590,7 @@ export default function NilaiManagementPage() {
                           className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4 text-black"
                         >
                           <thead>
-                            <tr className="bg-slate-100 text-slate-900 font-bold">
+                            <tr className="bg-slate-100 text-slate-900 font-bold" style={{ fontSize: `${raporConfig.fontSizeHeaderTabel || 11}px` }}>
                               <th className={`border border-[#000000] ${previewCellPadding} text-center w-8`}>No</th>
                               <th className={`border border-[#000000] ${previewCellPadding}`}>Mata Pelajaran</th>
                               {raporConfig.showKkm !== false && (
@@ -10354,7 +11634,7 @@ export default function NilaiManagementPage() {
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
                                     {raporConfig.showCatatanGuru !== false && (
-                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                      <td className={`border border-[#000000] ${previewCellPadding} leading-tight`} style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}>{item.catatan}</td>
                                     )}
                                   </tr>
                                 ))}
@@ -10384,7 +11664,7 @@ export default function NilaiManagementPage() {
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
                                     {raporConfig.showCatatanGuru !== false && (
-                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                      <td className={`border border-[#000000] ${previewCellPadding} leading-tight`} style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}>{item.catatan}</td>
                                     )}
                                   </tr>
                                 ))}
@@ -10414,7 +11694,7 @@ export default function NilaiManagementPage() {
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
                                     {raporConfig.showCatatanGuru !== false && (
-                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                      <td className={`border border-[#000000] ${previewCellPadding} leading-tight`} style={{ fontSize: `${raporConfig.fontSizeCatatanGuru || 10}px` }}>{item.catatan}</td>
                                     )}
                                   </tr>
                                 ))}
@@ -10424,34 +11704,39 @@ export default function NilaiManagementPage() {
                         </table>
                       )}
 
-                      {/* Tabel Rekap Presensi */}
-                      {raporConfig.showPresensi !== false && (
-                        <div className="mt-4 mb-5 max-w-sm">
-                          <p className="font-bold text-xs uppercase mb-1 text-slate-800">Kehadiran (Presensi):</p>
-                          <table
-                            style={{ fontSize: `${Math.max(9, (raporConfig.fontSizeTabelNilai || 11) - 1)}px` }}
-                            className="rapor-print-table w-full border-collapse border border-[#000000]"
-                          >
-                            <tbody>
-                              <tr>
-                                <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">1. Sakit</td>
-                                <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">1 hari</td>
-                              </tr>
-                              <tr>
-                                <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">2. Izin</td>
-                                <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">0 hari</td>
-                              </tr>
-                              <tr>
-                                <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">3. Tanpa Keterangan</td>
-                                <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">0 hari</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                      {/* Tabel Rekap Presensi & Tabel KKM */}
+                      <div className="mt-4 mb-5 flex flex-wrap items-start justify-between gap-4">
+                        {raporConfig.showPresensi !== false && (
+                          <div className="w-full sm:w-72">
+                            <p className="font-bold text-xs uppercase mb-1 text-slate-800">Kehadiran (Presensi):</p>
+                            <table
+                              style={{ fontSize: `${raporConfig.fontSizePresensi || 10}px` }}
+                              className="rapor-print-table w-full border-collapse border border-[#000000]"
+                            >
+                              <tbody>
+                                <tr>
+                                  <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">1. Sakit</td>
+                                  <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">1 hari</td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">2. Izin</td>
+                                  <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">0 hari</td>
+                                </tr>
+                                <tr>
+                                  <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">3. Tanpa Keterangan</td>
+                                  <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">0 hari</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Tabel KKM & Interval Predikat */}
+                        {renderTabelKkmComponent(true)}
+                      </div>
 
                       {/* Area Titimangsa & Tanda Tangan */}
-                      <div className="pt-6 border-0 text-xs">
+                      <div className="pt-6 border-0" style={{ fontSize: `${raporConfig.fontSizeTitimangsa || 11}px` }}>
                         {/* Titimangsa Alamat dan Tanggal */}
                         <div className="flex justify-end mb-2 pr-4">
                           <p className="text-slate-800 font-medium">
@@ -10467,8 +11752,15 @@ export default function NilaiManagementPage() {
                               <>
                                 <p className="text-slate-600">Mengetahui,</p>
                                 <p className="text-slate-800 font-medium">{previewKepsekLabel},</p>
-                                <div className="h-16" />
-                                <p className="font-bold underline">{previewKepsekNama}</p>
+                                <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                                <p
+                                  style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                                  className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                                    raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                                  }`}
+                                >
+                                  {previewKepsekNama}
+                                </p>
                                 {raporConfig.nipKepalaSekolah && (
                                   <p className="text-[10px] text-slate-600 mt-0.5">
                                     NIP. {raporConfig.nipKepalaSekolah}
@@ -10484,8 +11776,15 @@ export default function NilaiManagementPage() {
                               <>
                                 <p className="text-slate-600 invisible">Mengetahui,</p>
                                 <p className="text-slate-800 font-medium">Wali Kelas,</p>
-                                <div className="h-16" />
-                                <p className="font-bold underline">{previewWaliNama}</p>
+                                <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                                <p
+                                  style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                                  className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                                    raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                                  }`}
+                                >
+                                  {previewWaliNama}
+                                </p>
                               </>
                             )}
                           </div>
@@ -10496,8 +11795,13 @@ export default function NilaiManagementPage() {
                               <>
                                 <p className="text-slate-600 invisible">Mengetahui,</p>
                                 <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
-                                <div className="h-16" />
-                                <p className="font-bold underline">
+                                <div style={{ height: `${raporConfig.tinggiRuangTtd || 64}px` }} />
+                                <p
+                                  style={{ fontSize: `${raporConfig.fontSizeNamaTtd || 12}px` }}
+                                  className={`${raporConfig.boldNamaTtd !== false ? "font-bold" : "font-normal"} ${
+                                    raporConfig.underlineNamaTtd !== false ? "underline" : ""
+                                  }`}
+                                >
                                   {previewStudent.namaWali || "................................................"}
                                 </p>
                               </>
