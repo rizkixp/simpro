@@ -69,6 +69,7 @@ export default function PengaturanPage() {
     jadwalList,
     nilaiList,
     sppList,
+    clearAllDatabase,
   } = useSchoolData();
 
   // Backup & Restore Database States
@@ -77,6 +78,7 @@ export default function PengaturanPage() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
   const [restoreErrorMsg, setRestoreErrorMsg] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
   const [selectedBackupFile, setSelectedBackupFile] = useState<{
     name: string;
     size: string;
@@ -265,15 +267,22 @@ export default function PengaturanPage() {
     }
   };
 
-  const handleReset = () => {
-    if (
-      confirm(
-        "Apakah Anda yakin ingin mereset seluruh database simulasi ke pengaturan bawaan awal?"
-      )
-    ) {
-      resetToDefault();
+  const handleClearDatabase = async () => {
+    const confirmed = confirm(
+      "PERINGATAN KRITIS: KOSONGKAN SEMUA DATABASE!\n\nApakah Anda yakin ingin mengosongkan seluruh isi database sekolah?\n\nSeluruh data (Siswa, Guru, Kelas, Mapel, Jadwal, Nilai, SPP, Tabungan, Transport, LMS, Tahfidz, dan Mutabaah) akan DIHAPUS TOTAL (kosong 100%).\n\nPastikan Anda sudah mengunduh file cadangan (Backup JSON) jika data saat ini masih diperlukan.\n\nKlik OK untuk melanjutkan pengosongan database."
+    );
+    if (!confirmed) return;
+
+    setIsClearing(true);
+    try {
+      await clearAllDatabase();
       setIsDirty(false);
-      alert("Database sekolah berhasil di-reset ke data bawaan awal!");
+      alert("Database sekolah berhasil dikosongkan 100%! Seluruh data operasional kini dalam kondisi bersih.");
+    } catch (err: any) {
+      console.error("Gagal mengosongkan database:", err);
+      alert("Terjadi kendala saat mengosongkan database: " + (err?.message || err));
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -1452,11 +1461,16 @@ export default function PengaturanPage() {
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={handleReset}
-                className="px-4 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-semibold transition-all flex items-center gap-2"
+                onClick={handleClearDatabase}
+                disabled={isClearing}
+                className="px-4 py-2.5 rounded-xl border border-rose-300 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <RotateCcw className="h-4 w-4" />
-                <span>Reset Database ke Default</span>
+                {isClearing ? (
+                  <RefreshCw className="h-4 w-4 animate-spin text-rose-600" />
+                ) : (
+                  <Trash2 className="h-4 w-4 text-rose-600" />
+                )}
+                <span>{isClearing ? "Mengosongkan Database..." : "Kosongkan Semua Database (100% Bersih)"}</span>
               </button>
 
               <div className="flex items-center gap-3">

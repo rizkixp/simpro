@@ -1707,6 +1707,58 @@ export const SupabaseSchoolService = {
     }
   },
 
+  // ==================== CLEAR ALL SCHOOL DATA ====================
+  async clearAllSchoolData(): Promise<{ success: boolean; message: string }> {
+    const client = getSupabaseBrowserClient();
+    if (!client) {
+      return { success: false, message: "Klien Supabase belum aktif atau URL/Key belum dikonfigurasi." };
+    }
+
+    try {
+      const tables = [
+        "siswa",
+        "guru",
+        "kelas",
+        "mata_pelajaran",
+        "jadwal_pelajaran",
+        "presensi",
+        "nilai",
+        "tagihan",
+        "jenis_tagihan",
+        "tabungan",
+        "transaksi_tabungan",
+        "peserta_transportasi",
+        "spp_transport_records",
+        "transaksi_spp_transport",
+        "pengumuman",
+        "lms_materi",
+        "lms_tugas",
+        "lms_submissions",
+        "lms_kuis",
+        "lms_kuis_attempts",
+        "lms_forum_diskusi",
+        "lms_virtual_meetings",
+        "lms_bank_soal",
+        "lms_jadwal_materi",
+        "tahfidz_records",
+        "mutabaah_records",
+      ];
+
+      for (const table of tables) {
+        try {
+          await client.from(table).delete().neq("id", "___none___");
+        } catch (tableErr) {
+          console.warn(`[Supabase] Peringatan saat membersihkan tabel ${table}:`, tableErr);
+        }
+      }
+
+      return { success: true, message: "Seluruh data operasional di Supabase berhasil dikosongkan." };
+    } catch (err: any) {
+      console.error("[Supabase] Gagal mengosongkan database:", err);
+      return { success: false, message: err?.message || "Gagal mengosongkan data di Supabase." };
+    }
+  },
+
   // ==================== SEED INITIAL DATA ====================
   async seedInitialDataToSupabase(mockData: {
     profile: SchoolProfile;

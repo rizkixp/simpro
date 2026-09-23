@@ -347,6 +347,7 @@ interface SchoolDataContextType {
     rawBackup: DatabaseBackupFile | any,
     options?: { syncToCloud?: boolean }
   ) => Promise<{ success: boolean; message: string; counts?: Record<string, number> }>;
+  clearAllDatabase: (options?: { syncToCloud?: boolean }) => Promise<void>;
 }
 
 
@@ -479,11 +480,70 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         return item ? JSON.parse(item) : fallback;
       };
 
-      setProfile(load("profile", INITIAL_SCHOOL_PROFILE));
-      const loadedSiswa = load("siswa", INITIAL_SISWA);
-      const baseSiswaList = loadedSiswa && loadedSiswa.length > 0 ? loadedSiswa : INITIAL_SISWA;
-      const waliCleanMigrationKey = "sim_data_siswa_wali_cleared_v1";
-      const hasMigratedWali = typeof window !== "undefined" && localStorage.getItem(waliCleanMigrationKey) === "true";
+      const isCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
+      if (isCleared) {
+        setProfile(load("profile", INITIAL_SCHOOL_PROFILE));
+        setSiswaList(load("siswa", []));
+        setGuruList(load("guru", []));
+        setKelasList(load("kelas", []));
+        setMapelList(load("mapel", []));
+        setJadwalList(load("jadwal", []));
+        setPresensiList(load("presensi", []));
+        setNilaiList(load("nilai", []));
+        setJenisTagihanList(load("jenis_tagihan", []));
+        setSppList(load("spp", []));
+        setTabunganList(load("tabungan", []));
+        setTransaksiTabunganList(load("transaksi_tabungan", []));
+        setPesertaTransportList(load("peserta_transport", []));
+        setSppTransportRecords(load("spp_transport_records", []));
+        setTransaksiSPPTransportList(load("transaksi_spp_transport", []));
+        setPengumumanList(load("pengumuman", []));
+        setLmsMateriList(load("lms_materi", []));
+        setLmsTugasList(load("lms_tugas", []));
+        setLmsSubmissionList(load("lms_submissions", []));
+        setLmsKuisList(load("lms_kuis", []));
+        setLmsKuisAttemptList(load("lms_attempts", []));
+        setLmsForumList(load("lms_forum", []));
+        setLmsMeetingList(load("lms_meetings", []));
+        setLmsBankSoalList(load("lms_bank_soal", []));
+        setLmsJadwalMateriList(load("lms_jadwal_materi", []));
+        setTahfidzList(load("tahfidz", []));
+        setMutabaahList(load("mutabaah", []));
+        latestDataRef.current = {
+          profile: load("profile", INITIAL_SCHOOL_PROFILE),
+          siswaList: load("siswa", []),
+          guruList: load("guru", []),
+          kelasList: load("kelas", []),
+          mapelList: load("mapel", []),
+          jadwalList: load("jadwal", []),
+          presensiList: load("presensi", []),
+          nilaiList: load("nilai", []),
+          jenisTagihanList: load("jenis_tagihan", []),
+          sppList: load("spp", []),
+          tabunganList: load("tabungan", []),
+          transaksiTabunganList: load("transaksi_tabungan", []),
+          pesertaTransportList: load("peserta_transport", []),
+          sppTransportRecords: load("spp_transport_records", []),
+          transaksiSPPTransportList: load("transaksi_spp_transport", []),
+          pengumumanList: load("pengumuman", []),
+          lmsMateriList: load("lms_materi", []),
+          lmsTugasList: load("lms_tugas", []),
+          lmsSubmissionList: load("lms_submissions", []),
+          lmsKuisList: load("lms_kuis", []),
+          lmsKuisAttemptList: load("lms_attempts", []),
+          lmsForumList: load("lms_forum", []),
+          lmsMeetingList: load("lms_meetings", []),
+          lmsBankSoalList: load("lms_bank_soal", []),
+          lmsJadwalMateriList: load("lms_jadwal_materi", []),
+          tahfidzList: load("tahfidz", []),
+          mutabaahList: load("mutabaah", []),
+        };
+      } else {
+        setProfile(load("profile", INITIAL_SCHOOL_PROFILE));
+        const loadedSiswa = load("siswa", INITIAL_SISWA);
+        const baseSiswaList = loadedSiswa && loadedSiswa.length > 0 ? loadedSiswa : INITIAL_SISWA;
+        const waliCleanMigrationKey = "sim_data_siswa_wali_cleared_v1";
+        const hasMigratedWali = typeof window !== "undefined" && localStorage.getItem(waliCleanMigrationKey) === "true";
       const dummyWalies = new Set([
         "Wali Murid",
         "Ir. Bambang Sudirman",
@@ -707,6 +767,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         }
       });
       setMutabaahList(mergedMutabaah);
+      }
 
       // Nonaktifkan automatic push ke Supabase secara default
       const autoPushResetKey = "sim_auto_push_db_disabled_v1";
@@ -909,6 +970,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       );
 
       if (!hasCloudData) {
+        const isExplicitlyCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
+        if (isExplicitlyCleared) {
+          console.log("[Supabase] Database sekolah dalam status dikosongkan. Menjaga cloud tetap kosong.");
+          setIsSupabaseConnected(true);
+          setLastSyncTime(new Date());
+          setIsSyncing(false);
+          return;
+        }
         // First-time connected to fresh Supabase: auto seed so it's ready!
         console.log("[Supabase] Database cloud masih kosong. Menjalankan auto-seeding awal...");
         await seedDatabaseToCloud();
@@ -2952,7 +3021,131 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     setTahfidzList(INITIAL_TAHFIDZ_RECORDS);
     setMutabaahList(INITIAL_MUTABAAH_RECORDS);
 
-    localStorage.clear();
+    if (typeof window !== "undefined") {
+      localStorage.clear();
+      localStorage.removeItem("sim_database_cleared");
+    }
+  };
+
+  // ==================== KOSONGKAN SEMUA DATABASE (100% BERSIH) ====================
+  const clearAllDatabase = async (options?: { syncToCloud?: boolean }): Promise<void> => {
+    // 1. Emergency snapshot in case of accidental clear
+    try {
+      if (typeof window !== "undefined") {
+        const emergencySnapshot = {
+          savedAt: new Date().toISOString(),
+          state: latestDataRef.current,
+        };
+        localStorage.setItem("sim_emergency_snapshot_pre_clear", JSON.stringify(emergencySnapshot));
+      }
+    } catch (e) {
+      console.warn("Emergency pre-clear snapshot warning:", e);
+    }
+
+    // 2. Set all in-memory lists to empty arrays
+    setSiswaList([]);
+    setGuruList([]);
+    setKelasList([]);
+    setMapelList([]);
+    setJadwalList([]);
+    setPresensiList([]);
+    setNilaiList([]);
+    setJenisTagihanList([]);
+    setSppList([]);
+    setTabunganList([]);
+    setTransaksiTabunganList([]);
+    setPesertaTransportList([]);
+    setSppTransportRecords([]);
+    setTransaksiSPPTransportList([]);
+    setPengumumanList([]);
+    setLmsMateriList([]);
+    setLmsTugasList([]);
+    setLmsSubmissionList([]);
+    setLmsKuisList([]);
+    setLmsKuisAttemptList([]);
+    setLmsForumList([]);
+    setLmsMeetingList([]);
+    setLmsBankSoalList([]);
+    setLmsJadwalMateriList([]);
+    setTahfidzList([]);
+    setMutabaahList([]);
+
+    // 3. Update live ref
+    latestDataRef.current = {
+      ...latestDataRef.current,
+      siswaList: [],
+      guruList: [],
+      kelasList: [],
+      mapelList: [],
+      jadwalList: [],
+      presensiList: [],
+      nilaiList: [],
+      jenisTagihanList: [],
+      sppList: [],
+      tabunganList: [],
+      transaksiTabunganList: [],
+      pesertaTransportList: [],
+      sppTransportRecords: [],
+      transaksiSPPTransportList: [],
+      pengumumanList: [],
+      lmsMateriList: [],
+      lmsTugasList: [],
+      lmsSubmissionList: [],
+      lmsKuisList: [],
+      lmsKuisAttemptList: [],
+      lmsForumList: [],
+      lmsMeetingList: [],
+      lmsBankSoalList: [],
+      lmsJadwalMateriList: [],
+      tahfidzList: [],
+      mutabaahList: [],
+    };
+
+    // 4. Mark database as explicitly cleared in localStorage
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sim_database_cleared", "true");
+      const keysToClear = [
+        "siswa",
+        "guru",
+        "kelas",
+        "mapel",
+        "jadwal",
+        "presensi",
+        "nilai",
+        "jenis_tagihan",
+        "spp",
+        "tabungan",
+        "transaksi_tabungan",
+        "peserta_transport",
+        "spp_transport_records",
+        "transaksi_spp_transport",
+        "pengumuman",
+        "lms_materi",
+        "lms_tugas",
+        "lms_submissions",
+        "lms_kuis",
+        "lms_attempts",
+        "lms_forum",
+        "lms_meetings",
+        "lms_bank_soal",
+        "lms_jadwal_materi",
+        "tahfidz",
+        "mutabaah",
+      ];
+      keysToClear.forEach((k) => {
+        localStorage.setItem(`sim_data_${k}`, JSON.stringify([]));
+      });
+    }
+
+    // 5. Cloud Supabase clear if connected
+    const shouldSync = options?.syncToCloud ?? (isSupabaseConnected && SupabaseSchoolService.isConfigured());
+    if (shouldSync && SupabaseSchoolService.isConfigured()) {
+      try {
+        await SupabaseSchoolService.clearAllSchoolData();
+      } catch (err) {
+        console.warn("Gagal mengosongkan Supabase Cloud:", err);
+      }
+    }
   };
 
   // ==================== BACKUP & RESTORE DATABASE ====================
@@ -3088,6 +3281,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         success: false,
         message: "Format file tidak sesuai standar SIM Sekolah PRO. Pastikan memilih file cadangan .json yang benar.",
       };
+    }
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("sim_database_cleared");
     }
 
     // Emergency snapshot before restoring in case user wants to roll back
@@ -3453,6 +3650,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         // Backup & Restore Database
         exportDatabaseBackup,
         importDatabaseBackup,
+        clearAllDatabase,
       }}
 
 
