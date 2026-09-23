@@ -6632,7 +6632,7 @@ export default function NilaiManagementPage() {
                     <th className="border border-[#000000] px-3 py-1.5 text-center w-10">No</th>
                     <th className="border border-[#000000] px-3 py-1.5">Mata Pelajaran</th>
                     <th className="border border-[#000000] px-2 py-1.5 text-center w-16">KKM</th>
-                    <th className="border border-[#000000] px-2 py-1.5 text-center w-24 bg-amber-50">Nilai Prestasi</th>
+                    <th className="border border-[#000000] px-2 py-1.5 text-center w-24 text-black">Nilai Prestasi</th>
                     <th className="border border-[#000000] px-2 py-1.5 text-center w-16">Predikat</th>
                   </tr>
                 </thead>
@@ -6706,7 +6706,7 @@ export default function NilaiManagementPage() {
                                     </div>
                                   </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
-                                  <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                  <td className="border border-[#000000] px-2 py-1 text-center font-bold text-black font-mono">
                                     {mid.nilaiMid}
                                   </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold">
@@ -6772,7 +6772,7 @@ export default function NilaiManagementPage() {
                                     </div>
                                   </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
-                                  <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                  <td className="border border-[#000000] px-2 py-1 text-center font-bold text-black font-mono">
                                     {mid.nilaiMid}
                                   </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold">
@@ -6838,7 +6838,7 @@ export default function NilaiManagementPage() {
                                     </div>
                                   </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
-                                  <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-700 bg-amber-50/50 font-mono">
+                                  <td className="border border-[#000000] px-2 py-1 text-center font-bold text-black font-mono">
                                     {mid.nilaiMid}
                                   </td>
                                   <td className="border border-[#000000] px-2 py-1 text-center font-bold">
@@ -6858,7 +6858,7 @@ export default function NilaiManagementPage() {
                     <td colSpan={3} className="border border-[#000000] px-3 py-1.5 text-right">
                       Rata-Rata Nilai Sumatif Tengah Semester (STS):
                     </td>
-                    <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-amber-800 text-sm font-mono bg-amber-50">
+                    <td className="border border-[#000000] px-2 py-1.5 text-center font-bold text-black text-sm font-mono">
                       {studentMidAverage}
                     </td>
                     <td colSpan={1} className="border border-[#000000] px-2 py-1.5 text-center text-slate-700 font-bold">
@@ -7958,7 +7958,7 @@ export default function NilaiManagementPage() {
                                 <th className="border border-[#000000] px-2 py-1 text-center w-8">No</th>
                                 <th className="border border-[#000000] px-2 py-1">Mata Pelajaran</th>
                                 <th className="border border-[#000000] px-2 py-1 text-center w-12">KKM</th>
-                                <th className="border border-[#000000] px-2 py-1 text-center w-20 bg-amber-50">Nilai Prestasi</th>
+                                <th className="border border-[#000000] px-2 py-1 text-center w-20 text-black">Nilai Prestasi</th>
                                 <th className="border border-[#000000] px-2 py-1 text-center w-14">Predikat</th>
                               </tr>
                             </thead>
@@ -8032,7 +8032,7 @@ export default function NilaiManagementPage() {
                                                 </div>
                                               </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
-                                              <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1 text-center font-bold text-black font-mono">
                                                 {mid.nilaiMid}
                                               </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold">
@@ -8098,7 +8098,7 @@ export default function NilaiManagementPage() {
                                                 </div>
                                               </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
-                                              <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1 text-center font-bold text-black font-mono">
                                                 {mid.nilaiMid}
                                               </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold">
@@ -8164,7 +8164,7 @@ export default function NilaiManagementPage() {
                                                 </div>
                                               </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-mono">{kkm}</td>
-                                              <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-800 bg-amber-50/50 font-mono">
+                                              <td className="border border-[#000000] px-2 py-1 text-center font-bold text-black font-mono">
                                                 {mid.nilaiMid}
                                               </td>
                                               <td className="border border-[#000000] px-2 py-1 text-center font-bold">
@@ -8184,7 +8184,7 @@ export default function NilaiManagementPage() {
                                 <td colSpan={3} className="border border-[#000000] px-3 py-1 text-right">
                                   Rata-Rata Nilai Rapor STS:
                                 </td>
-                                <td className="border border-[#000000] px-2 py-1 text-center font-bold text-amber-800 font-mono bg-amber-50">
+                                <td className="border border-[#000000] px-2 py-1 text-center font-bold text-black font-mono">
                                   {midAvg}
                                 </td>
                                 <td colSpan={1} className="border border-[#000000] px-2 py-1 text-center text-slate-700 font-bold">
@@ -11489,7 +11489,7 @@ export default function NilaiManagementPage() {
                               {raporConfig.showKkm !== false && (
                                 <th className={`border border-[#000000] ${previewCellPadding} text-center w-14`}>KKM</th>
                               )}
-                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-24 bg-amber-50`}>
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-24 text-black`}>
                                 Nilai Prestasi
                               </th>
                               {raporConfig.showPredikat !== false && (
@@ -11516,7 +11516,7 @@ export default function NilaiManagementPage() {
                                     {raporConfig.showKkm !== false && (
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
                                     )}
-                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-slate-900`}>{item.uts}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-black`}>{item.uts}</td>
                                     {raporConfig.showPredikat !== false && (
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
@@ -11543,7 +11543,7 @@ export default function NilaiManagementPage() {
                                     {raporConfig.showKkm !== false && (
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
                                     )}
-                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-slate-900`}>{item.uts}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-black`}>{item.uts}</td>
                                     {raporConfig.showPredikat !== false && (
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
@@ -11570,7 +11570,7 @@ export default function NilaiManagementPage() {
                                     {raporConfig.showKkm !== false && (
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
                                     )}
-                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-slate-900`}>{item.uts}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-black`}>{item.uts}</td>
                                     {raporConfig.showPredikat !== false && (
                                       <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
                                     )}
