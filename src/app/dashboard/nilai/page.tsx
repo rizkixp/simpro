@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import * as XLSX from "xlsx";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope, isClassMatch } from "@/hooks/useTeacherScope";
@@ -287,6 +288,8 @@ export default function NilaiManagementPage() {
   const [isLegerEditMode, setIsLegerEditMode] = useState<boolean>(false);
   const [legerInputScores, setLegerInputScores] = useState<Record<string, string | number>>({});
   const [isLegerSaving, setIsLegerSaving] = useState<boolean>(false);
+  const [isLegerImporting, setIsLegerImporting] = useState<boolean>(false);
+  const legerFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Daftar mata pelajaran khusus rombel/kelas yang sedang dipilih pada Leger Rombel
   const currentLegerMapelList = useMemo(() => {
@@ -1821,6 +1824,176 @@ export default function NilaiManagementPage() {
       type: "success",
       message: `Berhasil mengisi ${count} nilai kosong dengan standar KKM mata pelajaran Kelas ${batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}.`,
     });
+  };
+
+  // Unduh Format / Template Excel Leger Rombel (dilengkapi daftar siswa dan mapel kelas aktif)
+  const handleDownloadLegerExcelTemplate = () => {
+    try {
+      const classNameClean =
+        batchSelectedKelas === "Semua"
+          ? "Semua_Kelas"
+          : batchSelectedKelas.replace(/[^a-zA-Z0-9]/g, "_");
+      const typeLabel = batchRaporType === "tengah" ? "STS_Mid" : "SAS_Akhir";
+      const fileName = `Format_Leger_Nilai_${classNameClean}_${typeLabel}_Sem_${batchRaporSemester}.xlsx`;
+
+      // Bangun baris data Excel terstruktur
+      const rows = batchStudents.map((s, idx) => {
+        const row: Record<string, string | number> = {
+          "No": idx + 1,
+          "NISN": s.nisn || "",
+          "Nama Siswa": s.nama,
+          "Kelas": s.kelas,
+        };
+
+        currentLegerMapelList.forEach((m) => {
+          const key = `${s.id}_${m.nama}`;
+          const currentVal = isLegerEditMode ? (legerInputScores[key] ?? "") : "";
+          row[m.nama] = currentVal !== "" ? Number(currentVal) : "";
+        });
+
+        return row;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+
+      // Atur lebar kolom otomatis agar rapi saat dibuka di Microsoft Excel
+      const colWidths = [
+        { wch: 6 },  // No
+        { wch: 16 }, // NISN
+        { wch: 30 }, // Nama Siswa
+        { wch: 20 }, // Kelas
+        ...currentLegerMapelList.map((m) => ({
+          wch: Math.max(m.nama.length + 4, 12),
+        })),
+      ];
+      worksheet["!cols"] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Nilai Leger");
+      XLSX.writeFile(workbook, fileName);
+
+      setNotification({
+        type: "success",
+        message: `Format Excel (${fileName}) berhasil diunduh. Silakan isi nilai siswa pada file tersebut dan klik "Impor Excel" untuk mengunggah.`,
+      });
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: `Gagal mengunduh format Excel: ${err?.message || err}`,
+      });
+    }
+  };
+
+  // Proses Unggah & Impor File Excel Leger Rombel
+  const handleProcessLegerExcelFile = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsLegerImporting(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        throw new Error("File Excel tidak memiliki lembar kerja (worksheet).");
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      if (jsonData.length === 0) {
+        throw new Error("File Excel kosong atau format baris data tidak terdeteksi.");
+      }
+
+      let importedScoresCount = 0;
+      let matchedStudentsCount = 0;
+
+      const updatedScores: Record<string, string | number> = {
+        ...legerInputScores,
+      };
+
+      jsonData.forEach((row) => {
+        const rowKeys = Object.keys(row);
+        const nisnKey = rowKeys.find((k) => {
+          const clean = k.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+          return clean === "nisn" || clean === "nis" || clean === "noinduk" || clean === "nomorinduk";
+        });
+        const namaKey = rowKeys.find((k) => {
+          const clean = k.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+          return (
+            clean === "namasiswa" ||
+            clean === "nama" ||
+            clean === "namapesertadidik" ||
+            clean === "siswa" ||
+            clean === "pesertadidik"
+          );
+        });
+
+        const rawNisn = nisnKey ? String(row[nisnKey]).trim() : "";
+        const rawNama = namaKey ? String(row[namaKey]).trim().toLowerCase() : "";
+
+        // Cari siswa yang cocok di batchStudents
+        const student = batchStudents.find((s) => {
+          if (rawNisn && s.nisn && s.nisn.trim() === rawNisn) return true;
+          if (rawNama && s.nama.trim().toLowerCase() === rawNama) return true;
+          return false;
+        });
+
+        if (!student) return;
+        matchedStudentsCount++;
+
+        // Cocokkan setiap mata pelajaran di currentLegerMapelList
+        currentLegerMapelList.forEach((m) => {
+          const mapelNorm = m.nama.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+          const matchedColKey = rowKeys.find((k) => {
+            const colNorm = k.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+            return (
+              colNorm === mapelNorm ||
+              colNorm.startsWith(mapelNorm) ||
+              colNorm.includes(mapelNorm) ||
+              mapelNorm.includes(colNorm)
+            );
+          });
+
+          if (matchedColKey !== undefined) {
+            const rawVal = row[matchedColKey];
+            if (rawVal !== "" && rawVal !== undefined && rawVal !== null) {
+              const numVal = Number(String(rawVal).replace(",", "."));
+              if (!isNaN(numVal) && numVal >= 0 && numVal <= 100) {
+                const key = `${student.id}_${m.nama}`;
+                updatedScores[key] = numVal;
+                importedScoresCount++;
+              }
+            }
+          }
+        });
+      });
+
+      if (matchedStudentsCount === 0) {
+        throw new Error(
+          "Tidak ada data siswa yang cocok dari file Excel. Pastikan kolom NISN atau Nama Siswa sesuai dengan siswa di kelas ini."
+        );
+      }
+
+      setLegerInputScores(updatedScores);
+      setNotification({
+        type: "success",
+        message: `Berhasil mengimpor nilai untuk ${matchedStudentsCount} siswa (${importedScoresCount} nilai mata pelajaran). Periksa nilai pada tabel dan klik "Simpan Nilai Leger" untuk menyimpan ke database.`,
+      });
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: `Gagal mengimpor Excel: ${err?.message || err}`,
+      });
+    } finally {
+      setIsLegerImporting(false);
+      if (e.target) {
+        e.target.value = "";
+      }
+    }
   };
 
   const handleSaveLegerScores = async () => {
@@ -5736,10 +5909,19 @@ export default function NilaiManagementPage() {
                 {/* Aksi Khusus Mode Input Leger vs Mode Cetak */}
                 {isLegerEditMode ? (
                   <>
+                    {/* Input File Tersembunyi untuk Impor Excel Leger */}
+                    <input
+                      ref={legerFileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      onChange={handleProcessLegerExcelFile}
+                    />
+
                     <button
                       type="button"
                       onClick={handleSaveLegerScores}
-                      disabled={isLegerSaving}
+                      disabled={isLegerSaving || isLegerImporting}
                       className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all disabled:opacity-50"
                       title="Simpan seluruh nilai leger rombel ini"
                     >
@@ -5749,6 +5931,31 @@ export default function NilaiManagementPage() {
                         <Save className="h-4 w-4" />
                       )}
                       <span>{isLegerSaving ? "Menyimpan..." : "Simpan Nilai Leger"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadLegerExcelTemplate}
+                      className="px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                      title="Unduh format tabel Excel untuk input nilai kelas ini secara offline"
+                    >
+                      <Download className="h-4 w-4 text-teal-600" />
+                      <span>Format Excel</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => legerFileInputRef.current?.click()}
+                      disabled={isLegerImporting}
+                      className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                      title="Impor nilai dari file Excel (.xlsx, .xls) ke tabel leger"
+                    >
+                      {isLegerImporting ? (
+                        <RefreshCw className="h-4 w-4 animate-spin text-indigo-600" />
+                      ) : (
+                        <Upload className="h-4 w-4 text-indigo-600" />
+                      )}
+                      <span>{isLegerImporting ? "Mengimpor..." : "Impor Excel"}</span>
                     </button>
 
                     <button
@@ -6367,7 +6574,30 @@ export default function NilaiManagementPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <div className="flex items-center flex-wrap gap-2 shrink-0 self-end sm:self-center">
+                      <button
+                        type="button"
+                        onClick={handleDownloadLegerExcelTemplate}
+                        className="px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        title="Unduh format tabel Excel untuk input nilai kelas ini secara offline"
+                      >
+                        <Download className="h-3.5 w-3.5 text-teal-600" />
+                        <span>Format Excel</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => legerFileInputRef.current?.click()}
+                        disabled={isLegerImporting}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                        title="Impor nilai dari file Excel (.xlsx, .xls) ke tabel leger"
+                      >
+                        {isLegerImporting ? (
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                        ) : (
+                          <Upload className="h-3.5 w-3.5 text-indigo-600" />
+                        )}
+                        <span>{isLegerImporting ? "Mengimpor..." : "Impor Excel"}</span>
+                      </button>
                       <button
                         type="button"
                         onClick={handleFillAllKkmEmpty}
@@ -6380,7 +6610,7 @@ export default function NilaiManagementPage() {
                       <button
                         type="button"
                         onClick={handleSaveLegerScores}
-                        disabled={isLegerSaving}
+                        disabled={isLegerSaving || isLegerImporting}
                         className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
                       >
                         {isLegerSaving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
