@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { UserRole } from "@/types/school";
-import { Menu, Bell, Shield, UserCheck, BookOpen, HeartHandshake, Wallet, Sparkles, Cloud, RefreshCw } from "lucide-react";
+import { Menu, Bell, Shield, UserCheck, BookOpen, HeartHandshake, Wallet, Sparkles, Cloud, RefreshCw, Zap } from "lucide-react";
 import InstallPwaButton from "@/components/common/InstallPwaButton";
 
 interface HeaderProps {
@@ -15,7 +15,7 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const router = useRouter();
   const { user, switchRole, switchUser, userList } = useAuth();
-  const { isSupabaseConnected, isSyncing, profile } = useSchoolData();
+  const { isSupabaseConnected, isSyncing, isAutoPushEnabled, isAutoPushing, lastAutoPushTime, profile } = useSchoolData();
 
   const roleConfigs: { role: UserRole; label: string; icon: React.ReactNode; color: string }[] = [
     { role: "admin", label: "Admin", icon: <Shield className="h-3.5 w-3.5" />, color: "bg-[#064e3b] text-white" },
@@ -88,6 +88,36 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             </>
           )}
         </button>
+
+        {/* Automatic Push Cloud Status Badge */}
+        {isSupabaseConnected && (
+          <button
+            onClick={() => router.push("/dashboard/pengaturan")}
+            title={
+              isAutoPushing
+                ? "Sedang mengunggah perubahan database secara otomatis ke Supabase Cloud..."
+                : isAutoPushEnabled
+                ? `Auto-Push Aktif: Perubahan data otomatis tersinkron ke Supabase Cloud.${lastAutoPushTime ? ` Terakhir: ${lastAutoPushTime.toLocaleTimeString("id-ID")} WIB` : ""}`
+                : "Auto-Push Nonaktif. Klik untuk mengaktifkan sinkronisasi otomatis ke cloud."
+            }
+            className={`hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+              isAutoPushing
+                ? "bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800"
+                : isAutoPushEnabled
+                ? "bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800"
+                : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+            }`}
+          >
+            <Zap className={`w-3.5 h-3.5 ${isAutoPushing ? "text-sky-600 animate-spin" : isAutoPushEnabled ? "text-teal-600 fill-teal-600" : "text-slate-400"}`} />
+            <span>
+              {isAutoPushing
+                ? "Auto-Push..."
+                : isAutoPushEnabled
+                ? "Auto-Push ON"
+                : "Auto-Push OFF"}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Right section: Instant Role Simulator & Profile */}

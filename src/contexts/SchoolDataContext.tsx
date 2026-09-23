@@ -330,7 +330,7 @@ interface SchoolDataContextType {
   lastSyncTime: Date | null;
   supabaseError: string | null;
   syncWithSupabase: () => Promise<void>;
-  seedDatabaseToCloud: () => Promise<boolean>;
+  seedDatabaseToCloud: (options?: { silent?: boolean }) => Promise<boolean>;
   testSupabaseHealth: () => Promise<SupabaseHealthStatus>;
 
   // Automatic Push Database Engine
@@ -441,8 +441,15 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
 
-  // Automatic Push Database States (Default NONAKTIF/FALSE)
-  const [isAutoPushEnabled, setIsAutoPushEnabled] = useState<boolean>(false);
+  // Automatic Push Database States (Default AKTIF jika Supabase terkonfigurasi)
+  const [isAutoPushEnabled, setIsAutoPushEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sim_auto_push_db_enabled");
+      if (saved !== null) return saved === "true";
+      return SupabaseSchoolService.isConfigured();
+    }
+    return false;
+  });
   const [isAutoPushing, setIsAutoPushing] = useState<boolean>(false);
   const [lastAutoPushTime, setLastAutoPushTime] = useState<Date | null>(null);
   const [autoPushStatus, setAutoPushStatus] = useState<"idle" | "pushing" | "success" | "error">("idle");
@@ -846,18 +853,15 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         };
       }
 
-      // Nonaktifkan automatic push ke Supabase secara default
-      const autoPushResetKey = "sim_auto_push_db_disabled_v1";
-      if (typeof window !== "undefined" && localStorage.getItem(autoPushResetKey) !== "true") {
-        setIsAutoPushEnabled(false);
-        localStorage.setItem("sim_auto_push_db_enabled", "false");
-        localStorage.setItem(autoPushResetKey, "true");
+      // Automatic Push ke Supabase Cloud: aktif secara default jika Supabase terkonfigurasi
+      const savedAutoPush = typeof window !== "undefined" ? localStorage.getItem("sim_auto_push_db_enabled") : null;
+      if (savedAutoPush !== null) {
+        setIsAutoPushEnabled(savedAutoPush === "true");
       } else {
-        const savedAutoPush = localStorage.getItem("sim_auto_push_db_enabled");
-        if (savedAutoPush !== null) {
-          setIsAutoPushEnabled(savedAutoPush === "true");
-        } else {
-          setIsAutoPushEnabled(false);
+        const isConfigured = SupabaseSchoolService.isConfigured();
+        setIsAutoPushEnabled(isConfigured);
+        if (typeof window !== "undefined" && isConfigured) {
+          localStorage.setItem("sim_auto_push_db_enabled", "true");
         }
       }
     } catch (e) {
@@ -878,7 +882,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       setIsAutoPushing(true);
       setAutoPushStatus("pushing");
       try {
-        const ok = await seedDatabaseToCloud();
+        const ok = await seedDatabaseToCloud({ silent: true });
         setIsAutoPushing(false);
         if (ok) {
           setLastAutoPushTime(new Date());
@@ -898,7 +902,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     setIsAutoPushing(true);
     setAutoPushStatus("pushing");
     try {
-      const ok = await seedDatabaseToCloud();
+      const ok = await seedDatabaseToCloud({ silent: true });
       setIsAutoPushing(false);
       if (ok) {
         setLastAutoPushTime(new Date());
@@ -918,7 +922,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const toggleAutoPush = (enabled?: boolean) => {
     const nextVal = enabled !== undefined ? enabled : !isAutoPushEnabled;
     setIsAutoPushEnabled(nextVal);
-    saveState("auto_push_db_enabled", nextVal);
+    saveState("auto_push_db_enabled", nextVal, true);
     if (nextVal) {
       triggerAutoPush("manual-enable");
     }
@@ -948,14 +952,16 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   // Seed current in-memory data to Supabase
-  const seedDatabaseToCloud = async (): Promise<boolean> => {
+  const seedDatabaseToCloud = async (options?: { silent?: boolean }): Promise<boolean> => {
     if (!SupabaseSchoolService.isConfigured()) {
       setSupabaseError("Supabase belum dikonfigurasi di .env.local");
       return false;
     }
-    setIsSyncing(true);
+    const silent = options?.silent ?? false;
+    if (!silent) setIsSyncing(true);
     try {
       const current = latestDataRef.current;
+      const deletedIds = Array.from(getDeletedIds());
       const res = await SupabaseSchoolService.seedInitialDataToSupabase({
         profile: current.profile || INITIAL_SCHOOL_PROFILE,
         siswa: current.siswaList || [],
@@ -1001,22 +1007,27 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         lmsJadwalMateri: current.lmsJadwalMateriList || [],
         tahfidz: current.tahfidzList || [],
         mutabaah: current.mutabaahList || [],
+        deletedIds,
       });
 
       if (res.success) {
         setIsSupabaseConnected(true);
         setLastSyncTime(new Date());
+        setLastAutoPushTime(new Date());
+        setAutoPushStatus("success");
         setSupabaseError(null);
       } else {
+        setAutoPushStatus("error");
         setSupabaseError(res.message);
       }
       return res.success;
     } catch (err: any) {
       console.error("[Supabase] Gagal seed database:", err);
+      setAutoPushStatus("error");
       setSupabaseError(err.message || "Gagal seed database ke cloud Supabase");
       return false;
     } finally {
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
     }
   };
 

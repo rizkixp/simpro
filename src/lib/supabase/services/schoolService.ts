@@ -1789,6 +1789,7 @@ export const SupabaseSchoolService = {
     lmsJadwalMateri: LMSJadwalMateri[];
     tahfidz?: TahfidzRecord[];
     mutabaah?: MutabaahRecord[];
+    deletedIds?: string[];
   }): Promise<{ success: boolean; message: string; details?: any }> {
     const client = getSupabaseBrowserClient();
     if (!client) {
@@ -1796,6 +1797,35 @@ export const SupabaseSchoolService = {
     }
 
     try {
+      // 0. Purge tombstoned / explicitly deleted IDs across tables in Supabase
+      if (mockData.deletedIds && mockData.deletedIds.length > 0) {
+        const delList = mockData.deletedIds;
+        const tables = [
+          "siswa",
+          "guru",
+          "kelas",
+          "mata_pelajaran",
+          "jadwal_pelajaran",
+          "nilai_siswa",
+          "tagihan_siswa",
+          "jenis_tagihan",
+          "pengumuman",
+          "lms_materi",
+          "lms_tugas",
+          "lms_kuis",
+          "lms_meetings",
+          "lms_bank_soal",
+          "lms_jadwal_materi",
+          "tahfidz_records",
+          "mutabaah_records",
+        ];
+        for (const tbl of tables) {
+          try {
+            await client.from(tbl).delete().in("id", delList);
+          } catch {}
+        }
+      }
+
       // 1. Profil Sekolah
       await this.updateProfile(mockData.profile);
 

@@ -232,7 +232,7 @@ export default function PengaturanPage() {
       const ok = await forceAutoPushNow();
       if (ok) {
         setSyncStatusMsg({
-          text: "Automatic Push Sukses! Seluruh database lokal saat ini telah berhasil disinkronkan ke Supabase Cloud.",
+          text: `Automatic Push Sukses! Seluruh database lokal (${siswaList.length} siswa, ${guruList.length} guru, ${kelasList.length} kelas, ${jadwalList.length} jadwal, ${nilaiList.length} nilai) telah berhasil diunggah ke Supabase Cloud.`,
           type: "success",
         });
       } else {
@@ -244,7 +244,7 @@ export default function PengaturanPage() {
     } catch (e: any) {
       setSyncStatusMsg({ text: e.message || "Gagal melakukan Automatic Push", type: "error" });
     }
-    setTimeout(() => setSyncStatusMsg(null), 4000);
+    setTimeout(() => setSyncStatusMsg(null), 5000);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -620,6 +620,34 @@ export default function PengaturanPage() {
               <Zap className={`w-3.5 h-3.5 ${isAutoPushing ? "animate-pulse" : ""}`} />
               <span>{isAutoPushing ? "Sedang Auto-Push..." : "Force Auto-Push Database Sekarang"}</span>
             </button>
+          </div>
+
+          {/* Live Data Sync Counter */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-2 border-t border-emerald-200/50 dark:border-emerald-900/40">
+            <div className="px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-emerald-100 dark:border-emerald-900/50 text-center">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Siswa</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{siswaList?.length || 0}</span>
+            </div>
+            <div className="px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-emerald-100 dark:border-emerald-900/50 text-center">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Guru / PTK</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{guruList?.length || 0}</span>
+            </div>
+            <div className="px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-emerald-100 dark:border-emerald-900/50 text-center">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Kelas</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{kelasList?.length || 0}</span>
+            </div>
+            <div className="px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-emerald-100 dark:border-emerald-900/50 text-center">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Mata Pelajaran</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{mapelList?.length || 0}</span>
+            </div>
+            <div className="px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-emerald-100 dark:border-emerald-900/50 text-center">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Jadwal</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{jadwalList?.length || 0}</span>
+            </div>
+            <div className="px-2.5 py-1.5 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-emerald-100 dark:border-emerald-900/50 text-center">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Nilai Siswa</span>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{nilaiList?.length || 0}</span>
+            </div>
           </div>
         </div>
 
