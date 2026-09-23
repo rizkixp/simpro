@@ -34,6 +34,11 @@ import {
   Link as LinkIcon,
   Monitor,
   Check,
+  Download,
+  FolderArchive,
+  FileJson,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 
 export default function PengaturanPage() {
@@ -55,7 +60,30 @@ export default function PengaturanPage() {
     lastAutoPushTime,
     autoPushStatus,
     forceAutoPushNow,
+    exportDatabaseBackup,
+    importDatabaseBackup,
+    siswaList,
+    guruList,
+    kelasList,
+    mapelList,
+    jadwalList,
+    nilaiList,
+    sppList,
   } = useSchoolData();
+
+  // Backup & Restore Database States
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
+  const [restoreErrorMsg, setRestoreErrorMsg] = useState<string | null>(null);
+  const [selectedBackupFile, setSelectedBackupFile] = useState<{
+    name: string;
+    size: string;
+    content: any;
+  } | null>(null);
+  const [syncCloudOnRestore, setSyncCloudOnRestore] = useState<boolean>(true);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -246,6 +274,86 @@ export default function PengaturanPage() {
       resetToDefault();
       setIsDirty(false);
       alert("Database sekolah berhasil di-reset ke data bawaan awal!");
+    }
+  };
+
+  const handleExportBackup = () => {
+    setIsExporting(true);
+    try {
+      const res = exportDatabaseBackup({ exportedBy: user?.name || "Administrator" });
+      if (res.success) {
+        setExportSuccessMsg(`File cadangan ${res.filename} berhasil diunduh ke komputer Anda!`);
+        setTimeout(() => setExportSuccessMsg(null), 6000);
+      }
+    } catch (err: any) {
+      alert("Gagal mengunduh cadangan: " + (err.message || ""));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRestoreErrorMsg(null);
+    setRestoreSuccessMsg(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      setRestoreErrorMsg("Format file tidak valid. Silakan pilih file cadangan dengan ekstensi .JSON!");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        const data = parsed.data || parsed;
+        if (!data.siswa && !data.guru && !data.kelas && !data.profile) {
+          setRestoreErrorMsg("File JSON ini tidak berisi data SIM Sekolah PRO yang valid.");
+          return;
+        }
+        setSelectedBackupFile({
+          name: file.name,
+          size: (file.size / 1024).toFixed(1) + " KB",
+          content: parsed,
+        });
+      } catch (parseErr: any) {
+        setRestoreErrorMsg("File JSON rusak atau tidak dapat dibaca: " + parseErr.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleExecuteRestore = async () => {
+    if (!selectedBackupFile) return;
+    setIsRestoring(true);
+    setRestoreErrorMsg(null);
+    setRestoreSuccessMsg(null);
+    try {
+      const res = await importDatabaseBackup(selectedBackupFile.content, {
+        syncToCloud: syncCloudOnRestore && isSupabaseConnected,
+      });
+      if (res.success) {
+        let countDetails = "";
+        if (res.counts) {
+          const parts = Object.entries(res.counts)
+            .filter(([_, v]) => v > 0)
+            .map(([k, v]) => `${v} ${k}`);
+          if (parts.length > 0) {
+            countDetails = ` (${parts.slice(0, 5).join(", ")}${parts.length > 5 ? `, +${parts.length - 5} lainnya` : ""})`;
+          }
+        }
+        setRestoreSuccessMsg(`Database berhasil dipulihkan dari ${selectedBackupFile.name}${countDetails}!`);
+        setSelectedBackupFile(null);
+        if (restoreInputRef.current) restoreInputRef.current.value = "";
+        setTimeout(() => setRestoreSuccessMsg(null), 8000);
+      } else {
+        setRestoreErrorMsg(res.message);
+      }
+    } catch (err: any) {
+      setRestoreErrorMsg("Gagal memulihkan database: " + (err.message || ""));
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -541,6 +649,231 @@ export default function PengaturanPage() {
             <UploadCloud className="h-3.5 w-3.5" />
             <span>Sinkronisasi / Unggah Data ke Cloud</span>
           </button>
+        </div>
+      </div>
+
+      {/* Cadangkan & Pulihkan Database Card */}
+      <div className="bg-gradient-to-br from-white via-white to-sky-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/20 rounded-3xl border border-sky-200/80 dark:border-sky-800/60 shadow-sm p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-sky-100 dark:border-sky-900/40">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 bg-sky-600 text-white rounded-2xl shadow-sm">
+              <FolderArchive className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Cadangkan & Pulihkan Database (Backup & Restore .JSON)
+                </h3>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800">
+                  <FileJson className="w-3 h-3 text-sky-600" />
+                  <span>26 Koleksi Lengkap</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Ekspor seluruh database sistem ke file <code className="text-sky-700 dark:text-sky-300 font-semibold">.json</code> untuk arsip lokal / pindah perangkat, dan pulihkan (restore) kapan saja dengan aman.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Alerts */}
+        {exportSuccessMsg && (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            <span>{exportSuccessMsg}</span>
+          </div>
+        )}
+
+        {restoreSuccessMsg && (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            <span>{restoreSuccessMsg}</span>
+          </div>
+        )}
+
+        {restoreErrorMsg && (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2.5">
+            <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+            <span>{restoreErrorMsg}</span>
+          </div>
+        )}
+
+        {/* 2-Column Grid: Ekspor vs Impor */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Kolom 1: Ekspor / Cadangkan Database */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                <Download className="w-4 h-4 text-sky-600" />
+                <h4>Ekspor & Unduh File Cadangan (Backup)</h4>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Unduh seluruh data aktif (profil, siswa, guru, kelas, jadwal, nilai, presensi, SPP, tabungan, hingga LMS) ke dalam satu file <code className="font-semibold text-slate-700 dark:text-slate-300">.json</code>. Simpan file ini di Google Drive atau flashdisk sebagai <strong>Save Point</strong> sebelum mencoba input data baru atau sebelum berpindah komputer.
+              </p>
+
+              {/* Data Summary Counter Pill Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Data Siswa</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs">{siswaList?.length || 0} siswa</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Tenaga Pendidik</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs">{guruList?.length || 0} guru</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Rombel / Kelas</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs">{kelasList?.length || 0} kelas</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Jadwal Pelajaran</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs">{jadwalList?.length || 0} jadwal</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Rekap Nilai Siswa</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs">{nilaiList?.length || 0} nilai</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
+                  <span className="text-slate-400 block text-[10px]">Tagihan SPP</span>
+                  <span className="font-bold text-slate-800 dark:text-white text-xs">{sppList?.length || 0} tagihan</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                disabled={isExporting}
+                className="w-full px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-sky-600/20 cursor-pointer disabled:opacity-60"
+              >
+                {isExporting ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                <span>{isExporting ? "Menyiapkan File Cadangan..." : "Cadangkan & Unduh Database (.JSON)"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Kolom 2: Impor / Pulihkan Database */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                <UploadCloud className="w-4 h-4 text-emerald-600" />
+                <h4>Impor & Pulihkan Database (Restore)</h4>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Pilih file cadangan <code className="font-semibold text-slate-700 dark:text-slate-300">.json</code> yang telah diekspor sebelumnya untuk mengembalikan seluruh sistem ke kondisi pada saat cadangan tersebut dibuat.
+              </p>
+
+              {/* Hidden file input */}
+              <input
+                ref={restoreInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {!selectedBackupFile ? (
+                <div
+                  onClick={() => restoreInputRef.current?.click()}
+                  className="p-6 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-sky-500 dark:hover:border-sky-400 bg-slate-50/60 dark:bg-slate-900/40 transition-all flex flex-col items-center justify-center gap-2 text-center cursor-pointer group"
+                >
+                  <div className="p-3 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 group-hover:text-sky-600 group-hover:scale-110 transition-all shadow-xs">
+                    <FileJson className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Klik untuk Memilih File Cadangan (.JSON)
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Mendukung format cadangan resmi SIM PRO
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Preview Box */
+                <div className="p-4 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-sky-600 text-white shadow-xs">
+                        <FileJson className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-xs text-slate-900 dark:text-white truncate max-w-[200px] sm:max-w-xs">
+                          {selectedBackupFile.name}
+                        </h5>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          Ukuran: {selectedBackupFile.size}
+                          {selectedBackupFile.content?.exportedAt && ` • Tanggal: ${new Date(selectedBackupFile.content.exportedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB`}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedBackupFile(null);
+                        if (restoreInputRef.current) restoreInputRef.current.value = "";
+                      }}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-800"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Summary preview of file contents */}
+                  {selectedBackupFile.content?.summary && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300 pt-1 border-t border-sky-200/60 dark:border-sky-800/60">
+                      <span>Siswa: <b>{selectedBackupFile.content.summary.siswaCount}</b></span>
+                      <span>Guru: <b>{selectedBackupFile.content.summary.guruCount}</b></span>
+                      <span>Kelas: <b>{selectedBackupFile.content.summary.kelasCount}</b></span>
+                      <span>Nilai: <b>{selectedBackupFile.content.summary.nilaiCount}</b></span>
+                      <span>SPP: <b>{selectedBackupFile.content.summary.sppCount}</b></span>
+                    </div>
+                  )}
+
+                  {/* Cloud sync checkbox */}
+                  {isSupabaseConnected && (
+                    <label className="flex items-center gap-2 cursor-pointer pt-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={syncCloudOnRestore}
+                        onChange={(e) => setSyncCloudOnRestore(e.target.checked)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="text-slate-700 dark:text-slate-300 text-[11px] font-medium">
+                        Otomatis unggah hasil pemulihan ke Cloud Supabase
+                      </span>
+                    </label>
+                  )}
+
+                  <div className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/40 p-2 rounded-xl border border-amber-200 dark:border-amber-900/60">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Data aktif saat ini akan digantikan secara penuh oleh data dalam file ini.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleExecuteRestore}
+                disabled={!selectedBackupFile || isRestoring}
+                className="w-full px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRestoring ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <UploadCloud className="w-4 h-4" />
+                )}
+                <span>{isRestoring ? "Sedang Memulihkan Database..." : "Pulihkan Database Sekarang"}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

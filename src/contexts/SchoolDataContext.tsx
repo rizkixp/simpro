@@ -37,6 +37,7 @@ import {
   LMSJadwalMateri,
   TahfidzRecord,
   MutabaahRecord,
+  User,
 } from "@/types/school";
 import { SupabaseSchoolService, SupabaseHealthStatus } from "@/lib/supabase/services/schoolService";
 import {
@@ -69,6 +70,71 @@ import {
   INITIAL_MUTABAAH_RECORDS,
   generateStudentYearRecord,
 } from "@/lib/mock-data";
+
+export interface DatabaseBackupSummary {
+  siswaCount: number;
+  guruCount: number;
+  kelasCount: number;
+  mapelCount: number;
+  jadwalCount: number;
+  presensiCount: number;
+  nilaiCount: number;
+  jenisTagihanCount: number;
+  sppCount: number;
+  tabunganCount: number;
+  transaksiTabunganCount: number;
+  pesertaTransportCount: number;
+  sppTransportCount: number;
+  pengumumanCount: number;
+  lmsMateriCount: number;
+  lmsTugasCount: number;
+  lmsKuisCount: number;
+  lmsBankSoalCount: number;
+  tahfidzCount: number;
+  mutabaahCount: number;
+  userCount: number;
+}
+
+export interface DatabaseBackupFile {
+  version: "1.0";
+  system: string;
+  appName: string;
+  schoolName: string;
+  npsn?: string;
+  exportedAt: string;
+  exportedBy?: string;
+  summary: DatabaseBackupSummary;
+  data: {
+    profile: SchoolProfile;
+    siswa: Siswa[];
+    guru: Guru[];
+    kelas: Kelas[];
+    mapel: MataPelajaran[];
+    jadwal: JadwalPelajaran[];
+    presensi: PresensiRecord[];
+    nilai: NilaiSiswa[];
+    jenisTagihan: JenisTagihan[];
+    spp: TagihanSPP[];
+    tabungan: TabunganSiswa[];
+    transaksiTabungan: TransaksiTabungan[];
+    pesertaTransport: PesertaTransportasi[];
+    sppTransportRecords: RecordSPPTransportTahunAjaran[];
+    transaksiSPPTransport: TransaksiSPPTransport[];
+    pengumuman: Pengumuman[];
+    lmsMateri: LMSMateri[];
+    lmsTugas: LMSTugas[];
+    lmsSubmissions: LMSSubmission[];
+    lmsKuis: LMSKuis[];
+    lmsAttempts: LMSKuisAttempt[];
+    lmsForum: LMSForumDiskusi[];
+    lmsMeetings: LMSVirtualMeeting[];
+    lmsBankSoal: LMSBankSoal[];
+    lmsJadwalMateri: LMSJadwalMateri[];
+    tahfidz: TahfidzRecord[];
+    mutabaah: MutabaahRecord[];
+    users?: User[];
+  };
+}
 
 interface SchoolDataContextType {
   profile: SchoolProfile;
@@ -274,6 +340,13 @@ interface SchoolDataContextType {
   lastAutoPushTime: Date | null;
   autoPushStatus: "idle" | "pushing" | "success" | "error";
   forceAutoPushNow: () => Promise<boolean>;
+
+  // Backup & Restore Database
+  exportDatabaseBackup: (options?: { exportedBy?: string }) => { success: boolean; filename: string; summary: DatabaseBackupSummary };
+  importDatabaseBackup: (
+    rawBackup: DatabaseBackupFile | any,
+    options?: { syncToCloud?: boolean }
+  ) => Promise<{ success: boolean; message: string; counts?: Record<string, number> }>;
 }
 
 
@@ -2882,6 +2955,369 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     localStorage.clear();
   };
 
+  // ==================== BACKUP & RESTORE DATABASE ====================
+  const exportDatabaseBackup = (options?: {
+    exportedBy?: string;
+  }): { success: boolean; filename: string; summary: DatabaseBackupSummary } => {
+    const current = latestDataRef.current;
+
+    let savedUsers: any[] = [];
+    try {
+      if (typeof window !== "undefined") {
+        const rawUsers = localStorage.getItem("sim_auth_users");
+        if (rawUsers) {
+          savedUsers = JSON.parse(rawUsers);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not read users for backup:", err);
+    }
+
+    const summary: DatabaseBackupSummary = {
+      siswaCount: current.siswaList?.length || 0,
+      guruCount: current.guruList?.length || 0,
+      kelasCount: current.kelasList?.length || 0,
+      mapelCount: current.mapelList?.length || 0,
+      jadwalCount: current.jadwalList?.length || 0,
+      presensiCount: current.presensiList?.length || 0,
+      nilaiCount: current.nilaiList?.length || 0,
+      jenisTagihanCount: current.jenisTagihanList?.length || 0,
+      sppCount: current.sppList?.length || 0,
+      tabunganCount: current.tabunganList?.length || 0,
+      transaksiTabunganCount: current.transaksiTabunganList?.length || 0,
+      pesertaTransportCount: current.pesertaTransportList?.length || 0,
+      sppTransportCount: current.sppTransportRecords?.length || 0,
+      pengumumanCount: current.pengumumanList?.length || 0,
+      lmsMateriCount: current.lmsMateriList?.length || 0,
+      lmsTugasCount: current.lmsTugasList?.length || 0,
+      lmsKuisCount: current.lmsKuisList?.length || 0,
+      lmsBankSoalCount: current.lmsBankSoalList?.length || 0,
+      tahfidzCount: current.tahfidzList?.length || 0,
+      mutabaahCount: current.mutabaahList?.length || 0,
+      userCount: savedUsers.length,
+    };
+
+    const schoolName = current.profile?.namaSekolah || "SIM Sekolah PRO";
+    const safeSchoolSlug = schoolName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 30);
+
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const timeStr = now.toTimeString().split(" ")[0].replace(/:/g, "");
+    const filename = `simpro_backup_${safeSchoolSlug}_${dateStr}_${timeStr}.json`;
+
+    const backupPayload: DatabaseBackupFile = {
+      version: "1.0",
+      system: "SIM PRO - Sistem Informasi Manajemen Sekolah",
+      appName: current.profile?.appName || "SIM Sekolah PRO",
+      schoolName: schoolName,
+      npsn: current.profile?.npsn || "",
+      exportedAt: now.toISOString(),
+      exportedBy: options?.exportedBy || "Administrator",
+      summary,
+      data: {
+        profile: current.profile,
+        siswa: current.siswaList || [],
+        guru: current.guruList || [],
+        kelas: current.kelasList || [],
+        mapel: current.mapelList || [],
+        jadwal: current.jadwalList || [],
+        presensi: current.presensiList || [],
+        nilai: current.nilaiList || [],
+        jenisTagihan: current.jenisTagihanList || [],
+        spp: current.sppList || [],
+        tabungan: current.tabunganList || [],
+        transaksiTabungan: current.transaksiTabunganList || [],
+        pesertaTransport: current.pesertaTransportList || [],
+        sppTransportRecords: current.sppTransportRecords || [],
+        transaksiSPPTransport: current.transaksiSPPTransportList || [],
+        pengumuman: current.pengumumanList || [],
+        lmsMateri: current.lmsMateriList || [],
+        lmsTugas: current.lmsTugasList || [],
+        lmsSubmissions: current.lmsSubmissionList || [],
+        lmsKuis: current.lmsKuisList || [],
+        lmsAttempts: current.lmsKuisAttemptList || [],
+        lmsForum: current.lmsForumList || [],
+        lmsMeetings: current.lmsMeetingList || [],
+        lmsBankSoal: current.lmsBankSoalList || [],
+        lmsJadwalMateri: current.lmsJadwalMateriList || [],
+        tahfidz: current.tahfidzList || [],
+        mutabaah: current.mutabaahList || [],
+        users: savedUsers,
+      },
+    };
+
+    if (typeof window !== "undefined") {
+      const jsonString = JSON.stringify(backupPayload, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    return { success: true, filename, summary };
+  };
+
+  const importDatabaseBackup = async (
+    rawBackup: DatabaseBackupFile | any,
+    options?: { syncToCloud?: boolean }
+  ): Promise<{ success: boolean; message: string; counts?: Record<string, number> }> => {
+    if (!rawBackup || typeof rawBackup !== "object") {
+      return { success: false, message: "File cadangan tidak valid (format data rusak)." };
+    }
+
+    const data = rawBackup.data ? rawBackup.data : rawBackup;
+
+    if (
+      !data.siswa &&
+      !data.guru &&
+      !data.kelas &&
+      !data.profile &&
+      !data.nilai &&
+      !data.jadwal
+    ) {
+      return {
+        success: false,
+        message: "Format file tidak sesuai standar SIM Sekolah PRO. Pastikan memilih file cadangan .json yang benar.",
+      };
+    }
+
+    // Emergency snapshot before restoring in case user wants to roll back
+    try {
+      if (typeof window !== "undefined") {
+        const emergencySnapshot = {
+          savedAt: new Date().toISOString(),
+          state: latestDataRef.current,
+        };
+        localStorage.setItem("sim_emergency_snapshot_pre_restore", JSON.stringify(emergencySnapshot));
+      }
+    } catch (e) {
+      console.warn("Emergency pre-restore snapshot warning:", e);
+    }
+
+    const restoredCounts: Record<string, number> = {};
+
+    // 1. Profile
+    if (data.profile) {
+      setProfile(data.profile);
+      latestDataRef.current.profile = data.profile;
+      saveState("profile", data.profile, true);
+      restoredCounts["Profil Sekolah"] = 1;
+    }
+
+    // 2. Siswa
+    if (Array.isArray(data.siswa)) {
+      setSiswaList(data.siswa);
+      latestDataRef.current.siswaList = data.siswa;
+      saveState("siswa", data.siswa, true);
+      restoredCounts["Siswa"] = data.siswa.length;
+    }
+
+    // 3. Guru
+    if (Array.isArray(data.guru)) {
+      setGuruList(data.guru);
+      latestDataRef.current.guruList = data.guru;
+      saveState("guru", data.guru, true);
+      restoredCounts["Guru & PTK"] = data.guru.length;
+    }
+
+    // 4. Kelas
+    if (Array.isArray(data.kelas)) {
+      setKelasList(data.kelas);
+      latestDataRef.current.kelasList = data.kelas;
+      saveState("kelas", data.kelas, true);
+      restoredCounts["Kelas"] = data.kelas.length;
+    }
+
+    // 5. Mapel
+    if (Array.isArray(data.mapel)) {
+      setMapelList(data.mapel);
+      latestDataRef.current.mapelList = data.mapel;
+      saveState("mapel", data.mapel, true);
+      restoredCounts["Mata Pelajaran"] = data.mapel.length;
+    }
+
+    // 6. Jadwal
+    if (Array.isArray(data.jadwal)) {
+      setJadwalList(data.jadwal);
+      latestDataRef.current.jadwalList = data.jadwal;
+      saveState("jadwal", data.jadwal, true);
+      restoredCounts["Jadwal KBM"] = data.jadwal.length;
+    }
+
+    // 7. Presensi
+    if (Array.isArray(data.presensi)) {
+      setPresensiList(data.presensi);
+      latestDataRef.current.presensiList = data.presensi;
+      saveState("presensi", data.presensi, true);
+      restoredCounts["Presensi"] = data.presensi.length;
+    }
+
+    // 8. Nilai
+    if (Array.isArray(data.nilai)) {
+      setNilaiList(data.nilai);
+      latestDataRef.current.nilaiList = data.nilai;
+      saveState("nilai", data.nilai, true);
+      restoredCounts["Nilai Siswa"] = data.nilai.length;
+    }
+
+    // 9. Jenis Tagihan
+    if (Array.isArray(data.jenisTagihan)) {
+      setJenisTagihanList(data.jenisTagihan);
+      latestDataRef.current.jenisTagihanList = data.jenisTagihan;
+      saveState("jenis_tagihan", data.jenisTagihan, true);
+    }
+
+    // 10. SPP
+    if (Array.isArray(data.spp)) {
+      setSppList(data.spp);
+      latestDataRef.current.sppList = data.spp;
+      saveState("spp", data.spp, true);
+      restoredCounts["Tagihan SPP"] = data.spp.length;
+    }
+
+    // 11. Tabungan
+    if (Array.isArray(data.tabungan)) {
+      setTabunganList(data.tabungan);
+      latestDataRef.current.tabunganList = data.tabungan;
+      saveState("tabungan", data.tabungan, true);
+    }
+
+    // 12. Transaksi Tabungan
+    if (Array.isArray(data.transaksiTabungan)) {
+      setTransaksiTabunganList(data.transaksiTabungan);
+      latestDataRef.current.transaksiTabunganList = data.transaksiTabungan;
+      saveState("transaksi_tabungan", data.transaksiTabungan, true);
+      restoredCounts["Transaksi Tabungan"] = data.transaksiTabungan.length;
+    }
+
+    // 13. Peserta Transport
+    if (Array.isArray(data.pesertaTransport)) {
+      setPesertaTransportList(data.pesertaTransport);
+      latestDataRef.current.pesertaTransportList = data.pesertaTransport;
+      saveState("peserta_transport", data.pesertaTransport, true);
+    }
+
+    // 14. SPP Transport Records
+    if (Array.isArray(data.sppTransportRecords)) {
+      setSppTransportRecords(data.sppTransportRecords);
+      latestDataRef.current.sppTransportRecords = data.sppTransportRecords;
+      saveState("spp_transport_records", data.sppTransportRecords, true);
+    }
+
+    // 15. Transaksi SPP Transport
+    if (Array.isArray(data.transaksiSPPTransport)) {
+      setTransaksiSPPTransportList(data.transaksiSPPTransport);
+      latestDataRef.current.transaksiSPPTransportList = data.transaksiSPPTransport;
+      saveState("transaksi_spp_transport", data.transaksiSPPTransport, true);
+    }
+
+    // 16. Pengumuman
+    if (Array.isArray(data.pengumuman)) {
+      setPengumumanList(data.pengumuman);
+      latestDataRef.current.pengumumanList = data.pengumuman;
+      saveState("pengumuman", data.pengumuman, true);
+    }
+
+    // 17-25. LMS
+    if (Array.isArray(data.lmsMateri)) {
+      setLmsMateriList(data.lmsMateri);
+      latestDataRef.current.lmsMateriList = data.lmsMateri;
+      saveState("lms_materi", data.lmsMateri, true);
+      restoredCounts["LMS Materi"] = data.lmsMateri.length;
+    }
+    if (Array.isArray(data.lmsTugas)) {
+      setLmsTugasList(data.lmsTugas);
+      latestDataRef.current.lmsTugasList = data.lmsTugas;
+      saveState("lms_tugas", data.lmsTugas, true);
+      restoredCounts["LMS Tugas"] = data.lmsTugas.length;
+    }
+    if (Array.isArray(data.lmsSubmissions)) {
+      setLmsSubmissionList(data.lmsSubmissions);
+      latestDataRef.current.lmsSubmissionList = data.lmsSubmissions;
+      saveState("lms_submissions", data.lmsSubmissions, true);
+    }
+    if (Array.isArray(data.lmsKuis)) {
+      setLmsKuisList(data.lmsKuis);
+      latestDataRef.current.lmsKuisList = data.lmsKuis;
+      saveState("lms_kuis", data.lmsKuis, true);
+      restoredCounts["LMS Kuis"] = data.lmsKuis.length;
+    }
+    if (Array.isArray(data.lmsAttempts)) {
+      setLmsKuisAttemptList(data.lmsAttempts);
+      latestDataRef.current.lmsKuisAttemptList = data.lmsAttempts;
+      saveState("lms_attempts", data.lmsAttempts, true);
+    }
+    if (Array.isArray(data.lmsForum)) {
+      setLmsForumList(data.lmsForum);
+      latestDataRef.current.lmsForumList = data.lmsForum;
+      saveState("lms_forum", data.lmsForum, true);
+    }
+    if (Array.isArray(data.lmsMeetings)) {
+      setLmsMeetingList(data.lmsMeetings);
+      latestDataRef.current.lmsMeetingList = data.lmsMeetings;
+      saveState("lms_meetings", data.lmsMeetings, true);
+    }
+    if (Array.isArray(data.lmsBankSoal)) {
+      setLmsBankSoalList(data.lmsBankSoal);
+      latestDataRef.current.lmsBankSoalList = data.lmsBankSoal;
+      saveState("lms_bank_soal", data.lmsBankSoal, true);
+    }
+    if (Array.isArray(data.lmsJadwalMateri)) {
+      setLmsJadwalMateriList(data.lmsJadwalMateri);
+      latestDataRef.current.lmsJadwalMateriList = data.lmsJadwalMateri;
+      saveState("lms_jadwal_materi", data.lmsJadwalMateri, true);
+    }
+
+    // 26-27. Tahfidz & Mutabaah
+    if (Array.isArray(data.tahfidz)) {
+      setTahfidzList(data.tahfidz);
+      latestDataRef.current.tahfidzList = data.tahfidz;
+      saveState("tahfidz", data.tahfidz, true);
+      restoredCounts["Tahfidz"] = data.tahfidz.length;
+    }
+    if (Array.isArray(data.mutabaah)) {
+      setMutabaahList(data.mutabaah);
+      latestDataRef.current.mutabaahList = data.mutabaah;
+      saveState("mutabaah", data.mutabaah, true);
+      restoredCounts["Mutabaah"] = data.mutabaah.length;
+    }
+
+    // 28. Users
+    if (Array.isArray(data.users) && data.users.length > 0 && typeof window !== "undefined") {
+      try {
+        localStorage.setItem("sim_auth_users", JSON.stringify(data.users));
+        restoredCounts["Akun Pengguna"] = data.users.length;
+      } catch (e) {
+        console.warn("Could not save users from backup:", e);
+      }
+    }
+
+    // Cloud synchronization
+    const shouldSync = options?.syncToCloud ?? (isSupabaseConnected && SupabaseSchoolService.isConfigured());
+    if (shouldSync && SupabaseSchoolService.isConfigured()) {
+      try {
+        await seedDatabaseToCloud();
+      } catch (cloudErr) {
+        console.warn("Gagal menyinkronkan data pemulihan ke cloud:", cloudErr);
+      }
+    }
+
+    return {
+      success: true,
+      message: "Seluruh database berhasil dipulihkan dari file cadangan!",
+      counts: restoredCounts,
+    };
+  };
+
   return (
     <SchoolDataContext.Provider
       value={{
@@ -3013,6 +3449,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         lastAutoPushTime,
         autoPushStatus,
         forceAutoPushNow,
+
+        // Backup & Restore Database
+        exportDatabaseBackup,
+        importDatabaseBackup,
       }}
 
 
