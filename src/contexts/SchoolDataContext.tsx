@@ -495,6 +495,18 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
       }
 
+      // Migration: Bersihkan rekaman nilai IPAS untuk Kelas 1 yang tidak ada dalam kurikulum/jadwal
+      const ipasCleanMigrationKey = "sim_data_nilai_ipas_k1_cleared_v1";
+      if (typeof window !== "undefined" && localStorage.getItem(ipasCleanMigrationKey) !== "true") {
+        mergedNilai = mergedNilai.filter((n) => {
+          const isK1 = n.kelas && (n.kelas.toLowerCase().includes("kelas 1") || n.kelas.trim() === "1");
+          const isIpas = n.mapel && n.mapel.toLowerCase().includes("ilmu pengetahuan alam");
+          return !(isK1 && isIpas);
+        });
+        localStorage.setItem(ipasCleanMigrationKey, "true");
+        localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
+      }
+
       setNilaiList(mergedNilai);
       setSppList(load("spp", INITIAL_SPP));
       setJenisTagihanList(load("jenis_tagihan", INITIAL_JENIS_TAGIHAN));

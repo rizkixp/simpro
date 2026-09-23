@@ -593,65 +593,6 @@ export default function DashboardOverviewPage() {
   // =========================================================================
   return (
     <div className="space-y-6">
-      {/* Welcome Banner - Islamic Emerald & Gold */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#06281e] text-white p-6 sm:p-8 shadow-xl shadow-emerald-950/20 border border-emerald-600/30">
-        {/* Subtle Islamic Arabesque Pattern */}
-        <div className="absolute inset-0 opacity-10 bg-islamic-pattern pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/60 backdrop-blur-md text-xs font-semibold text-emerald-200 mb-3.5 border border-emerald-500/30 shadow-xs">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>SD Islam Smart School</span>
-              <span className="text-emerald-400/40">•</span>
-              <span className="text-amber-300 font-medium">1447 H / TA {profile.tahunAjaranAktif}</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
-              Assalamu'alaikum, {user?.name}
-              <span className="text-amber-300 inline-block animate-pulse">✨</span>
-            </h1>
-            <p className="mt-2 text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
-              {user?.role === "admin"
-                ? "Selamat datang di Panel SIM SDI Smart School. Pantau pembinaan santri, administrasi asatidz, dan operasional madrasah terintegrasi."
-                : user?.role === "guru"
-                ? `Wali Kelas ${teacherScope.assignedClass || "Binaan"}. Kelola data murid, presensi sholat & pembelajaran, serta penilaian e-rapor kelas Anda.`
-                : "Akses riwayat kehadiran, nilai e-rapor, jadwal pelajaran, pembiasaan ibadah harian, dan informasi SPP sekolah."}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {user?.role === "admin" ? (
-              <Link
-                href="/dashboard/siswa"
-                className="px-4 py-2.5 rounded-xl bg-white text-emerald-900 hover:bg-emerald-50 font-semibold text-xs shadow-md transition-all flex items-center gap-2 group"
-              >
-                <PlusCircle className="h-4 w-4 text-emerald-700 group-hover:scale-110 transition-transform" />
-                <span>Tambah Siswa</span>
-              </Link>
-            ) : user?.role === "guru" ? (
-              <Link
-                href="/dashboard/nilai"
-                className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs shadow-md transition-all flex items-center gap-2"
-              >
-                <Award className="h-4 w-4 text-slate-900" />
-                <span>E-Rapor {teacherScope.assignedClass}</span>
-              </Link>
-            ) : null}
-            <Link
-              href="/dashboard/presensi"
-              className="px-4 py-2.5 rounded-xl bg-emerald-800/60 hover:bg-emerald-700/60 border border-emerald-400/40 text-white font-semibold text-xs transition-all flex items-center gap-2 backdrop-blur-sm"
-            >
-              <CalendarCheck2 className="h-4 w-4 text-amber-300" />
-              <span>Presensi Hari Ini</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Decorative ambient glows */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-16 w-60 h-60 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
-      </div>
-
       {/* Primary KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {/* Stat 1: Siswa */}

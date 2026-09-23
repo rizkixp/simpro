@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope, isClassMatch } from "@/hooks/useTeacherScope";
@@ -104,7 +104,7 @@ export default function NilaiManagementPage() {
   const [selectedKelas, setSelectedKelas] = useState("Semua");
   const [selectedMapel, setSelectedMapel] = useState("Semua");
 
-  // Helper: Dapatkan daftar mata pelajaran suatu kelas berdasarkan entri di menu Jadwal Pelajaran & KBM
+  // Helper: Dapatkan daftar mata pelajaran suatu kelas berdasarkan entri di menu Jadwal Pelajaran & KBM + Nilai Siswa
   const getAvailableMapelForClass = (
     targetKelas: string
   ): { mapels: MataPelajaran[]; isScheduled: boolean } => {
@@ -120,24 +120,42 @@ export default function NilaiManagementPage() {
       isClassMatch(j.kelas, targetKelas)
     );
 
-    // Ambil nama-nama mapel unik dari jadwal
-    const scheduledNames = Array.from(
-      new Set(
-        classJadwal
-          .map((j) => j.mapel?.trim())
-          .filter((m): m is string => Boolean(m && m.length > 0))
-      )
-    );
+    // Ambil juga mata pelajaran yang sudah pernah dinilai di kelas ini
+    const classNilaiMapels = (nilaiList || [])
+      .filter((n) => isClassMatch(n.kelas, targetKelas))
+      .map((n) => n.mapel?.trim())
+      .filter((m): m is string => Boolean(m && m.length > 0));
+
+    // Jika kelas target sudah memiliki jadwal pelajaran di menu Jadwal Pelajaran & KBM,
+    // gunakan HANYA mata pelajaran dari jadwal kelas tersebut sebagai acuan resmi.
+    // Hal ini memastikan kolom input nilai leger rombel sinkron dan tepat sesuai mata pelajaran kelas
+    // (misalnya Kelas 1 tidak memiliki IPAS di jadwal, maka IPAS tidak akan muncul di leger).
+    // Riwayat nilai (classNilaiMapels) hanya dipakai jika kelas belum memiliki entri jadwal sama sekali.
+    const scheduledNames =
+      classJadwal.length > 0
+        ? Array.from(
+            new Set(
+              classJadwal
+                .map((j) => j.mapel?.trim())
+                .filter((m): m is string => Boolean(m && m.length > 0))
+            )
+          )
+        : Array.from(new Set(classNilaiMapels));
 
     if (scheduledNames.length > 0) {
       const matched: MataPelajaran[] = [];
       scheduledNames.forEach((name) => {
-        const found = mapelList.find(
-          (m) =>
-            m.nama.trim().toLowerCase() === name.toLowerCase() ||
-            name.toLowerCase().includes(m.nama.trim().toLowerCase()) ||
-            m.nama.trim().toLowerCase().includes(name.toLowerCase())
+        // Prioritaskan kecocokan persis terlebih dahulu
+        const exact = mapelList.find(
+          (m) => m.nama.trim().toLowerCase() === name.toLowerCase()
         );
+        const found =
+          exact ||
+          mapelList.find(
+            (m) =>
+              name.toLowerCase().includes(m.nama.trim().toLowerCase()) ||
+              m.nama.trim().toLowerCase().includes(name.toLowerCase())
+          );
         if (found) {
           if (!matched.some((item) => item.id === found.id)) {
             matched.push(found);
@@ -153,8 +171,26 @@ export default function NilaiManagementPage() {
         }
       });
 
-      // Jika akun merupakan guru pengampu mata pelajaran tertentu, filter lebih lanjut
-      if (teacherScope.isTeacher && teacherScope.scopedMapelList.length > 0) {
+      // Urutkan mata pelajaran sesuai urutan kurikulum standar di mapelList
+      matched.sort((a, b) => {
+        const idxA = mapelList.findIndex(
+          (m) => m.nama.toLowerCase().trim() === a.nama.toLowerCase().trim()
+        );
+        const idxB = mapelList.findIndex(
+          (m) => m.nama.toLowerCase().trim() === b.nama.toLowerCase().trim()
+        );
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.nama.localeCompare(b.nama);
+      });
+
+      // Jika akun merupakan guru pengampu mata pelajaran tertentu (dan BUKAN wali kelas di kelas ini), filter lebih lanjut
+      if (
+        teacherScope.isTeacher &&
+        !teacherScope.isHomeroom &&
+        teacherScope.scopedMapelList.length > 0
+      ) {
         const teacherFiltered = matched.filter((sm) =>
           teacherScope.scopedMapelList.some(
             (tm) => tm.nama.trim().toLowerCase() === sm.nama.trim().toLowerCase()
@@ -251,6 +287,16 @@ export default function NilaiManagementPage() {
   const [isLegerEditMode, setIsLegerEditMode] = useState<boolean>(false);
   const [legerInputScores, setLegerInputScores] = useState<Record<string, string | number>>({});
   const [isLegerSaving, setIsLegerSaving] = useState<boolean>(false);
+
+  // Daftar mata pelajaran khusus rombel/kelas yang sedang dipilih pada Leger Rombel
+  const currentLegerMapelList = useMemo(() => {
+    const targetKelas =
+      teacherScope.isTeacher && teacherScope.assignedClass
+        ? teacherScope.assignedClass
+        : batchSelectedKelas;
+    const { mapels } = getAvailableMapelForClass(targetKelas);
+    return mapels.length > 0 ? mapels : mapelList;
+  }, [batchSelectedKelas, teacherScope, jadwalList, nilaiList, mapelList]);
 
   // Konfigurasi Kustomisasi Kop Surat & Titimangsa Rapor
   interface RaporConfig {
@@ -1658,7 +1704,7 @@ export default function NilaiManagementPage() {
   };
 
   // =========================================================================
-  // LOGIKA INPUT NILAI DARI LEGER NILAI ROMBEL (MATRIKS 1 KELAS x SEMUA MAPEL)
+  // LOGIKA INPUT NILAI DARI LEGER NILAI ROMBEL (MATRIKS 1 KELAS x MAPEL KELAS)
   // =========================================================================
   const initLegerInputScores = (
     kelasTarget: string,
@@ -1673,9 +1719,12 @@ export default function NilaiManagementPage() {
       return isClassMatch(s.kelas, kelasTarget);
     });
 
+    const { mapels: targetMapels } = getAvailableMapelForClass(kelasTarget);
+    const activeMapels = targetMapels.length > 0 ? targetMapels : mapelList;
+
     const initialScores: Record<string, string | number> = {};
     students.forEach((s) => {
-      mapelList.forEach((m) => {
+      activeMapels.forEach((m) => {
         const rec = nilaiList.find(
           (n) =>
             n.siswaId === s.id &&
@@ -1754,7 +1803,7 @@ export default function NilaiManagementPage() {
     setLegerInputScores((prev) => {
       const updated = { ...prev };
       batchStudents.forEach((s) => {
-        mapelList.forEach((m) => {
+        currentLegerMapelList.forEach((m) => {
           const key = `${s.id}_${m.nama}`;
           if (
             updated[key] === "" ||
@@ -1770,7 +1819,7 @@ export default function NilaiManagementPage() {
     });
     setNotification({
       type: "success",
-      message: `Berhasil mengisi ${count} nilai kosong dengan standar KKM mata pelajaran.`,
+      message: `Berhasil mengisi ${count} nilai kosong dengan standar KKM mata pelajaran Kelas ${batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}.`,
     });
   };
 
@@ -1780,7 +1829,7 @@ export default function NilaiManagementPage() {
       const itemsToSave: NilaiSiswa[] = [];
 
       batchStudents.forEach((s) => {
-        mapelList.forEach((m) => {
+        currentLegerMapelList.forEach((m) => {
           const key = `${s.id}_${m.nama}`;
           const rawVal = legerInputScores[key];
 
@@ -2338,7 +2387,13 @@ export default function NilaiManagementPage() {
               setIsLegerEditMode(false);
               setBatchRaporType(isTengah ? "tengah" : "akhir");
               setBatchRaporSemester(activeSemester);
-              setBatchSelectedKelas(selectedKelas !== "Semua" ? selectedKelas : "Semua");
+              const targetKelas =
+                teacherScope.isTeacher && teacherScope.assignedClass
+                  ? teacherScope.assignedClass
+                  : selectedKelas !== "Semua"
+                  ? selectedKelas
+                  : kelasList[0]?.nama || "Semua";
+              setBatchSelectedKelas(targetKelas);
               setIsBatchRaporOpen(true);
             }}
             className="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer"
@@ -5515,10 +5570,13 @@ export default function NilaiManagementPage() {
                   <Printer className="h-3.5 w-3.5" />
                   <span>Modul Cetak / Ekspor Rapor Seluruh Siswa</span>
                 </div>
-                <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2 flex-wrap">
                   <span>{isLegerEditMode ? "Input Nilai Leger Rombel" : "E-Rapor Rombel"}: {batchSelectedKelas === "Semua" ? "Seluruh Siswa" : `Kelas ${batchSelectedKelas}`}</span>
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold">
                     {batchStudents.length} Siswa
+                  </span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
+                    {currentLegerMapelList.length} Mapel Rombel
                   </span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -6344,7 +6402,7 @@ export default function NilaiManagementPage() {
                     {isLegerEditMode ? "INPUT & REKAP NILAI HASIL BELAJAR" : "BUKU LEGER NILAI HASIL BELAJAR"} {batchRaporType === "tengah" ? "SUMATIF TENGAH SEMESTER (STS)" : "SUMATIF AKHIR SEMESTER (SAS)"}
                   </h3>
                   <p className="text-xs text-slate-600 font-medium">
-                    Kelas: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}</strong> &bull; Semester: <strong>{batchRaporSemester || profile.semesterAktif}</strong> &bull; Tahun Ajaran: <strong>{profile.tahunAjaranAktif}</strong>
+                    Kelas: <strong>{batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}</strong> &bull; Semester: <strong>{batchRaporSemester || profile.semesterAktif}</strong> &bull; Tahun Ajaran: <strong>{profile.tahunAjaranAktif}</strong> &bull; Mapel Rombel: <strong>{currentLegerMapelList.length} Mapel</strong>
                   </p>
                 </div>
 
@@ -6362,7 +6420,7 @@ export default function NilaiManagementPage() {
                       let count = 0;
                       const scoresByMapel: Record<string, number> = {};
 
-                      mapelList.forEach((m) => {
+                      currentLegerMapelList.forEach((m) => {
                         if (isLegerEditMode) {
                           const key = `${s.id}_${m.nama}`;
                           const rawVal = legerInputScores[key];
@@ -6413,7 +6471,7 @@ export default function NilaiManagementPage() {
                             <th className="border border-slate-300 px-2 py-2 text-center w-24">NISN</th>
                             <th className="border border-slate-300 px-3 py-2 min-w-[160px]">Nama Peserta Didik</th>
                             <th className="border border-slate-300 px-2 py-2 text-center w-14">Kelas</th>
-                            {mapelList.map((m) => (
+                            {currentLegerMapelList.map((m) => (
                               <th
                                 key={m.id}
                                 className="border border-slate-300 px-2 py-2 text-center min-w-[70px]"
@@ -6442,7 +6500,7 @@ export default function NilaiManagementPage() {
                         <tbody className="divide-y divide-slate-200 text-[11px]">
                           {rankedStudents.length === 0 ? (
                             <tr>
-                              <td colSpan={mapelList.length + 8} className="text-center py-6 text-slate-400">
+                              <td colSpan={currentLegerMapelList.length + 8} className="text-center py-6 text-slate-400">
                                 Tidak ada data siswa untuk ditampilkan.
                               </td>
                             </tr>
@@ -6453,7 +6511,7 @@ export default function NilaiManagementPage() {
                                 <td className="border border-slate-300 px-2 py-1.5 text-center font-mono text-[10px] text-slate-600">{s.nisn}</td>
                                 <td className="border border-slate-300 px-3 py-1.5 font-bold text-slate-900">{s.nama}</td>
                                 <td className="border border-slate-300 px-2 py-1.5 text-center text-slate-600">{s.kelas}</td>
-                                {mapelList.map((m) => {
+                                {currentLegerMapelList.map((m) => {
                                   const rawVal = isLegerEditMode
                                     ? (legerInputScores[`${s.id}_${m.nama}`] ?? "")
                                     : s.scoresByMapel[m.nama];

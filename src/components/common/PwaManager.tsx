@@ -20,29 +20,65 @@ export function PwaManager() {
   const [showOnlineToast, setShowOnlineToast] = useState(false);
 
   useEffect(() => {
-    // 1. Register Service Worker
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((registration) => {
-            console.log("SDI Smart PWA: Service Worker aktif:", registration.scope);
-          })
-          .catch((error) => {
-            console.warn("SDI Smart PWA: Pendaftaran Service Worker gagal:", error);
-          });
-      });
+    if (typeof window === "undefined") return;
+
+    const isLocalhost = Boolean(
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.hostname.endsWith(".local") ||
+      window.location.port === "3000"
+    );
+
+    // 1. In Local Development: Completely unregister Service Workers & clear cached shells
+    let handleBeforeInstallPrompt: ((e: Event) => void) | null = null;
+
+    if (isLocalhost) {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister().then((success) => {
+              if (success) {
+                console.log("[PWA Dev] Berhasil unregister Service Worker di localhost:", registration.scope);
+              }
+            });
+          }
+        });
+      }
+
+      if ("caches" in window) {
+        caches.keys().then((keys) => {
+          for (const key of keys) {
+            caches.delete(key).then(() => {
+              console.log("[PWA Dev] Cache lokal dibersihkan:", key);
+            });
+          }
+        });
+      }
+    } else {
+      // 2. In Production: Register Service Worker
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((registration) => {
+              console.log("SDI Smart PWA: Service Worker aktif:", registration.scope);
+            })
+            .catch((error) => {
+              console.warn("SDI Smart PWA: Pendaftaran Service Worker gagal:", error);
+            });
+        });
+      }
+
+      // 3. Capture BeforeInstallPrompt for Android & Chrome/Edge
+      handleBeforeInstallPrompt = (e: Event) => {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e as BeforeInstallPromptEvent;
+        window.dispatchEvent(new CustomEvent("pwa-install-ready"));
+        console.log("SDI Smart PWA: Install prompt siap.");
+      };
+
+      window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     }
-
-    // 2. Capture BeforeInstallPrompt for Android & Chrome/Edge
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      window.__pwaInstallPrompt = e as BeforeInstallPromptEvent;
-      window.dispatchEvent(new CustomEvent("pwa-install-ready"));
-      console.log("SDI Smart PWA: Install prompt siap.");
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
     // 3. Online/Offline Network Status Listeners
     const handleOnline = () => {
@@ -64,7 +100,9 @@ export function PwaManager() {
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      if (handleBeforeInstallPrompt) {
+        window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      }
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };

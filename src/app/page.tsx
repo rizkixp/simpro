@@ -9,7 +9,7 @@ import Link from "next/link";
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, login } = useAuth();
   const { profile } = useSchoolData();
 
   const appName = profile?.appName || "SIM Sekolah PRO";
@@ -23,6 +23,14 @@ export default function HomePage() {
   const ctaText = profile?.landingCtaText || "Buka Portal & Form Login";
   const showDemoButton = profile?.landingShowDemoButton !== false;
   const footerText = profile?.landingFooterText || `${appName} - ${appTagline}. All rights reserved.`;
+
+  const handleDemoClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      await login("admin@sekolah.id", "admin", "admin123");
+    }
+    router.push("/dashboard");
+  };
 
   useEffect(() => {
     if (!isLoading) {
@@ -99,12 +107,12 @@ export default function HomePage() {
             <ArrowRight className="h-5 w-5" />
           </Link>
           {showDemoButton && (
-            <Link
-              href="/dashboard"
-              className="px-8 py-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-base border border-white/10 backdrop-blur-md transition-all"
+            <button
+              onClick={handleDemoClick}
+              className="px-8 py-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-base border border-white/10 backdrop-blur-md transition-all cursor-pointer"
             >
               Lihat Demo Dashboard Langsung
-            </Link>
+            </button>
           )}
         </div>
 
