@@ -6274,7 +6274,7 @@ export default function NilaiManagementPage() {
                     {/* Kolom 2: Wali Kelas */}
                     <div>
                       <p className="text-slate-600 invisible">Mengetahui,</p>
-                      <p className="text-slate-800 font-medium">Wali Kelas {raporSiswa.kelas},</p>
+                      <p className="text-slate-800 font-medium">Wali Kelas,</p>
                       <div className="h-16" />
                       <p className="font-bold underline">{waliNama}</p>
                     </div>
@@ -7249,7 +7249,7 @@ export default function NilaiManagementPage() {
                             {/* Kolom 2: Wali Kelas */}
                             <div>
                               <p className="text-slate-600 invisible">Mengetahui,</p>
-                              <p className="text-slate-800 font-medium">Wali Kelas {siswa.kelas},</p>
+                              <p className="text-slate-800 font-medium">Wali Kelas,</p>
                               <div className="h-14" />
                               <p className="font-bold underline">{waliNama}</p>
                             </div>
@@ -7551,7 +7551,7 @@ export default function NilaiManagementPage() {
                     </div>
                     <div>
                       <p className="text-slate-500">{raporConfig.tempatRapor}, {raporConfig.tanggalRapor}</p>
-                      <p className="font-bold">Wali Kelas {batchSelectedKelas === "Semua" ? "" : batchSelectedKelas}</p>
+                      <p className="font-bold">Wali Kelas</p>
                       <div className="h-16" />
                       <p className="font-bold underline text-sm">{teacherScope.teacherName || user?.name || "Wali Kelas"}</p>
                       <p className="text-[10px] text-slate-400">Guru Pembina / Wali Kelas</p>
