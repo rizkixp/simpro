@@ -52,6 +52,9 @@ import {
   Upload,
   RotateCcw,
   Image as ImageIcon,
+  Bold,
+  Underline as UnderlineIcon,
+  Type,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -301,7 +304,7 @@ export default function NilaiManagementPage() {
     return mapels.length > 0 ? mapels : mapelList;
   }, [batchSelectedKelas, teacherScope, jadwalList, nilaiList, mapelList]);
 
-  // Konfigurasi Kustomisasi Kop Surat & Titimangsa Rapor
+  // Konfigurasi Kustomisasi Kop Surat, Judul, & Titimangsa Rapor
   interface RaporConfig {
     logoKiriUrl: string;
     logoKananUrl: string;
@@ -318,6 +321,16 @@ export default function NilaiManagementPage() {
     ukuranLogoKop?: "sm" | "md" | "lg" | "xl";
     tempatRapor: string;
     tanggalRapor: string;
+
+    // Kustomisasi Judul & Format Huruf Rapor
+    judulRaporSTS?: string;
+    judulRaporSAS?: string;
+    subjudulRapor?: string;
+    fontSizeJudulRapor?: number;
+    boldJudulRapor?: boolean;
+    underlineJudulRapor?: boolean;
+    fontSizeSubjudulRapor?: number;
+    boldSubjudulRapor?: boolean;
   }
 
   const getDefaultRaporConfig = (): RaporConfig => ({
@@ -336,11 +349,22 @@ export default function NilaiManagementPage() {
     ukuranLogoKop: "lg",
     tempatRapor: "Jakarta",
     tanggalRapor: formatDateIndo(new Date().toISOString().split("T")[0]),
+
+    // Judul & Teks Rapor Default
+    judulRaporSTS: "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)",
+    judulRaporSAS: "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)",
+    subjudulRapor: "",
+    fontSizeJudulRapor: 16,
+    boldJudulRapor: true,
+    underlineJudulRapor: true,
+    fontSizeSubjudulRapor: 12,
+    boldSubjudulRapor: false,
   });
 
   const [raporConfig, setRaporConfig] = useState<RaporConfig>(getDefaultRaporConfig);
   const [isRaporSettingsOpen, setIsRaporSettingsOpen] = useState(false);
-  const [activeRaporConfigTab, setActiveRaporConfigTab] = useState<"kop" | "titimangsa">("kop");
+  const [activeRaporConfigTab, setActiveRaporConfigTab] = useState<"kop" | "titimangsa" | "judul">("kop");
+  const [isInlineTitleEdit, setIsInlineTitleEdit] = useState(false);
 
   // Load saved rapor config from localStorage
   useEffect(() => {
@@ -358,6 +382,14 @@ export default function NilaiManagementPage() {
           fontSizeBaris4: parsed.fontSizeBaris4 || prev.fontSizeBaris4 || 11,
           ukuranLogoKop: parsed.ukuranLogoKop || prev.ukuranLogoKop || "lg",
           namaSekolah: parsed.namaSekolah || profile?.namaSekolah || prev.namaSekolah,
+          judulRaporSTS: parsed.judulRaporSTS ?? prev.judulRaporSTS,
+          judulRaporSAS: parsed.judulRaporSAS ?? prev.judulRaporSAS,
+          subjudulRapor: parsed.subjudulRapor ?? prev.subjudulRapor,
+          fontSizeJudulRapor: parsed.fontSizeJudulRapor ?? prev.fontSizeJudulRapor ?? 16,
+          boldJudulRapor: parsed.boldJudulRapor ?? prev.boldJudulRapor ?? true,
+          underlineJudulRapor: parsed.underlineJudulRapor ?? prev.underlineJudulRapor ?? true,
+          fontSizeSubjudulRapor: parsed.fontSizeSubjudulRapor ?? prev.fontSizeSubjudulRapor ?? 12,
+          boldSubjudulRapor: parsed.boldSubjudulRapor ?? prev.boldSubjudulRapor ?? false,
         }));
       }
     } catch (e) {
@@ -405,10 +437,10 @@ export default function NilaiManagementPage() {
             </div>
             <div>
               <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                Kustomisasi Kop Surat & Titimangsa Rapor
+                Kustomisasi Kop Surat, Judul & Titimangsa Rapor
               </h4>
               <p className="text-[11px] text-slate-500">
-                Sesuaikan logo kiri/kanan, teks kop instansi, serta titimangsa alamat dan tanggal rapor.
+                Sesuaikan logo kop, teks instansi, judul & format huruf rapor, serta titimangsa tanggal.
               </p>
             </div>
           </div>
@@ -436,8 +468,8 @@ export default function NilaiManagementPage() {
           </div>
         </div>
 
-        {/* Tab Switcher: Logo & Kop vs Titimangsa Tanda Tangan */}
-        <div className="flex gap-2 mb-4">
+        {/* Tab Switcher: Logo & Kop vs Titimangsa Tanda Tangan vs Judul & Format */}
+        <div className="flex flex-wrap gap-2 mb-4">
           <button
             type="button"
             onClick={() => setActiveRaporConfigTab("kop")}
@@ -458,7 +490,19 @@ export default function NilaiManagementPage() {
                 : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
             }`}
           >
-            2. Alamat & Tanggal Rapor (Titimangsa Tanda Tangan)
+            2. Alamat & Tanggal Rapor (Titimangsa)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveRaporConfigTab("judul")}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeRaporConfigTab === "judul"
+                ? "bg-amber-500 text-white shadow-sm"
+                : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+            }`}
+          >
+            <Type className="h-3.5 w-3.5" />
+            <span>3. Judul & Format Huruf Rapor</span>
           </button>
         </div>
 
@@ -840,7 +884,7 @@ export default function NilaiManagementPage() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeRaporConfigTab === "titimangsa" ? (
           /* Titimangsa Tab */
           <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
             <p className="text-slate-500">
@@ -892,6 +936,301 @@ export default function NilaiManagementPage() {
               <strong className="text-slate-900 dark:text-slate-100 font-mono">
                 {raporConfig.tempatRapor}, {raporConfig.tanggalRapor}
               </strong>
+            </div>
+          </div>
+        ) : (
+          /* Tab 3: Judul & Format Huruf Rapor */
+          <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <p className="text-slate-500">
+                Atur teks judul rapor, besar huruf (font size), format tebal (bold), dan garis bawah (underline).
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  updateRaporConfig({
+                    judulRaporSTS: "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)",
+                    judulRaporSAS: "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)",
+                    subjudulRapor: "",
+                    fontSizeJudulRapor: 16,
+                    boldJudulRapor: true,
+                    underlineJudulRapor: true,
+                    fontSizeSubjudulRapor: 12,
+                    boldSubjudulRapor: false,
+                  })
+                }
+                className="px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                title="Kembalikan format judul rapor ke standar sistem"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Judul Standar</span>
+              </button>
+            </div>
+
+            {/* Styling Toolbar: Font Size, Bold, Underline */}
+            <div className="p-3.5 rounded-xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-800/40 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-100 block">
+                    Format Huruf Judul Utama:
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Besar huruf (px), tebal teks (bold), dan garis bawah (underline).
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Font Size Stepper & Select */}
+                  <div className="flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <span className="text-[11px] text-slate-500 font-semibold mr-1">Ukuran Font:</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRaporConfig({
+                          fontSizeJudulRapor: Math.max(10, (raporConfig.fontSizeJudulRapor || 16) - 1),
+                        })
+                      }
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs cursor-pointer"
+                      title="Perkecil Ukuran Font Judul"
+                    >
+                      -
+                    </button>
+                    <select
+                      value={raporConfig.fontSizeJudulRapor || 16}
+                      onChange={(e) => updateRaporConfig({ fontSizeJudulRapor: Number(e.target.value) })}
+                      className="text-xs font-bold px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 cursor-pointer"
+                    >
+                      {[11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28].map((sz) => (
+                        <option key={sz} value={sz}>{sz}px</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRaporConfig({
+                          fontSizeJudulRapor: Math.min(32, (raporConfig.fontSizeJudulRapor || 16) + 1),
+                        })
+                      }
+                      className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs cursor-pointer"
+                      title="Perbesar Ukuran Font Judul"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Bold Toggle */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRaporConfig({
+                        boldJudulRapor: !(raporConfig.boldJudulRapor ?? true),
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border cursor-pointer ${
+                      (raporConfig.boldJudulRapor ?? true)
+                        ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                        : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 hover:bg-slate-100"
+                    }`}
+                    title="Aktifkan / Nonaktifkan Huruf Tebal (Bold)"
+                  >
+                    <Bold className="h-3.5 w-3.5" />
+                    <span>Tebal (Bold)</span>
+                  </button>
+
+                  {/* Underline Toggle */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRaporConfig({
+                        underlineJudulRapor: !(raporConfig.underlineJudulRapor ?? true),
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border cursor-pointer ${
+                      (raporConfig.underlineJudulRapor ?? true)
+                        ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                        : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 hover:bg-slate-100"
+                    }`}
+                    title="Aktifkan / Nonaktifkan Garis Bawah (Underline)"
+                  >
+                    <UnderlineIcon className="h-3.5 w-3.5" />
+                    <span>Garis Bawah (Underline)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Presets Ukuran Huruf Judul */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-200/60 dark:border-amber-900/40">
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  Preset Cepat Ukuran Judul:
+                </span>
+                <div className="flex gap-1.5">
+                  {[
+                    { label: "13px (Kecil)", size: 13 },
+                    { label: "14px (Sedang)", size: 14 },
+                    { label: "16px (Standar)", size: 16 },
+                    { label: "18px (Besar)", size: 18 },
+                    { label: "20px (Ekstra)", size: 20 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.size}
+                      type="button"
+                      onClick={() => updateRaporConfig({ fontSizeJudulRapor: preset.size })}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border transition-all ${
+                        (raporConfig.fontSizeJudulRapor || 16) === preset.size
+                          ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                          : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Input Teks Judul STS & SAS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Teks Judul STS */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-slate-800 dark:text-slate-100">
+                    Teks Judul Rapor STS (Tengah Semester)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRaporConfig({
+                        judulRaporSTS: "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)",
+                      })
+                    }
+                    className="text-[10px] text-amber-700 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    Reset Teks
+                  </button>
+                </div>
+                <textarea
+                  rows={2}
+                  value={raporConfig.judulRaporSTS ?? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"}
+                  onChange={(e) => updateRaporConfig({ judulRaporSTS: e.target.value })}
+                  placeholder="LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-xs uppercase"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Muncul saat memilih tipe cetak Rapor Tengah Semester (STS).
+                </p>
+              </div>
+
+              {/* Teks Judul SAS */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-slate-800 dark:text-slate-100">
+                    Teks Judul Rapor SAS (Akhir Semester)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRaporConfig({
+                        judulRaporSAS: "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)",
+                      })
+                    }
+                    className="text-[10px] text-amber-700 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    Reset Teks
+                  </button>
+                </div>
+                <textarea
+                  rows={2}
+                  value={raporConfig.judulRaporSAS ?? "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"}
+                  onChange={(e) => updateRaporConfig({ judulRaporSAS: e.target.value })}
+                  placeholder="LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-xs uppercase"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Muncul saat memilih tipe cetak Rapor Akhir Semester (SAS).
+                </p>
+              </div>
+            </div>
+
+            {/* Subjudul (Tahun Ajaran & Semester) */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <label className="font-bold text-slate-800 dark:text-slate-100 block">
+                    Subjudul (Tahun Ajaran & Semester)
+                  </label>
+                  <span className="text-[10px] text-slate-500">
+                    Kosongkan bila ingin otomatis mengikuti tahun ajaran dan semester aktif.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Subtitle Font Size */}
+                  <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <span className="text-[10px] text-slate-500 font-medium">Font:</span>
+                    <select
+                      value={raporConfig.fontSizeSubjudulRapor || 12}
+                      onChange={(e) => updateRaporConfig({ fontSizeSubjudulRapor: Number(e.target.value) })}
+                      className="text-xs font-bold px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 cursor-pointer"
+                    >
+                      {[10, 11, 12, 13, 14, 15, 16].map((sz) => (
+                        <option key={sz} value={sz}>{sz}px</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Subtitle Bold */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateRaporConfig({
+                        boldSubjudulRapor: !(raporConfig.boldSubjudulRapor ?? false),
+                      })
+                    }
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all border cursor-pointer ${
+                      raporConfig.boldSubjudulRapor
+                        ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                        : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200"
+                    }`}
+                  >
+                    <Bold className="h-3 w-3" />
+                    <span>Tebal</span>
+                  </button>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={raporConfig.subjudulRapor || ""}
+                onChange={(e) => updateRaporConfig({ subjudulRapor: e.target.value })}
+                placeholder={`Otomatis: Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${profile.semesterAktif}`}
+                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs"
+              />
+            </div>
+
+            {/* Live Preview Card */}
+            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border-2 border-dashed border-amber-300 dark:border-amber-700/60 text-center">
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-2">
+                Pratinjau Hasil Format Judul
+              </span>
+              <h3
+                style={{ fontSize: `${raporConfig.fontSizeJudulRapor || 16}px` }}
+                className={`tracking-wider uppercase text-slate-900 dark:text-white ${
+                  (raporConfig.boldJudulRapor ?? true) ? "font-extrabold" : "font-normal"
+                } ${
+                  (raporConfig.underlineJudulRapor ?? true) ? "underline" : "no-underline"
+                }`}
+              >
+                {raporConfig.judulRaporSTS || "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"}
+              </h3>
+              <p
+                style={{ fontSize: `${raporConfig.fontSizeSubjudulRapor || 12}px` }}
+                className={`mt-1 ${
+                  raporConfig.boldSubjudulRapor
+                    ? "font-bold text-slate-800 dark:text-slate-200"
+                    : "font-medium text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                {raporConfig.subjudulRapor?.trim()
+                  ? raporConfig.subjudulRapor
+                  : `Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${profile.semesterAktif}`}
+              </p>
             </div>
           </div>
         )}
@@ -5292,20 +5631,207 @@ export default function NilaiManagementPage() {
             </div>
 
             {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
-            {isAdmin && renderRaporSettingsPanel()}
+            {(isAdmin || isRaporSettingsOpen) && renderRaporSettingsPanel()}
 
             {/* Official School Letterhead (Kop Surat) */}
             {renderOfficialLetterhead()}
 
             {/* Report Title & Type Info */}
             <div className="text-center mb-5">
-              <h3 className="text-base font-extrabold underline tracking-wider uppercase text-slate-900">
+              {/* Quick Format & Edit Bar (No Print) */}
+              <div className="mb-2.5 print:hidden inline-flex flex-wrap items-center justify-center gap-1.5 p-1 px-3 rounded-full bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800 dark:hover:bg-slate-700/70 border border-slate-300 dark:border-slate-600 shadow-xs transition-all text-xs">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                  <Type className="h-3 w-3" />
+                  <span>Format Judul:</span>
+                </span>
+
+                {/* Font Size - */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      fontSizeJudulRapor: Math.max(10, (raporConfig.fontSizeJudulRapor || 16) - 1),
+                    })
+                  }
+                  className="w-5 h-5 rounded-md bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                  title="Perkecil Ukuran Huruf Judul"
+                >
+                  -
+                </button>
+                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 min-w-[34px] text-center">
+                  {raporConfig.fontSizeJudulRapor || 16}px
+                </span>
+                {/* Font Size + */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      fontSizeJudulRapor: Math.min(32, (raporConfig.fontSizeJudulRapor || 16) + 1),
+                    })
+                  }
+                  className="w-5 h-5 rounded-md bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                  title="Perbesar Ukuran Huruf Judul"
+                >
+                  +
+                </button>
+
+                <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-600 mx-0.5" />
+
+                {/* Bold Toggle */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      boldJudulRapor: !(raporConfig.boldJudulRapor ?? true),
+                    })
+                  }
+                  className={`px-2 py-0.5 rounded-md font-bold text-xs flex items-center gap-1 cursor-pointer transition-all ${
+                    (raporConfig.boldJudulRapor ?? true)
+                      ? "bg-amber-500 text-white shadow-xs font-black"
+                      : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50"
+                  }`}
+                  title="Tebalkan Huruf Judul (Bold)"
+                >
+                  <Bold className="h-3 w-3" />
+                  <span>B</span>
+                </button>
+
+                {/* Underline Toggle */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateRaporConfig({
+                      underlineJudulRapor: !(raporConfig.underlineJudulRapor ?? true),
+                    })
+                  }
+                  className={`px-2 py-0.5 rounded-md font-bold text-xs flex items-center gap-1 cursor-pointer transition-all ${
+                    (raporConfig.underlineJudulRapor ?? true)
+                      ? "bg-amber-500 text-white shadow-xs font-black underline"
+                      : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50"
+                  }`}
+                  title="Garis Bawah Judul (Underline)"
+                >
+                  <UnderlineIcon className="h-3 w-3" />
+                  <span>U</span>
+                </button>
+
+                <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-600 mx-0.5" />
+
+                {/* Edit Text Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsInlineTitleEdit(!isInlineTitleEdit)}
+                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                    isInlineTitleEdit
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/80"
+                  }`}
+                  title="Ubah teks tulisan judul langsung di lembar rapor"
+                >
+                  <Edit2 className="h-3 w-3" />
+                  <span>{isInlineTitleEdit ? "Tutup Edit Teks" : "Edit Tulisan"}</span>
+                </button>
+
+                {/* Open Full Settings */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveRaporConfigTab("judul");
+                    setIsRaporSettingsOpen(true);
+                  }}
+                  className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-200 border border-slate-200 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                  title="Buka panel pengaturan lengkap judul & kop"
+                >
+                  <Sliders className="h-3 w-3" />
+                  <span>Atur Lengkap</span>
+                </button>
+              </div>
+
+              {/* Inline Title Editor Box if active */}
+              {isInlineTitleEdit && (
+                <div className="max-w-xl mx-auto mb-3 p-3 bg-amber-50 dark:bg-slate-800 border-2 border-amber-400 rounded-xl space-y-2 shadow-sm text-left print:hidden animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                      Edit Tulisan Judul ({raporPrintType === "tengah" ? "STS" : "SAS"}):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsInlineTitleEdit(false)}
+                      className="text-[11px] px-2.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg cursor-pointer"
+                    >
+                      Selesai
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={
+                      raporPrintType === "tengah"
+                        ? (raporConfig.judulRaporSTS ?? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)")
+                        : (raporConfig.judulRaporSAS ?? "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)")
+                    }
+                    onChange={(e) => {
+                      if (raporPrintType === "tengah") {
+                        updateRaporConfig({ judulRaporSTS: e.target.value });
+                      } else {
+                        updateRaporConfig({ judulRaporSAS: e.target.value });
+                      }
+                    }}
+                    placeholder={
+                      raporPrintType === "tengah"
+                        ? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
+                        : "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-amber-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold uppercase"
+                  />
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-slate-500">
+                      Teks judul akan otomatis tersimpan dan diterapkan pada pratinjau & cetak.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (raporPrintType === "tengah") {
+                          updateRaporConfig({
+                            judulRaporSTS: "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)",
+                          });
+                        } else {
+                          updateRaporConfig({
+                            judulRaporSAS: "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)",
+                          });
+                        }
+                      }}
+                      className="text-[10px] text-rose-600 hover:underline cursor-pointer"
+                    >
+                      Reset Teks Standar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Title Header with Dynamic Style */}
+              <h3
+                style={{ fontSize: `${raporConfig.fontSizeJudulRapor || 16}px` }}
+                className={`tracking-wider uppercase text-slate-900 ${
+                  (raporConfig.boldJudulRapor ?? true) ? "font-extrabold" : "font-normal"
+                } ${
+                  (raporConfig.underlineJudulRapor ?? true) ? "underline" : "no-underline"
+                }`}
+              >
                 {raporPrintType === "tengah"
-                  ? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
-                  : "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"}
+                  ? (raporConfig.judulRaporSTS || "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)")
+                  : (raporConfig.judulRaporSAS || "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)")}
               </h3>
-              <p className="text-xs text-slate-600 mt-1 font-medium">
-                Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {raporPrintSemester || profile.semesterAktif}
+              <p
+                style={{ fontSize: `${raporConfig.fontSizeSubjudulRapor || 12}px` }}
+                className={`mt-1 ${
+                  raporConfig.boldSubjudulRapor
+                    ? "font-bold text-slate-800"
+                    : "font-medium text-slate-600"
+                }`}
+              >
+                {raporConfig.subjudulRapor?.trim()
+                  ? raporConfig.subjudulRapor
+                  : `Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${raporPrintSemester || profile.semesterAktif}`}
               </p>
               {raporPrintType === "akhir" && (
                 <div className="mt-2 inline-block px-3 py-1 rounded-full bg-slate-100 text-[10px] text-slate-700 font-medium print:hidden">
@@ -6119,21 +6645,88 @@ export default function NilaiManagementPage() {
                       <span>Simpan / Ekspor PDF</span>
                     </button>
 
-                    {isAdmin && (
+                    <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                        <Type className="h-3 w-3" />
+                        <span>Judul:</span>
+                      </span>
                       <button
                         type="button"
-                        onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                          isRaporSettingsOpen
-                            ? "bg-amber-500 text-white shadow-amber-500/20"
-                            : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
-                        }`}
-                        title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                        onClick={() =>
+                          updateRaporConfig({
+                            fontSizeJudulRapor: Math.max(10, (raporConfig.fontSizeJudulRapor || 16) - 1),
+                          })
+                        }
+                        className="w-5 h-5 rounded bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                        title="Perkecil Font Judul"
                       >
-                        <Sliders className="h-4 w-4" />
-                        <span>Atur Kop & TTD</span>
+                        -
                       </button>
-                    )}
+                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 min-w-[28px] text-center">
+                        {raporConfig.fontSizeJudulRapor || 16}px
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateRaporConfig({
+                            fontSizeJudulRapor: Math.min(32, (raporConfig.fontSizeJudulRapor || 16) + 1),
+                          })
+                        }
+                        className="w-5 h-5 rounded bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                        title="Perbesar Font Judul"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateRaporConfig({
+                            boldJudulRapor: !(raporConfig.boldJudulRapor ?? true),
+                          })
+                        }
+                        className={`px-1.5 py-0.5 rounded font-bold text-xs cursor-pointer transition-all ${
+                          (raporConfig.boldJudulRapor ?? true)
+                            ? "bg-amber-500 text-white font-black"
+                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300"
+                        }`}
+                        title="Tebalkan Huruf Judul (Bold)"
+                      >
+                        <Bold className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateRaporConfig({
+                            underlineJudulRapor: !(raporConfig.underlineJudulRapor ?? true),
+                          })
+                        }
+                        className={`px-1.5 py-0.5 rounded font-bold text-xs cursor-pointer transition-all ${
+                          (raporConfig.underlineJudulRapor ?? true)
+                            ? "bg-amber-500 text-white font-black underline"
+                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300"
+                        }`}
+                        title="Garis Bawah Judul (Underline)"
+                      >
+                        <UnderlineIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveRaporConfigTab("judul");
+                        setIsRaporSettingsOpen(!isRaporSettingsOpen);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                        isRaporSettingsOpen
+                          ? "bg-amber-500 text-white shadow-amber-500/20"
+                          : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                      }`}
+                      title="Kustomisasi Judul, Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                    >
+                      <Sliders className="h-4 w-4" />
+                      <span>Atur Judul & Kop</span>
+                    </button>
                   </>
                 )}
 
@@ -6150,7 +6743,7 @@ export default function NilaiManagementPage() {
             </div>
 
             {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
-            {isAdmin && renderRaporSettingsPanel()}
+            {(isAdmin || isRaporSettingsOpen) && renderRaporSettingsPanel()}
 
             {/* ========================================================= */}
             {/* KONTEN 1: MODE BUNDEL LEMBAR RAPOR PER SISWA (MULTI-PAGE) */}
@@ -6214,13 +6807,41 @@ export default function NilaiManagementPage() {
 
                         {/* Title */}
                         <div className="text-center mb-4">
-                          <h3 className="text-sm font-extrabold underline tracking-wider uppercase text-slate-900">
+                          <h3
+                            style={{
+                              fontSize: `${
+                                raporConfig.fontSizeJudulRapor
+                                  ? Math.max(11, Math.round(raporConfig.fontSizeJudulRapor * 0.92))
+                                  : 14
+                              }px`,
+                            }}
+                            className={`tracking-wider uppercase text-slate-900 ${
+                              (raporConfig.boldJudulRapor ?? true) ? "font-extrabold" : "font-normal"
+                            } ${
+                              (raporConfig.underlineJudulRapor ?? true) ? "underline" : "no-underline"
+                            }`}
+                          >
                             {batchRaporType === "tengah"
-                              ? "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
-                              : "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"}
+                              ? (raporConfig.judulRaporSTS || "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)")
+                              : (raporConfig.judulRaporSAS || "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)")}
                           </h3>
-                          <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
-                            Tahun Ajaran {profile.tahunAjaranAktif} &bull; Semester {batchRaporSemester || profile.semesterAktif}
+                          <p
+                            style={{
+                              fontSize: `${
+                                raporConfig.fontSizeSubjudulRapor
+                                  ? Math.max(10, Math.round(raporConfig.fontSizeSubjudulRapor * 0.92))
+                                  : 11
+                              }px`,
+                            }}
+                            className={`mt-0.5 ${
+                              raporConfig.boldSubjudulRapor
+                                ? "font-bold text-slate-800"
+                                : "font-medium text-slate-600"
+                            }`}
+                          >
+                            {raporConfig.subjudulRapor?.trim()
+                              ? raporConfig.subjudulRapor
+                              : `Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${batchRaporSemester || profile.semesterAktif}`}
                           </p>
                         </div>
 
