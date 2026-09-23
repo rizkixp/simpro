@@ -860,9 +860,27 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         saveState("presensi", data.presensi, true);
       }
       if (Array.isArray(data.nilai)) {
-        setNilaiList(data.nilai);
-        latestDataRef.current.nilaiList = data.nilai;
-        saveState("nilai", data.nilai, true);
+        const localNilai = latestDataRef.current.nilaiList || [];
+        const mergedNilai = [...data.nilai];
+        localNilai.forEach((loc) => {
+          const idx = mergedNilai.findIndex(
+            (rem) =>
+              rem.id === loc.id ||
+              (rem.siswaId === loc.siswaId &&
+                rem.mapel?.trim().toLowerCase() === loc.mapel?.trim().toLowerCase() &&
+                (rem.semester || "Ganjil").trim().toLowerCase() === (loc.semester || "Ganjil").trim().toLowerCase())
+          );
+          if (idx >= 0) {
+            if (loc.hasSts || loc.hasSas || (typeof loc.uts === "number" && loc.uts > 0) || (typeof loc.uas === "number" && loc.uas > 0)) {
+              mergedNilai[idx] = { ...mergedNilai[idx], ...loc };
+            }
+          } else {
+            mergedNilai.push(loc);
+          }
+        });
+        setNilaiList(mergedNilai);
+        latestDataRef.current.nilaiList = mergedNilai;
+        saveState("nilai", mergedNilai, true);
       }
       if (Array.isArray(data.jenisTagihan)) {
         setJenisTagihanList(data.jenisTagihan);
@@ -1465,19 +1483,22 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const toUpsert: NilaiSiswa[] = [];
 
     items.forEach((item, index) => {
-      const existingIndex = item.id
-        ? updated.findIndex((n) => n.id === item.id)
-        : updated.findIndex(
-            (n) =>
-              n.siswaId === item.siswaId &&
-              n.mapel.toLowerCase() === item.mapel.toLowerCase() &&
-              (n.semester || "Ganjil").toLowerCase() === (item.semester || "Ganjil").toLowerCase()
-          );
+      const existingIndex = updated.findIndex((n) => {
+        if (item.id && n.id === item.id) return true;
+        const sameSiswa = n.siswaId === item.siswaId;
+        const sameMapel =
+          n.mapel && item.mapel && n.mapel.trim().toLowerCase() === item.mapel.trim().toLowerCase();
+        const sameSem =
+          (n.semester || "Ganjil").trim().toLowerCase() ===
+          (item.semester || "Ganjil").trim().toLowerCase();
+        return sameSiswa && Boolean(sameMapel) && Boolean(sameSem);
+      });
 
       if (existingIndex >= 0) {
         const merged = {
           ...updated[existingIndex],
           ...item,
+          id: updated[existingIndex].id, // Pertahankan ID asli
         } as NilaiSiswa;
         updated[existingIndex] = merged;
         toUpsert.push(merged);
@@ -1492,6 +1513,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     });
 
     setNilaiList(updated);
+    latestDataRef.current.nilaiList = updated;
     saveState("nilai", updated);
     if (toUpsert.length > 0) {
       persistSupabase(() => SupabaseSchoolService.bulkUpsertNilai(toUpsert));

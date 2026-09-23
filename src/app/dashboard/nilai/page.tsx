@@ -1731,25 +1731,25 @@ export default function NilaiManagementPage() {
         const rec = nilaiList.find(
           (n) =>
             n.siswaId === s.id &&
-            n.mapel.toLowerCase() === m.nama.toLowerCase() &&
-            (n.semester || "Ganjil").toLowerCase() === semesterTarget.toLowerCase()
+            n.mapel?.trim().toLowerCase() === m.nama?.trim().toLowerCase() &&
+            (n.semester || "Ganjil").trim().toLowerCase() === semesterTarget.trim().toLowerCase()
         );
         const key = `${s.id}_${m.nama}`;
         if (rec) {
           if (typeTarget === "tengah") {
             const val =
-              typeof rec.nilaiMid === "number"
-                ? rec.nilaiMid
-                : typeof rec.uts === "number" && rec.uts > 0
+              typeof rec.uts === "number" && rec.uts > 0
                 ? rec.uts
+                : typeof rec.nilaiMid === "number" && rec.nilaiMid > 0
+                ? rec.nilaiMid
                 : "";
             initialScores[key] = val;
           } else {
             const val =
-              typeof rec.nilaiAkhir === "number"
-                ? rec.nilaiAkhir
-                : typeof rec.uas === "number" && rec.uas > 0
+              typeof rec.uas === "number" && rec.uas > 0
                 ? rec.uas
+                : typeof rec.nilaiAkhir === "number" && rec.nilaiAkhir > 0 && rec.hasSas
+                ? rec.nilaiAkhir
                 : "";
             initialScores[key] = val;
           }
@@ -1901,14 +1901,72 @@ export default function NilaiManagementPage() {
       }
 
       const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+      // Deteksi baris header secara dinamis jika file memiliki baris kop/judul di atas tabel (misal baris 1-3)
+      const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(rawRows.length, 12); i++) {
+        const rowStr = (rawRows[i] || []).map((c) => String(c).toLowerCase()).join(" ");
+        if (
+          rowStr.includes("nama") ||
+          rowStr.includes("nisn") ||
+          rowStr.includes("siswa") ||
+          rowStr.includes("peserta didik")
+        ) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, {
+        range: headerRowIndex,
+        defval: "",
+      });
 
       if (jsonData.length === 0) {
-        throw new Error("File Excel kosong atau format baris data tidak terdeteksi.");
+        throw new Error("File Excel kosong atau format tabel nilai tidak terdeteksi.");
       }
 
       let importedScoresCount = 0;
       let matchedStudentsCount = 0;
+
+      const cleanNorm = (str: string) =>
+        String(str || "")
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+
+      const cleanDigits = (str: string) =>
+        String(str || "")
+          .replace(/\D/g, "")
+          .replace(/^0+/, "");
+
+      const IGNORED_COLS = new Set([
+        "no",
+        "nomor",
+        "no.",
+        "nisn",
+        "nis",
+        "noinduk",
+        "nomorinduk",
+        "nama",
+        "namasiswa",
+        "namapesertadidik",
+        "siswa",
+        "pesertadidik",
+        "kelas",
+        "rombel",
+        "peringkat",
+        "rank",
+        "total",
+        "ratarata",
+        "rata2",
+        "status",
+        "kkm",
+        "predikat",
+        "keterangan",
+        "aksi",
+      ]);
 
       const updatedScores: Record<string, string | number> = {
         ...legerInputScores,
@@ -1917,27 +1975,43 @@ export default function NilaiManagementPage() {
       jsonData.forEach((row) => {
         const rowKeys = Object.keys(row);
         const nisnKey = rowKeys.find((k) => {
-          const clean = k.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-          return clean === "nisn" || clean === "nis" || clean === "noinduk" || clean === "nomorinduk";
+          const norm = cleanNorm(k);
+          return norm === "nisn" || norm === "nis" || norm === "noinduk" || norm === "nomorinduk";
         });
         const namaKey = rowKeys.find((k) => {
-          const clean = k.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+          const norm = cleanNorm(k);
           return (
-            clean === "namasiswa" ||
-            clean === "nama" ||
-            clean === "namapesertadidik" ||
-            clean === "siswa" ||
-            clean === "pesertadidik"
+            norm === "namasiswa" ||
+            norm === "nama" ||
+            norm === "namapesertadidik" ||
+            norm === "siswa" ||
+            norm === "pesertadidik" ||
+            norm.includes("namasiswa")
           );
         });
 
         const rawNisn = nisnKey ? String(row[nisnKey]).trim() : "";
-        const rawNama = namaKey ? String(row[namaKey]).trim().toLowerCase() : "";
+        const rawNama = namaKey ? String(row[namaKey]).trim() : "";
 
         // Cari siswa yang cocok di batchStudents
         const student = batchStudents.find((s) => {
-          if (rawNisn && s.nisn && s.nisn.trim() === rawNisn) return true;
-          if (rawNama && s.nama.trim().toLowerCase() === rawNama) return true;
+          // 1. Cek NISN
+          if (rawNisn && s.nisn) {
+            const rawNisnClean = cleanDigits(rawNisn);
+            const sNisnClean = cleanDigits(s.nisn);
+            if (rawNisnClean.length >= 3 && rawNisnClean === sNisnClean) return true;
+            if (rawNisn.trim() === s.nisn.trim()) return true;
+          }
+
+          // 2. Cek Nama Siswa (case-insensitive & whitespace tolerant)
+          if (rawNama) {
+            const sNamaNorm = cleanNorm(s.nama);
+            const rowNamaNorm = cleanNorm(rawNama);
+            if (sNamaNorm === rowNamaNorm) return true;
+            if (sNamaNorm.length >= 4 && rowNamaNorm.length >= 4) {
+              if (sNamaNorm.includes(rowNamaNorm) || rowNamaNorm.includes(sNamaNorm)) return true;
+            }
+          }
           return false;
         });
 
@@ -1946,16 +2020,34 @@ export default function NilaiManagementPage() {
 
         // Cocokkan setiap mata pelajaran di currentLegerMapelList
         currentLegerMapelList.forEach((m) => {
-          const mapelNorm = m.nama.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+          const mapelNorm = cleanNorm(m.nama);
 
+          // Cari kolom di Excel yang bukan metadata dan cocok dengan mapel
           const matchedColKey = rowKeys.find((k) => {
-            const colNorm = k.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-            return (
-              colNorm === mapelNorm ||
-              colNorm.startsWith(mapelNorm) ||
-              colNorm.includes(mapelNorm) ||
-              mapelNorm.includes(colNorm)
-            );
+            const colNorm = cleanNorm(k.replace(/\(.*?\)/g, ""));
+            if (!colNorm || IGNORED_COLS.has(colNorm)) return false;
+
+            if (colNorm === mapelNorm) return true;
+
+            // Alias & singkatan umum pelajaran
+            if (mapelNorm.includes("agama") && (colNorm === "pai" || colNorm === "agama" || colNorm === "agamaislam")) return true;
+            if (mapelNorm.includes("matematika") && (colNorm === "mtk" || colNorm === "math")) return true;
+            if (mapelNorm.includes("bahasaindonesia") && (colNorm === "bindonesia" || colNorm === "bindo" || colNorm === "bi")) return true;
+            if (mapelNorm.includes("bahasainggris") && (colNorm === "binggris" || colNorm === "bing")) return true;
+            if (mapelNorm.includes("bahasaarab") && (colNorm === "barab" || colNorm === "arab")) return true;
+            if (mapelNorm.includes("jasmani") && (colNorm === "pjok" || colNorm === "penjas" || colNorm === "olahraga")) return true;
+            if (mapelNorm.includes("pancasila") && (colNorm === "pkn" || colNorm === "ppkn")) return true;
+            if (mapelNorm.includes("alam") && (colNorm === "ipa" || colNorm === "ipas")) return true;
+            if (mapelNorm.includes("sosial") && (colNorm === "ips")) return true;
+            if (mapelNorm.includes("seni") && (colNorm === "sbdp" || colNorm === "senirupa" || colNorm === "senibudaya")) return true;
+            if (mapelNorm.includes("quran") && (colNorm === "alquran" || colNorm === "quran")) return true;
+            if (mapelNorm.includes("fikih") && (colNorm === "fiqih")) return true;
+
+            // Partial match jika panjang nama kolom >= 4 karakter
+            if (colNorm.length >= 4 && mapelNorm.length >= 4) {
+              if (colNorm.includes(mapelNorm) || mapelNorm.includes(colNorm)) return true;
+            }
+            return false;
           });
 
           if (matchedColKey !== undefined) {
@@ -1978,10 +2070,16 @@ export default function NilaiManagementPage() {
         );
       }
 
+      if (importedScoresCount === 0) {
+        throw new Error(
+          `Siswa (${matchedStudentsCount} anak) berhasil dikenali, namun tidak ada nilai angka (0-100) yang terdeteksi di kolom mata pelajaran. Pastikan kolom mata pelajaran sesuai dengan mapel kelas ini.`
+        );
+      }
+
       setLegerInputScores(updatedScores);
       setNotification({
         type: "success",
-        message: `Berhasil mengimpor nilai untuk ${matchedStudentsCount} siswa (${importedScoresCount} nilai mata pelajaran). Periksa nilai pada tabel dan klik "Simpan Nilai Leger" untuk menyimpan ke database.`,
+        message: `Berhasil mengimpor nilai untuk ${matchedStudentsCount} siswa (${importedScoresCount} nilai mata pelajaran). Periksa nilai pada tabel dan klik "Simpan Nilai Leger" untuk menyimpan ke sistem.`,
       });
     } catch (err: any) {
       setNotification({
@@ -1999,7 +2097,7 @@ export default function NilaiManagementPage() {
   const handleSaveLegerScores = async () => {
     setIsLegerSaving(true);
     try {
-      const itemsToSave: NilaiSiswa[] = [];
+      const itemsToSave: (Omit<NilaiSiswa, "id"> & { id?: string })[] = [];
 
       batchStudents.forEach((s) => {
         currentLegerMapelList.forEach((m) => {
@@ -2009,19 +2107,17 @@ export default function NilaiManagementPage() {
           const existing = nilaiList.find(
             (n) =>
               n.siswaId === s.id &&
-              n.mapel.toLowerCase() === m.nama.toLowerCase() &&
-              (n.semester || "Ganjil").toLowerCase() === batchRaporSemester.toLowerCase()
+              n.mapel?.trim().toLowerCase() === m.nama?.trim().toLowerCase() &&
+              (n.semester || "Ganjil").trim().toLowerCase() === batchRaporSemester.trim().toLowerCase()
           );
 
           if (rawVal !== "" && rawVal !== undefined) {
-            const numVal = Number(rawVal) || 0;
-            if (numVal > 0 || existing) {
+            const numVal = Number(rawVal);
+            if (!isNaN(numVal) && numVal >= 0 && numVal <= 100) {
               if (batchRaporType === "tengah") {
                 const { nilaiMid, predikatMid } = calculateMidGrade(numVal);
                 itemsToSave.push({
-                  id: existing
-                    ? existing.id
-                    : `nilai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${s.id}-${m.id}`,
+                  id: existing?.id,
                   siswaId: s.id,
                   siswaNama: s.nama,
                   nisn: s.nisn,
@@ -2054,9 +2150,7 @@ export default function NilaiManagementPage() {
                   numVal
                 );
                 itemsToSave.push({
-                  id: existing
-                    ? existing.id
-                    : `nilai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${s.id}-${m.id}`,
+                  id: existing?.id,
                   siswaId: s.id,
                   siswaNama: s.nama,
                   nisn: s.nisn,
@@ -2086,10 +2180,19 @@ export default function NilaiManagementPage() {
       });
 
       if (itemsToSave.length > 0) {
-        await bulkSaveNilai(itemsToSave);
+        bulkSaveNilai(itemsToSave);
+
+        // Update state legerInputScores agar nilai tetap ada di tabel setelah tombol simpan diklik
+        const updatedInitial: Record<string, string | number> = { ...legerInputScores };
+        itemsToSave.forEach((item) => {
+          const val = (batchRaporType === "tengah" ? item.uts : item.uas) ?? "";
+          updatedInitial[`${item.siswaId}_${item.mapel}`] = val;
+        });
+        setLegerInputScores(updatedInitial);
+
         setNotification({
           type: "success",
-          message: `Berhasil menyimpan ${itemsToSave.length} rekaman nilai dari Leger untuk ${batchStudents.length} siswa Kelas ${batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas} (${batchRaporType === "tengah" ? "STS" : "SAS"} - Semester ${batchRaporSemester})!`,
+          message: `Berhasil menyimpan ${itemsToSave.length} rekaman nilai dari Leger untuk ${batchStudents.length} siswa Kelas ${batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas} (${batchRaporType === "tengah" ? "STS" : "SAS"} - Semester ${batchRaporSemester})! Data telah tersimpan di sistem.`,
         });
       } else {
         setNotification({
