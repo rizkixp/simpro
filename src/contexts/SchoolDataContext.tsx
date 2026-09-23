@@ -865,34 +865,98 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         });
       }
       if (Array.isArray(data.siswa)) {
-        setSiswaList(data.siswa);
-        latestDataRef.current.siswaList = data.siswa;
-        saveState("siswa", data.siswa, true);
+        const localSiswa = latestDataRef.current.siswaList || [];
+        const remoteSiswa = data.siswa;
+        const mergedSiswa = [...remoteSiswa];
+        localSiswa.forEach((loc) => {
+          const exists = mergedSiswa.some(
+            (rem) => rem.id === loc.id || (Boolean(loc.nisn?.trim()) && Boolean(rem.nisn?.trim()) && rem.nisn.trim() === loc.nisn.trim())
+          );
+          if (!exists) {
+            mergedSiswa.push(loc);
+          }
+        });
+        setSiswaList(mergedSiswa);
+        latestDataRef.current.siswaList = mergedSiswa;
+        saveState("siswa", mergedSiswa, true);
       }
       if (Array.isArray(data.guru)) {
-        setGuruList(data.guru);
-        latestDataRef.current.guruList = data.guru;
-        saveState("guru", data.guru, true);
+        const localGuru = latestDataRef.current.guruList || [];
+        const remoteGuru = data.guru;
+        const mergedGuru = [...remoteGuru];
+        localGuru.forEach((loc) => {
+          const exists = mergedGuru.some(
+            (rem) => rem.id === loc.id || (Boolean(loc.nip?.trim()) && Boolean(rem.nip?.trim()) && rem.nip.trim() === loc.nip.trim())
+          );
+          if (!exists) {
+            mergedGuru.push(loc);
+          }
+        });
+        setGuruList(mergedGuru);
+        latestDataRef.current.guruList = mergedGuru;
+        saveState("guru", mergedGuru, true);
       }
       if (Array.isArray(data.kelas)) {
-        setKelasList(data.kelas);
-        latestDataRef.current.kelasList = data.kelas;
-        saveState("kelas", data.kelas, true);
+        const localKelas = latestDataRef.current.kelasList || [];
+        const remoteKelas = data.kelas;
+        const mergedKelas = [...remoteKelas];
+        localKelas.forEach((loc) => {
+          const exists = mergedKelas.some(
+            (rem) => rem.id === loc.id || (Boolean(rem.nama) && Boolean(loc.nama) && rem.nama.toLowerCase().trim() === loc.nama.toLowerCase().trim())
+          );
+          if (!exists) {
+            mergedKelas.push(loc);
+          }
+        });
+        setKelasList(mergedKelas);
+        latestDataRef.current.kelasList = mergedKelas;
+        saveState("kelas", mergedKelas, true);
       }
       if (Array.isArray(data.mapel)) {
-        setMapelList(data.mapel);
-        latestDataRef.current.mapelList = data.mapel;
-        saveState("mapel", data.mapel, true);
+        const localMapel = latestDataRef.current.mapelList || [];
+        const remoteMapel = data.mapel;
+        const mergedMapel = [...remoteMapel];
+        localMapel.forEach((loc) => {
+          const exists = mergedMapel.some(
+            (rem) => rem.id === loc.id || (Boolean(rem.nama) && Boolean(loc.nama) && rem.nama.toLowerCase().trim() === loc.nama.toLowerCase().trim())
+          );
+          if (!exists) {
+            mergedMapel.push(loc);
+          }
+        });
+        setMapelList(mergedMapel);
+        latestDataRef.current.mapelList = mergedMapel;
+        saveState("mapel", mergedMapel, true);
       }
       if (Array.isArray(data.jadwal)) {
-        setJadwalList(data.jadwal);
-        latestDataRef.current.jadwalList = data.jadwal;
-        saveState("jadwal", data.jadwal, true);
+        const localJadwal = latestDataRef.current.jadwalList || [];
+        const remoteJadwal = data.jadwal;
+        const mergedJadwal = [...remoteJadwal];
+        localJadwal.forEach((loc) => {
+          const exists = mergedJadwal.some((rem) => rem.id === loc.id);
+          if (!exists) {
+            mergedJadwal.push(loc);
+          }
+        });
+        setJadwalList(mergedJadwal);
+        latestDataRef.current.jadwalList = mergedJadwal;
+        saveState("jadwal", mergedJadwal, true);
       }
       if (Array.isArray(data.presensi)) {
-        setPresensiList(data.presensi);
-        latestDataRef.current.presensiList = data.presensi;
-        saveState("presensi", data.presensi, true);
+        const localPresensi = latestDataRef.current.presensiList || [];
+        const remotePresensi = data.presensi;
+        const mergedPresensi = [...remotePresensi];
+        localPresensi.forEach((loc) => {
+          const exists = mergedPresensi.some(
+            (rem) => rem.id === loc.id || (rem.siswaId === loc.siswaId && rem.tanggal === loc.tanggal)
+          );
+          if (!exists) {
+            mergedPresensi.push(loc);
+          }
+        });
+        setPresensiList(mergedPresensi);
+        latestDataRef.current.presensiList = mergedPresensi;
+        saveState("presensi", mergedPresensi, true);
       }
       if (Array.isArray(data.nilai)) {
         const localNilai = latestDataRef.current.nilaiList || [];
@@ -1089,7 +1153,11 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       const updated = [...created, ...prev];
       latestDataRef.current.siswaList = updated;
       saveState("siswa", updated);
-      persistSupabase(() => SupabaseSchoolService.bulkUpsertSiswa(created));
+      if (SupabaseSchoolService.isConfigured()) {
+        SupabaseSchoolService.bulkUpsertSiswa(created).catch((err) => {
+          console.warn("[Supabase] Import siswa persistence warning:", err);
+        });
+      }
       return updated;
     });
   };

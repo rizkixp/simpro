@@ -353,7 +353,7 @@ export const SupabaseSchoolService = {
     if (!client) return false;
     const { error } = await client.from("siswa").upsert({
       id: siswa.id,
-      nisn: siswa.nisn,
+      nisn: siswa.nisn?.trim() ? siswa.nisn.trim() : null,
       nama: siswa.nama,
       jenis_kelamin: siswa.jenisKelamin,
       kelas: siswa.kelas,
@@ -366,6 +366,9 @@ export const SupabaseSchoolService = {
       status: siswa.status,
       avatar: siswa.avatar,
     });
+    if (error) {
+      console.error("[Supabase] upsertSiswa error:", error);
+    }
     return !error;
   },
 
@@ -374,7 +377,7 @@ export const SupabaseSchoolService = {
     if (!client || items.length === 0) return false;
     const payload = items.map((siswa) => ({
       id: siswa.id,
-      nisn: siswa.nisn,
+      nisn: siswa.nisn?.trim() ? siswa.nisn.trim() : null,
       nama: siswa.nama,
       jenis_kelamin: siswa.jenisKelamin,
       kelas: siswa.kelas,
@@ -388,6 +391,9 @@ export const SupabaseSchoolService = {
       avatar: siswa.avatar,
     }));
     const { error } = await client.from("siswa").upsert(payload);
+    if (error) {
+      console.error("[Supabase] bulkUpsertSiswa error:", error);
+    }
     return !error;
   },
 

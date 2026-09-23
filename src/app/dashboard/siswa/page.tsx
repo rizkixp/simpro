@@ -40,7 +40,7 @@ import {
 export default function SiswaManagementPage() {
   const { user } = useAuth();
   const teacherScope = useTeacherScope();
-  const { siswaList, addSiswa, importSiswaList, updateSiswa, deleteSiswa, bulkDeleteSiswa, kelasList, profile } = useSchoolData();
+  const { siswaList, addSiswa, importSiswaList, updateSiswa, deleteSiswa, bulkDeleteSiswa, kelasList, profile, syncWithSupabase, isSyncing, isSupabaseConnected } = useSchoolData();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedKelas, setSelectedKelas] = useState("Semua");
@@ -610,6 +610,27 @@ export default function SiswaManagementPage() {
           >
             <Download className="h-4 w-4" />
             <span>Ekspor CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await syncWithSupabase();
+                setImportNotice({
+                  type: "success",
+                  text: "Sinkronisasi data siswa dengan Supabase Cloud berhasil!",
+                });
+              } catch (e: any) {
+                alert(e.message || "Gagal sinkronisasi data cloud.");
+              }
+            }}
+            disabled={isSyncing}
+            className="px-3.5 py-2 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 text-xs font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-60 cursor-pointer"
+            title="Tarik & sinkronkan data siswa dengan Supabase Cloud"
+          >
+            <UploadCloud className={`h-4 w-4 text-emerald-600 dark:text-emerald-400 ${isSyncing ? "animate-pulse" : ""}`} />
+            <span>{isSyncing ? "Menyinkronkan..." : "Sinkron Cloud"}</span>
           </button>
 
           <button
