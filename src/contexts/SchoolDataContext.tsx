@@ -444,6 +444,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         localStorage.setItem("sim_data_siswa", JSON.stringify(sanitizedSiswa));
       }
       setSiswaList(sanitizedSiswa);
+      latestDataRef.current.siswaList = sanitizedSiswa;
       const loadedGuru = load("guru", INITIAL_GURU);
       const baseGuruList = loadedGuru && loadedGuru.length > 0 ? loadedGuru : INITIAL_GURU;
       const sanitizedGuru = baseGuruList.map((g: any) => ({
