@@ -42,6 +42,7 @@ const TABLES_TO_PULL = [
   "mata_pelajaran",
   "jadwal_pelajaran",
   "presensi",
+  "nilai_siswa",
   "jenis_tagihan",
   "tagihan_siswa",
   "tabungan_siswa",

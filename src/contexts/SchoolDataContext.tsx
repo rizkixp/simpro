@@ -348,6 +348,7 @@ interface SchoolDataContextType {
     options?: { syncToCloud?: boolean }
   ) => Promise<{ success: boolean; message: string; counts?: Record<string, number> }>;
   clearAllDatabase: (options?: { syncToCloud?: boolean }) => Promise<void>;
+  clearNilaiDanSpp: () => Promise<void>;
 }
 
 
@@ -729,11 +730,23 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           localStorage.setItem(ipasCleanMigrationKey, "true");
           localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
         }
+        // Migration: Kosongkan database Rekap Nilai Siswa dan Tagihan SPP
+        const clearNilaiSppMigrationKey = "sim_data_nilai_spp_cleared_v1";
+        const needsNilaiSppReset = typeof window !== "undefined" && localStorage.getItem(clearNilaiSppMigrationKey) !== "true";
+        if (needsNilaiSppReset) {
+          mergedNilai = [];
+          localStorage.setItem("sim_data_nilai", JSON.stringify([]));
+        }
         setNilaiList(mergedNilai);
 
         // 9. SPP & Jenis Tagihan
         const rawSpp = localStorage.getItem("sim_data_spp");
-        const loadedSpp: TagihanSiswa[] = (rawSpp !== null ? (JSON.parse(rawSpp) || []) : INITIAL_SPP).filter((s: any) => !deletedIds.has(s.id));
+        let loadedSpp: TagihanSiswa[] = (rawSpp !== null ? (JSON.parse(rawSpp) || []) : INITIAL_SPP).filter((s: any) => !deletedIds.has(s.id));
+        if (needsNilaiSppReset) {
+          loadedSpp = [];
+          localStorage.setItem("sim_data_spp", JSON.stringify([]));
+          localStorage.setItem(clearNilaiSppMigrationKey, "true");
+        }
         setSppList(loadedSpp);
 
         const rawJenisTagihan = localStorage.getItem("sim_data_jenis_tagihan");
@@ -3404,6 +3417,39 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
+  const clearNilaiDanSpp = async (): Promise<void> => {
+    // 1. Update in-memory state
+    setNilaiList([]);
+    setSppList([]);
+    latestDataRef.current = {
+      ...latestDataRef.current,
+      nilaiList: [],
+      sppList: [],
+    };
+
+    // 2. Persist to LocalStorage
+    saveState("nilai", []);
+    saveState("spp", []);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sim_data_nilai", JSON.stringify([]));
+      localStorage.setItem("sim_data_spp", JSON.stringify([]));
+      localStorage.setItem("sim_data_nilai_spp_cleared_v1", "true");
+    }
+
+    // 3. Delete from Supabase Cloud if configured
+    if (SupabaseSchoolService.isConfigured()) {
+      try {
+        const client = (await import("@/lib/supabase/client")).getSupabaseBrowserClient();
+        if (client) {
+          await client.from("nilai_siswa").delete().neq("id", "___none___");
+          await client.from("tagihan_siswa").delete().neq("id", "___none___");
+        }
+      } catch (err) {
+        console.warn("Gagal mengosongkan nilai & tagihan di Supabase:", err);
+      }
+    }
+  };
+
   // ==================== BACKUP & RESTORE DATABASE ====================
   const exportDatabaseBackup = (options?: {
     exportedBy?: string;
@@ -3908,6 +3954,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         exportDatabaseBackup,
         importDatabaseBackup,
         clearAllDatabase,
+        clearNilaiDanSpp,
       }}
 
 

@@ -58,6 +58,10 @@ import {
   ChevronUp,
   ChevronDown,
   ArrowUpDown,
+  Eye,
+  School,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -309,23 +313,35 @@ export default function NilaiManagementPage() {
 
   // Konfigurasi Kustomisasi Kop Surat, Judul, & Titimangsa Rapor
   interface RaporConfig {
+    // 1. Kop Surat
+    tampilkanKop?: boolean;
     logoKiriUrl: string;
     logoKananUrl: string;
     yayasanNama: string;
     namaSekolah: string;
     npsnAkreditasi: string;
     alamatKontak: string;
-    garisKop: "double" | "single";
+    garisKop: "double" | "single" | "none";
     ukuranFontKop?: "sm" | "md" | "lg";
     fontSizeBaris1?: number;
     fontSizeBaris2?: number;
     fontSizeBaris3?: number;
     fontSizeBaris4?: number;
     ukuranLogoKop?: "sm" | "md" | "lg" | "xl";
+
+    // 2. Alamat & Titimangsa Tanggal
     tempatRapor: string;
     tanggalRapor: string;
+    tanggalRaporSTS?: string;
+    tanggalRaporSAS?: string;
+    labelKepalaSekolah?: string;
+    customKepalaSekolah?: string;
+    nipKepalaSekolah?: string;
+    showTtdKepsek?: boolean;
+    showTtdWali?: boolean;
+    showTtdOrtu?: boolean;
 
-    // Kustomisasi Judul & Format Huruf Rapor
+    // 3. Judul & Format Huruf Rapor
     judulRaporSTS?: string;
     judulRaporSAS?: string;
     subjudulRapor?: string;
@@ -335,11 +351,22 @@ export default function NilaiManagementPage() {
     fontSizeSubjudulRapor?: number;
     boldSubjudulRapor?: boolean;
 
-    // Kustomisasi Urutan Mata Pelajaran Rapor
+    // 4. Format & Pengaturan Rapor Lainnya (Font Size, Spacing, Columns)
+    fontFamilyRapor?: "sans" | "serif" | "mono";
+    fontSizeTabelNilai?: number;
+    fontSizeIdentitas?: number;
+    paddingTabel?: "kompak" | "sedang" | "longgar";
+    showKkm?: boolean;
+    showPredikat?: boolean;
+    showCatatanGuru?: boolean;
+    showPresensi?: boolean;
+
+    // 5. Kustomisasi Urutan Mata Pelajaran Rapor
     customMapelOrder?: string[];
   }
 
   const getDefaultRaporConfig = (): RaporConfig => ({
+    tampilkanKop: true,
     logoKiriUrl: "",
     logoKananUrl: "",
     yayasanNama: "YAYASAN PENDIDIKAN ISLAM TERPADU",
@@ -353,8 +380,17 @@ export default function NilaiManagementPage() {
     fontSizeBaris3: 16,
     fontSizeBaris4: 11,
     ukuranLogoKop: "lg",
+
     tempatRapor: "Jakarta",
     tanggalRapor: formatDateIndo(new Date().toISOString().split("T")[0]),
+    tanggalRaporSTS: formatDateIndo(new Date().toISOString().split("T")[0]),
+    tanggalRaporSAS: formatDateIndo(new Date().toISOString().split("T")[0]),
+    labelKepalaSekolah: "Kepala Sekolah",
+    customKepalaSekolah: "",
+    nipKepalaSekolah: "",
+    showTtdKepsek: true,
+    showTtdWali: true,
+    showTtdOrtu: true,
 
     // Judul & Teks Rapor Default
     judulRaporSTS: "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)",
@@ -366,6 +402,15 @@ export default function NilaiManagementPage() {
     fontSizeSubjudulRapor: 12,
     boldSubjudulRapor: false,
 
+    fontFamilyRapor: "sans",
+    fontSizeTabelNilai: 11,
+    fontSizeIdentitas: 12,
+    paddingTabel: "sedang",
+    showKkm: true,
+    showPredikat: true,
+    showCatatanGuru: true,
+    showPresensi: true,
+
     // Urutan Mata Pelajaran Default
     customMapelOrder: [],
   });
@@ -374,6 +419,16 @@ export default function NilaiManagementPage() {
   const [isRaporSettingsOpen, setIsRaporSettingsOpen] = useState(false);
   const [activeRaporConfigTab, setActiveRaporConfigTab] = useState<"kop" | "titimangsa" | "judul" | "urutan">("kop");
   const [isInlineTitleEdit, setIsInlineTitleEdit] = useState(false);
+
+  // State untuk Modal Khusus Format Rapor & Live Preview
+  const [isFormatRaporModalOpen, setIsFormatRaporModalOpen] = useState(false);
+  const [formatRaporActiveTab, setFormatRaporActiveTab] = useState<"kop" | "judul" | "titimangsa" | "format" | "urutan">("kop");
+  const [formatPreviewType, setFormatPreviewType] = useState<"tengah" | "akhir">("tengah");
+  const [formatPreviewSemester, setFormatPreviewSemester] = useState<"Ganjil" | "Genap">("Ganjil");
+  const [formatPreviewSource, setFormatPreviewSource] = useState<"demo" | "siswa">("demo");
+  const [formatPreviewSelectedSiswaId, setFormatPreviewSelectedSiswaId] = useState<string>("");
+  const [formatPreviewZoom, setFormatPreviewZoom] = useState<number>(100);
+  const [formatSaveToast, setFormatSaveToast] = useState(false);
 
   // Load saved rapor config from localStorage
   useEffect(() => {
@@ -384,6 +439,8 @@ export default function NilaiManagementPage() {
         setRaporConfig((prev) => ({
           ...prev,
           ...parsed,
+          tampilkanKop: parsed.tampilkanKop ?? prev.tampilkanKop ?? true,
+          garisKop: parsed.garisKop || prev.garisKop || "double",
           ukuranFontKop: parsed.ukuranFontKop || prev.ukuranFontKop || "md",
           fontSizeBaris1: parsed.fontSizeBaris1 || prev.fontSizeBaris1 || 16,
           fontSizeBaris2: parsed.fontSizeBaris2 || prev.fontSizeBaris2 || 16,
@@ -391,6 +448,16 @@ export default function NilaiManagementPage() {
           fontSizeBaris4: parsed.fontSizeBaris4 || prev.fontSizeBaris4 || 11,
           ukuranLogoKop: parsed.ukuranLogoKop || prev.ukuranLogoKop || "lg",
           namaSekolah: parsed.namaSekolah || profile?.namaSekolah || prev.namaSekolah,
+          tempatRapor: parsed.tempatRapor || prev.tempatRapor || "Jakarta",
+          tanggalRapor: parsed.tanggalRapor || prev.tanggalRapor,
+          tanggalRaporSTS: parsed.tanggalRaporSTS || prev.tanggalRaporSTS || prev.tanggalRapor,
+          tanggalRaporSAS: parsed.tanggalRaporSAS || prev.tanggalRaporSAS || prev.tanggalRapor,
+          labelKepalaSekolah: parsed.labelKepalaSekolah || prev.labelKepalaSekolah || "Kepala Sekolah",
+          customKepalaSekolah: parsed.customKepalaSekolah ?? prev.customKepalaSekolah ?? "",
+          nipKepalaSekolah: parsed.nipKepalaSekolah ?? prev.nipKepalaSekolah ?? "",
+          showTtdKepsek: parsed.showTtdKepsek ?? prev.showTtdKepsek ?? true,
+          showTtdWali: parsed.showTtdWali ?? prev.showTtdWali ?? true,
+          showTtdOrtu: parsed.showTtdOrtu ?? prev.showTtdOrtu ?? true,
           judulRaporSTS: parsed.judulRaporSTS ?? prev.judulRaporSTS,
           judulRaporSAS: parsed.judulRaporSAS ?? prev.judulRaporSAS,
           subjudulRapor: parsed.subjudulRapor ?? prev.subjudulRapor,
@@ -399,6 +466,14 @@ export default function NilaiManagementPage() {
           underlineJudulRapor: parsed.underlineJudulRapor ?? prev.underlineJudulRapor ?? true,
           fontSizeSubjudulRapor: parsed.fontSizeSubjudulRapor ?? prev.fontSizeSubjudulRapor ?? 12,
           boldSubjudulRapor: parsed.boldSubjudulRapor ?? prev.boldSubjudulRapor ?? false,
+          fontFamilyRapor: parsed.fontFamilyRapor || prev.fontFamilyRapor || "sans",
+          fontSizeTabelNilai: parsed.fontSizeTabelNilai || prev.fontSizeTabelNilai || 11,
+          fontSizeIdentitas: parsed.fontSizeIdentitas || prev.fontSizeIdentitas || 12,
+          paddingTabel: parsed.paddingTabel || prev.paddingTabel || "sedang",
+          showKkm: parsed.showKkm ?? prev.showKkm ?? true,
+          showPredikat: parsed.showPredikat ?? prev.showPredikat ?? true,
+          showCatatanGuru: parsed.showCatatanGuru ?? prev.showCatatanGuru ?? true,
+          showPresensi: parsed.showPresensi ?? prev.showPresensi ?? true,
           customMapelOrder: Array.isArray(parsed.customMapelOrder)
             ? parsed.customMapelOrder
             : prev.customMapelOrder || [],
@@ -527,6 +602,99 @@ export default function NilaiManagementPage() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  // Close Format Rapor modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFormatRaporModalOpen) {
+        setIsFormatRaporModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFormatRaporModalOpen]);
+
+  // Handle printing directly from format preview paper
+  const handlePrintFormatRapor = () => {
+    const previewEl = document.getElementById("format-rapor-preview-paper");
+    if (!previewEl) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    const fontCss =
+      raporConfig.fontFamilyRapor === "serif"
+        ? "font-family: 'Times New Roman', Times, serif;"
+        : raporConfig.fontFamilyRapor === "mono"
+        ? "font-family: 'Courier New', Courier, monospace;"
+        : "font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;";
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Pratinjau Format Rapor - SIMPRO</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm 12mm;
+            }
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              padding: 0;
+              color: #000;
+              background: #fff;
+              ${fontCss}
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .rapor-print-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 12px;
+            }
+            .rapor-print-table th, .rapor-print-table td {
+              border: 1px solid #000000;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: bold; }
+            .uppercase { text-transform: uppercase; }
+            .underline { text-decoration: underline; }
+            .flex { display: flex; }
+            .items-center { align-items: center; }
+            .justify-between { justify-content: space-between; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .gap-4 { gap: 1rem; }
+            .mt-1 { margin-top: 0.25rem; }
+            .mb-1 { margin-bottom: 0.25rem; }
+            .mb-2 { margin-bottom: 0.5rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .pt-6 { padding-top: 1.5rem; }
+            .h-16 { height: 4rem; }
+          </style>
+        </head>
+        <body>
+          <div style="padding: 12px;">
+            ${previewEl.innerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 400);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const renderRaporSettingsPanel = () => {
@@ -1466,7 +1634,10 @@ export default function NilaiManagementPage() {
   };
 
   const renderOfficialLetterhead = (isSmall = false) => {
+    if (raporConfig.tampilkanKop === false) return null;
+
     const isDouble = raporConfig.garisKop === "double";
+    const isNone = raporConfig.garisKop === "none";
 
     // Ukuran Font Khusus Masing-masing Baris Kop
     const fSize1 = isSmall
@@ -1495,7 +1666,9 @@ export default function NilaiManagementPage() {
     return (
       <div
         className={`text-center pb-3 mb-4 ${
-          isDouble
+          isNone
+            ? ""
+            : isDouble
             ? "border-b-4 border-double border-[#000000]"
             : "border-b-2 border-[#000000]"
         }`}
@@ -3400,6 +3573,17 @@ export default function NilaiManagementPage() {
         >
           <Layers className="h-4 w-4" />
           <span>Rekap Komponen Lengkap</span>
+        </button>
+
+        {/* Tombol Khusus Format Rapor & Live Preview */}
+        <button
+          type="button"
+          onClick={() => setIsFormatRaporModalOpen(true)}
+          className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-md shadow-amber-500/20 active:scale-95 border border-amber-600 ml-auto sm:ml-0"
+          title="Pengaturan Format Cetak Rapor & Pratinjau Langsung (Live Preview)"
+        >
+          <Sliders className="h-4 w-4 text-white" />
+          <span>Format Rapor</span>
         </button>
       </div>
 
@@ -6674,40 +6858,66 @@ export default function NilaiManagementPage() {
                 matchedKelasObj?.waliKelasNama ||
                 (teacherScope.isTeacher ? teacherScope.teacherName : "Wali Kelas");
 
+              const tglCetak =
+                raporPrintType === "tengah"
+                  ? (raporConfig.tanggalRaporSTS || raporConfig.tanggalRapor)
+                  : (raporConfig.tanggalRaporSAS || raporConfig.tanggalRapor);
+              const kepsekNama =
+                raporConfig.customKepalaSekolah?.trim() || profile.kepalaSekolah;
+              const kepsekLabel =
+                raporConfig.labelKepalaSekolah?.trim() || "Kepala Sekolah";
+
               return (
                 <div className="pt-6 border-0 border-none text-xs">
                   {/* Titimangsa Alamat dan Tanggal Rapor */}
                   <div className="flex justify-end mb-2 pr-4">
                     <p className="text-slate-800 font-medium">
-                      {raporConfig.tempatRapor}, {raporConfig.tanggalRapor}
+                      {raporConfig.tempatRapor}, {tglCetak}
                     </p>
                   </div>
 
                   <div className="grid grid-cols-3 text-center gap-4">
                     {/* Kolom 1: Kepala Sekolah */}
                     <div>
-                      <p className="text-slate-600">Mengetahui,</p>
-                      <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
-                      <div className="h-16" />
-                      <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                      {raporConfig.showTtdKepsek !== false && (
+                        <>
+                          <p className="text-slate-600">Mengetahui,</p>
+                          <p className="text-slate-800 font-medium">{kepsekLabel},</p>
+                          <div className="h-16" />
+                          <p className="font-bold underline">{kepsekNama}</p>
+                          {raporConfig.nipKepalaSekolah && (
+                            <p className="text-[10px] text-slate-600 mt-0.5">
+                              NIP. {raporConfig.nipKepalaSekolah}
+                            </p>
+                          )}
+                        </>
+                      )}
                     </div>
 
                     {/* Kolom 2: Wali Kelas */}
                     <div>
-                      <p className="text-slate-600 invisible">Mengetahui,</p>
-                      <p className="text-slate-800 font-medium">Wali Kelas,</p>
-                      <div className="h-16" />
-                      <p className="font-bold underline">{waliNama}</p>
+                      {raporConfig.showTtdWali !== false && (
+                        <>
+                          <p className="text-slate-600 invisible">Mengetahui,</p>
+                          <p className="text-slate-800 font-medium">Wali Kelas,</p>
+                          <div className="h-16" />
+                          <p className="font-bold underline">{waliNama}</p>
+                        </>
+                      )}
                     </div>
 
                     {/* Kolom 3: Orang Tua / Wali Santri */}
                     <div>
-                      <p className="text-slate-600 invisible">Mengetahui,</p>
-                      <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
-                      <div className="h-16" />
-                      <p className="font-bold underline">
-                        {raporSiswa.namaWali || "................................................"}
-                      </p>
+                      {raporConfig.showTtdOrtu !== false && (
+                        <>
+                          <p className="text-slate-600 invisible">Mengetahui,</p>
+                          <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
+                          <div className="h-16" />
+                          <p className="font-bold underline">
+                            {raporSiswa.namaWali || "................................................"}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -7847,35 +8057,59 @@ export default function NilaiManagementPage() {
                           {/* Titimangsa Alamat dan Tanggal Rapor */}
                           <div className="flex justify-end mb-2 pr-4">
                             <p className="text-slate-800 font-medium">
-                              {raporConfig.tempatRapor}, {raporConfig.tanggalRapor}
+                              {raporConfig.tempatRapor},{" "}
+                              {batchRaporType === "tengah"
+                                ? (raporConfig.tanggalRaporSTS || raporConfig.tanggalRapor)
+                                : (raporConfig.tanggalRaporSAS || raporConfig.tanggalRapor)}
                             </p>
                           </div>
 
                           <div className="grid grid-cols-3 text-center gap-4">
                             {/* Kolom 1: Kepala Sekolah */}
                             <div>
-                              <p className="text-slate-600">Mengetahui,</p>
-                              <p className="text-slate-800 font-medium">Kepala Sekolah,</p>
-                              <div className="h-14" />
-                              <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                              {raporConfig.showTtdKepsek !== false && (
+                                <>
+                                  <p className="text-slate-600">Mengetahui,</p>
+                                  <p className="text-slate-800 font-medium">
+                                    {raporConfig.labelKepalaSekolah || "Kepala Sekolah"},
+                                  </p>
+                                  <div className="h-14" />
+                                  <p className="font-bold underline">
+                                    {raporConfig.customKepalaSekolah || profile.kepalaSekolah}
+                                  </p>
+                                  {raporConfig.nipKepalaSekolah && (
+                                    <p className="text-[10px] text-slate-600 mt-0.5">
+                                      NIP. {raporConfig.nipKepalaSekolah}
+                                    </p>
+                                  )}
+                                </>
+                              )}
                             </div>
 
                             {/* Kolom 2: Wali Kelas */}
                             <div>
-                              <p className="text-slate-600 invisible">Mengetahui,</p>
-                              <p className="text-slate-800 font-medium">Wali Kelas,</p>
-                              <div className="h-14" />
-                              <p className="font-bold underline">{waliNama}</p>
+                              {raporConfig.showTtdWali !== false && (
+                                <>
+                                  <p className="text-slate-600 invisible">Mengetahui,</p>
+                                  <p className="text-slate-800 font-medium">Wali Kelas,</p>
+                                  <div className="h-14" />
+                                  <p className="font-bold underline">{waliNama}</p>
+                                </>
+                              )}
                             </div>
 
                             {/* Kolom 3: Orang Tua / Wali Santri */}
                             <div>
-                              <p className="text-slate-600 invisible">Mengetahui,</p>
-                              <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
-                              <div className="h-14" />
-                              <p className="font-bold underline">
-                                {siswa.namaWali || "................................................"}
-                              </p>
+                              {raporConfig.showTtdOrtu !== false && (
+                                <>
+                                  <p className="text-slate-600 invisible">Mengetahui,</p>
+                                  <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
+                                  <div className="h-14" />
+                                  <p className="font-bold underline">
+                                    {siswa.namaWali || "................................................"}
+                                  </p>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -8766,6 +9000,1519 @@ export default function NilaiManagementPage() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL KHUSUS: FORMAT CETAK RAPOR & PRATINJAU LANGSUNG (LIVE PREVIEW)      */}
+      {/* ========================================================================= */}
+      {isFormatRaporModalOpen && (() => {
+        // Data Siswa untuk Pratinjau
+        const previewStudent: Siswa = (() => {
+          if (formatPreviewSource === "siswa" && siswaList.length > 0) {
+            const found = siswaList.find((s) => s.id === formatPreviewSelectedSiswaId);
+            if (found) return found;
+            return siswaList[0];
+          }
+          return {
+            id: "demo-preview-student",
+            nama: "Ahmad Fauzan Pratama",
+            nisn: "0123456789",
+            kelas: "VI-A",
+            namaWali: "H. Muhammad Pratama",
+            jenisKelamin: "L",
+            tanggalLahir: "2012-05-15",
+            tempatLahir: "Jakarta",
+            alamat: "Jl. Pendidikan No. 45",
+            noHpWali: "08123456789",
+            status: "Aktif",
+            avatar: "",
+          } as Siswa;
+        })();
+
+        // Data Nilai Mata Pelajaran untuk Pratinjau
+        const previewSubjects = (() => {
+          if (formatPreviewSource === "siswa" && previewStudent?.id) {
+            const existingRecords = nilaiList.filter(
+              (n) => n.siswaId === previewStudent.id && n.semester === formatPreviewSemester
+            );
+            if (existingRecords.length > 0) {
+              return existingRecords.map((r) => {
+                const foundMapel = mapelList.find(
+                  (m) => m.nama.toLowerCase().trim() === r.mapel.toLowerCase().trim()
+                );
+                const kkm = foundMapel?.kkm || 75;
+                const tugas = r.tugas || 0;
+                const uts = r.uts || 0;
+                const uas = r.uas || 0;
+                const akhir = Math.round(0.3 * tugas + 0.3 * uts + 0.4 * uas);
+                const pred =
+                  formatPreviewType === "tengah"
+                    ? calculateMidGrade(uts).predikatMid
+                    : calculateSemesterGrade(tugas, uts, uas).predikat;
+                return {
+                  nama: r.mapel,
+                  kkm,
+                  tugas,
+                  uts,
+                  uas,
+                  akhir,
+                  predikat: pred,
+                  catatan:
+                    r.catatanMid ||
+                    r.catatan ||
+                    "Menunjukkan pemahaman yang sangat baik dan aktif dalam seluruh kegiatan pembelajaran.",
+                };
+              });
+            }
+          }
+
+          // Fallback Data Simulasi Lengkap (12 Mata Pelajaran)
+          return [
+            // Muatan Wajib
+            { nama: "Pendidikan Agama Islam", kkm: 75, tugas: 88, uts: 86, uas: 90, akhir: 88, predikat: "A", catatan: "Sangat baik dalam memahami materi fikih ibadah dan berakhlak terpuji." },
+            { nama: "Pendidikan Pancasila", kkm: 75, tugas: 82, uts: 80, uas: 84, akhir: 82, predikat: "B", catatan: "Baik dalam mengamalkan nilai gotong royong dan musyawarah mufakat." },
+            { nama: "Bahasa Indonesia", kkm: 75, tugas: 85, uts: 88, uas: 86, akhir: 86, predikat: "A", catatan: "Menunjukkan pemahaman teks fiksi dan literasi bacaan yang sangat memuaskan." },
+            { nama: "Matematika", kkm: 75, tugas: 80, uts: 82, uas: 85, akhir: 83, predikat: "B", catatan: "Baik dalam menguasai operasi pecahan dan jaring-jaring bangun ruang." },
+            { nama: "Ilmu Pengetahuan Alam dan Sosial (IPAS)", kkm: 75, tugas: 87, uts: 85, uas: 88, akhir: 87, predikat: "A", catatan: "Sangat antusias dalam eksperimen sains dan pemeliharaan lingkungan." },
+            { nama: "Bahasa Inggris", kkm: 75, tugas: 84, uts: 85, uas: 86, akhir: 85, predikat: "A", catatan: "Lancar dalam percakapan tematik harian dan kosakata dasar bahasa Inggris." },
+            { nama: "Seni Budaya dan Prakarya", kkm: 75, tugas: 86, uts: 88, uas: 90, akhir: 88, predikat: "A", catatan: "Sangat kreatif dan terampil dalam membuat karya seni rupa daerah." },
+            { nama: "Pendidikan Jasmani, Olahraga & Kesehatan", kkm: 75, tugas: 85, uts: 86, uas: 88, akhir: 86, predikat: "A", catatan: "Memiliki kebugaran jasmani dan sportivitas yang sangat baik dalam berolahraga." },
+            // Muatan Lokal
+            { nama: "Bahasa Sunda", kkm: 75, tugas: 82, uts: 80, uas: 84, akhir: 82, predikat: "B", catatan: "Cukup fasih melafalkan percakapan undak-usuk basa santun sehari-hari." },
+            { nama: "Keterampilan Komputer (TIK)", kkm: 75, tugas: 90, uts: 92, uas: 94, akhir: 92, predikat: "A", catatan: "Sangat terampil menggunakan aplikasi pengetikan dan dokumen digital." },
+            // Kecerdasan Al-Qur'an
+            { nama: "Tahsin / Tilawati", kkm: 80, tugas: 92, uts: 90, uas: 94, akhir: 92, predikat: "A", catatan: "Makhraj dan hukum tajwid sangat tartil, bacaan fasih dan lancar." },
+            { nama: "Tahfidz Al-Qur'an", kkm: 80, tugas: 95, uts: 94, uas: 96, akhir: 95, predikat: "A", catatan: "Hafalan Juz 30 mutqin dan lancar dengan tajwid dan makhorijul huruf tepat." },
+          ];
+        })();
+
+        // Pengelompokan & Urutan Mapel Pratinjau
+        const previewWajib = sortRecordsByMapelOrder(previewSubjects.filter((m) => getMapelSection(m.nama) === "wajib"));
+        const previewMulok = sortRecordsByMapelOrder(previewSubjects.filter((m) => getMapelSection(m.nama) === "mulok"));
+        const previewQuran = sortRecordsByMapelOrder(previewSubjects.filter((m) => getMapelSection(m.nama) === "quran"));
+
+        // Info Wali Kelas & Kepala Sekolah
+        const previewMatchedKelas = kelasList.find((k) => isClassMatch(k.nama, previewStudent.kelas));
+        const previewMatchedWali = previewMatchedKelas
+          ? guruList.find((g) => g.id === previewMatchedKelas.waliKelasId)
+          : null;
+        const previewWaliNama =
+          (previewMatchedWali?.nama ? `${previewMatchedWali.nama}, ${previewMatchedWali.gelar || ""}`.trim() : null) ||
+          previewMatchedKelas?.waliKelasNama ||
+          "Ustadzah Siti Aisyah, S.Pd.";
+
+        const previewTgl =
+          formatPreviewType === "tengah"
+            ? (raporConfig.tanggalRaporSTS || raporConfig.tanggalRapor)
+            : (raporConfig.tanggalRaporSAS || raporConfig.tanggalRapor);
+
+        const previewKepsekNama = raporConfig.customKepalaSekolah?.trim() || profile.kepalaSekolah;
+        const previewKepsekLabel = raporConfig.labelKepalaSekolah?.trim() || "Kepala Sekolah";
+
+        const previewJudulText =
+          formatPreviewType === "tengah"
+            ? (raporConfig.judulRaporSTS || "LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)")
+            : (raporConfig.judulRaporSAS || "LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)");
+
+        const previewSubjudulText = raporConfig.subjudulRapor?.trim()
+          ? raporConfig.subjudulRapor
+          : `Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${formatPreviewSemester}`;
+
+        const previewFontFamily =
+          raporConfig.fontFamilyRapor === "serif"
+            ? "'Times New Roman', Times, serif"
+            : raporConfig.fontFamilyRapor === "mono"
+            ? "'Courier New', Courier, monospace"
+            : "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
+        const previewCellPadding =
+          raporConfig.paddingTabel === "kompak"
+            ? "px-2 py-1"
+            : raporConfig.paddingTabel === "longgar"
+            ? "px-3 py-2.5"
+            : "px-2.5 py-1.5";
+
+        const handleSaveConfig = () => {
+          try {
+            localStorage.setItem("simpro_rapor_config", JSON.stringify(raporConfig));
+            setFormatSaveToast(true);
+            setTimeout(() => setFormatSaveToast(false), 2500);
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        const handleResetConfig = () => {
+          if (confirm("Kembalikan seluruh format cetak rapor ke setelan bawaan standar?")) {
+            const def = getDefaultRaporConfig();
+            setRaporConfig(def);
+            try {
+              localStorage.setItem("simpro_rapor_config", JSON.stringify(def));
+            } catch (e) {}
+            setFormatSaveToast(true);
+            setTimeout(() => setFormatSaveToast(false), 2000);
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex flex-col p-2 sm:p-4 animate-in fade-in duration-200 overflow-hidden">
+            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col h-full max-h-[96vh] max-w-[1700px] w-full mx-auto overflow-hidden">
+              {/* Header Modal */}
+              <div className="px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/20">
+                    <Sliders className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                        Pengaturan Format Cetak Rapor
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                        Live Interactive Preview
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Ubah Kop Rapor, Judul Rapor, Titimangsa & Tanda Tangan, Ukuran Font, dan lihat perubahannya secara instan.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Toast & Actions */}
+                <div className="flex items-center gap-2.5">
+                  {formatSaveToast && (
+                    <div className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 animate-in fade-in duration-150">
+                      <Check className="h-4 w-4" />
+                      <span>Format Berhasil Disimpan!</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleResetConfig}
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="Kembalikan semua setelan ke default"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Reset Default</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveConfig}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer active:scale-95"
+                    title="Simpan pengaturan format ini"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>Simpan Format</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handlePrintFormatRapor}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all cursor-pointer active:scale-95"
+                    title="Cetak lembar pratinjau ini"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    <span className="hidden md:inline">Cetak / PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFormatRaporModalOpen(false)}
+                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body: Two Column Layout (Settings on Left, Live Preview on Right) */}
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
+                {/* ========================================================= */}
+                {/* KOLOM KIRI: PANEL PENGATURAN BER-TAB (5 COLS)             */}
+                {/* ========================================================= */}
+                <div className="lg:col-span-5 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-hidden bg-white dark:bg-slate-900">
+                  {/* Tab Navigation */}
+                  <div className="p-2.5 bg-slate-100/70 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setFormatRaporActiveTab("kop")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        formatRaporActiveTab === "kop"
+                          ? "bg-amber-500 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <School className="h-3.5 w-3.5" />
+                      <span>Kop Rapor</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormatRaporActiveTab("judul")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        formatRaporActiveTab === "judul"
+                          ? "bg-amber-500 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <Type className="h-3.5 w-3.5" />
+                      <span>Judul Rapor</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormatRaporActiveTab("titimangsa")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        formatRaporActiveTab === "titimangsa"
+                          ? "bg-amber-500 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>Alamat & Tanggal</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormatRaporActiveTab("format")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        formatRaporActiveTab === "format"
+                          ? "bg-amber-500 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <Sliders className="h-3.5 w-3.5" />
+                      <span>Font & Tabel</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormatRaporActiveTab("urutan")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        formatRaporActiveTab === "urutan"
+                          ? "bg-amber-500 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      <span>Urutan Mapel</span>
+                    </button>
+                  </div>
+
+                  {/* Tab Scroll Content */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {/* TAB 1: KOP RAPOR */}
+                    {formatRaporActiveTab === "kop" && (
+                      <div className="space-y-4 text-xs">
+                        {/* Toggle Kop */}
+                        <div className="p-3.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-slate-100 block">
+                              Tampilkan Kop Surat Resmi
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              Nonaktifkan bila mencetak pada blanko kertas kop yang sudah dicetak sebelumnya.
+                            </span>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={raporConfig.tampilkanKop ?? true}
+                              onChange={(e) => updateRaporConfig({ tampilkanKop: e.target.checked })}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                          </label>
+                        </div>
+
+                        {/* Logo Controls */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                          {/* Logo Kiri */}
+                          <div className="space-y-2">
+                            <span className="font-bold text-slate-700 dark:text-slate-200 block">Logo Kiri (Sekolah/Yayasan)</span>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-12 h-12 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center bg-white dark:bg-slate-900 overflow-hidden shrink-0">
+                                {raporConfig.logoKiriUrl ? (
+                                  <img src={raporConfig.logoKiriUrl} alt="Logo Kiri" className="w-full h-full object-contain" />
+                                ) : (
+                                  <GraduationCap className="h-6 w-6 text-blue-600" />
+                                )}
+                              </div>
+                              <div className="space-y-1 flex-1">
+                                <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-[11px] cursor-pointer transition-colors shadow-2xs">
+                                  <Upload className="h-3 w-3" />
+                                  <span>Unggah File</span>
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoUpload("kiri", e)} />
+                                </label>
+                                {raporConfig.logoKiriUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ logoKiriUrl: "" })}
+                                    className="block text-[10px] text-rose-500 hover:underline cursor-pointer"
+                                  >
+                                    Hapus Logo
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={raporConfig.logoKiriUrl}
+                              onChange={(e) => updateRaporConfig({ logoKiriUrl: e.target.value })}
+                              placeholder="Atau tautan URL gambar..."
+                              className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px]"
+                            />
+                          </div>
+
+                          {/* Logo Kanan */}
+                          <div className="space-y-2">
+                            <span className="font-bold text-slate-700 dark:text-slate-200 block">Logo Kanan (Dinas/Pemda)</span>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-12 h-12 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center bg-white dark:bg-slate-900 overflow-hidden shrink-0">
+                                {raporConfig.logoKananUrl ? (
+                                  <img src={raporConfig.logoKananUrl} alt="Logo Kanan" className="w-full h-full object-contain" />
+                                ) : (
+                                  <ImageIcon className="h-6 w-6 text-slate-400" />
+                                )}
+                              </div>
+                              <div className="space-y-1 flex-1">
+                                <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-[11px] cursor-pointer transition-colors shadow-2xs">
+                                  <Upload className="h-3 w-3" />
+                                  <span>Unggah File</span>
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleLogoUpload("kanan", e)} />
+                                </label>
+                                {raporConfig.logoKananUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updateRaporConfig({ logoKananUrl: "" })}
+                                    className="block text-[10px] text-rose-500 hover:underline cursor-pointer"
+                                  >
+                                    Hapus Logo
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={raporConfig.logoKananUrl}
+                              onChange={(e) => updateRaporConfig({ logoKananUrl: e.target.value })}
+                              placeholder="Atau tautan URL gambar..."
+                              className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Ukuran Logo */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Ukuran Logo Kop:</span>
+                          <div className="grid grid-cols-4 gap-2">
+                            {[
+                              { id: "sm", label: "Kecil (80px)" },
+                              { id: "md", label: "Sedang (96px)" },
+                              { id: "lg", label: "Besar (112px)" },
+                              { id: "xl", label: "Jumbo (128px)" },
+                            ].map((sz) => (
+                              <button
+                                key={sz.id}
+                                type="button"
+                                onClick={() => updateRaporConfig({ ukuranLogoKop: sz.id as any })}
+                                className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold text-center border cursor-pointer transition-all ${
+                                  (raporConfig.ukuranLogoKop || "lg") === sz.id
+                                    ? "bg-amber-500 text-white border-amber-600 shadow-2xs font-bold"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                {sz.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Teks Kop & Font Size Per Baris */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Teks & Ukuran Huruf Tiap Baris Kop:</span>
+
+                          {/* Baris 1 */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Baris 1: Yayasan / Instansi</label>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-slate-400">Font:</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris1: Math.max(10, (raporConfig.fontSizeBaris1 || 16) - 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
+                                <span className="w-8 text-center font-mono font-bold text-amber-600">{raporConfig.fontSizeBaris1 || 16}px</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris1: Math.min(26, (raporConfig.fontSizeBaris1 || 16) + 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">+</button>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={raporConfig.yayasanNama}
+                              onChange={(e) => updateRaporConfig({ yayasanNama: e.target.value })}
+                              placeholder="YAYASAN PENDIDIKAN ISLAM..."
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold uppercase text-xs"
+                            />
+                          </div>
+
+                          {/* Baris 2 */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Baris 2: Nama Sekolah</label>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-slate-400">Font:</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris2: Math.max(10, (raporConfig.fontSizeBaris2 || 16) - 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
+                                <span className="w-8 text-center font-mono font-bold text-amber-600">{raporConfig.fontSizeBaris2 || 16}px</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris2: Math.min(28, (raporConfig.fontSizeBaris2 || 16) + 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">+</button>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={raporConfig.namaSekolah}
+                              onChange={(e) => updateRaporConfig({ namaSekolah: e.target.value })}
+                              placeholder="SD ISLAM TERPADU..."
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold uppercase text-xs"
+                            />
+                          </div>
+
+                          {/* Baris 3 */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Baris 3: NPSN & Status Akreditasi</label>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-slate-400">Font:</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris3: Math.max(10, (raporConfig.fontSizeBaris3 || 16) - 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
+                                <span className="w-8 text-center font-mono font-bold text-amber-600">{raporConfig.fontSizeBaris3 || 16}px</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris3: Math.min(22, (raporConfig.fontSizeBaris3 || 16) + 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">+</button>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={raporConfig.npsnAkreditasi}
+                              onChange={(e) => updateRaporConfig({ npsnAkreditasi: e.target.value })}
+                              placeholder="NPSN: 69987654 • TERAKREDITASI A"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-medium text-xs"
+                            />
+                          </div>
+
+                          {/* Baris 4 */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Baris 4: Alamat & Kontak Resmi</label>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-slate-400">Font:</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris4: Math.max(9, (raporConfig.fontSizeBaris4 || 11) - 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
+                                <span className="w-8 text-center font-mono font-bold text-amber-600">{raporConfig.fontSizeBaris4 || 11}px</span>
+                                <button type="button" onClick={() => updateRaporConfig({ fontSizeBaris4: Math.min(18, (raporConfig.fontSizeBaris4 || 11) + 1) })} className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">+</button>
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={raporConfig.alamatKontak}
+                              onChange={(e) => updateRaporConfig({ alamatKontak: e.target.value })}
+                              placeholder="Jl. Merdeka No. 12 • Telp: (021) 123456"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Garis Pembatas Kop */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                          <span className="font-bold text-slate-700 dark:text-slate-200">Garis Pembatas Kop:</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateRaporConfig({ garisKop: "double" })}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ${
+                                raporConfig.garisKop === "double"
+                                  ? "bg-amber-500 text-white border-amber-600 shadow-2xs font-bold"
+                                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                              }`}
+                            >
+                              Garis Ganda (Resmi)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateRaporConfig({ garisKop: "single" })}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ${
+                                raporConfig.garisKop === "single"
+                                  ? "bg-amber-500 text-white border-amber-600 shadow-2xs font-bold"
+                                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                              }`}
+                            >
+                              Garis Tunggal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateRaporConfig({ garisKop: "none" })}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ${
+                                raporConfig.garisKop === "none"
+                                  ? "bg-amber-500 text-white border-amber-600 shadow-2xs font-bold"
+                                  : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                              }`}
+                            >
+                              Tanpa Garis
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 2: JUDUL RAPOR */}
+                    {formatRaporActiveTab === "judul" && (
+                      <div className="space-y-4 text-xs">
+                        {/* Judul Rapor STS */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                          <label className="font-bold text-slate-700 dark:text-slate-200 block">
+                            Judul Rapor Sumatif Tengah Semester (STS)
+                          </label>
+                          <input
+                            type="text"
+                            value={raporConfig.judulRaporSTS ?? ""}
+                            onChange={(e) => updateRaporConfig({ judulRaporSTS: e.target.value })}
+                            placeholder="LAPORAN PENILAIAN HASIL BELAJAR SUMATIF TENGAH SEMESTER (STS)"
+                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold uppercase text-xs"
+                          />
+                        </div>
+
+                        {/* Judul Rapor SAS */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                          <label className="font-bold text-slate-700 dark:text-slate-200 block">
+                            Judul Rapor Sumatif Akhir Semester (SAS)
+                          </label>
+                          <input
+                            type="text"
+                            value={raporConfig.judulRaporSAS ?? ""}
+                            onChange={(e) => updateRaporConfig({ judulRaporSAS: e.target.value })}
+                            placeholder="LAPORAN CAPAIAN HASIL BELAJAR SUMATIF AKHIR SEMESTER (SAS)"
+                            className="w-full px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold uppercase text-xs"
+                          />
+                        </div>
+
+                        {/* Format & Ukuran Judul */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Format Gaya Huruf Judul:</span>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-500">Ukuran Font:</span>
+                              <button type="button" onClick={() => updateRaporConfig({ fontSizeJudulRapor: Math.max(12, (raporConfig.fontSizeJudulRapor || 16) - 1) })} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
+                              <span className="w-10 text-center font-mono font-bold text-amber-600 text-sm">{raporConfig.fontSizeJudulRapor || 16}px</span>
+                              <button type="button" onClick={() => updateRaporConfig({ fontSizeJudulRapor: Math.min(26, (raporConfig.fontSizeJudulRapor || 16) + 1) })} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">+</button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* Bold Toggle */}
+                              <button
+                                type="button"
+                                onClick={() => updateRaporConfig({ boldJudulRapor: !(raporConfig.boldJudulRapor ?? true) })}
+                                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 border cursor-pointer transition-all ${
+                                  (raporConfig.boldJudulRapor ?? true)
+                                    ? "bg-amber-500 text-white border-amber-600 shadow-2xs"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                <Bold className="h-3.5 w-3.5" />
+                                <span>Tebal</span>
+                              </button>
+
+                              {/* Underline Toggle */}
+                              <button
+                                type="button"
+                                onClick={() => updateRaporConfig({ underlineJudulRapor: !(raporConfig.underlineJudulRapor ?? true) })}
+                                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 border cursor-pointer transition-all ${
+                                  (raporConfig.underlineJudulRapor ?? true)
+                                    ? "bg-amber-500 text-white border-amber-600 shadow-2xs underline"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                <UnderlineIcon className="h-3.5 w-3.5" />
+                                <span>Garis Bawah</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Subjudul Rapor */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="font-bold text-slate-700 dark:text-slate-200">
+                              Subjudul Rapor (Tahun Ajaran & Semester)
+                            </label>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-slate-400">Font:</span>
+                              <select
+                                value={raporConfig.fontSizeSubjudulRapor || 12}
+                                onChange={(e) => updateRaporConfig({ fontSizeSubjudulRapor: Number(e.target.value) })}
+                                className="px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-bold"
+                              >
+                                {[10, 11, 12, 13, 14, 15, 16].map((sz) => (
+                                  <option key={sz} value={sz}>{sz}px</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => updateRaporConfig({ boldSubjudulRapor: !(raporConfig.boldSubjudulRapor ?? false) })}
+                                className={`px-2 py-0.5 rounded text-[11px] font-bold border cursor-pointer ${
+                                  raporConfig.boldSubjudulRapor
+                                    ? "bg-amber-500 text-white border-amber-600"
+                                    : "bg-white dark:bg-slate-900 text-slate-600 border-slate-200"
+                                }`}
+                              >
+                                B
+                              </button>
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            value={raporConfig.subjudulRapor || ""}
+                            onChange={(e) => updateRaporConfig({ subjudulRapor: e.target.value })}
+                            placeholder={`Otomatis: Tahun Ajaran ${profile.tahunAjaranAktif} • Semester ${profile.semesterAktif}`}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                          />
+                          <p className="text-[10px] text-slate-400 italic">
+                            Biarkan kosong bila ingin mengikuti secara dinamis tahun ajaran & semester aktif.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 3: ALAMAT & TANGGAL RAPOR (TITIMANGSA & TTD) */}
+                    {formatRaporActiveTab === "titimangsa" && (
+                      <div className="space-y-4 text-xs">
+                        {/* Tempat & Tanggal */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Kota & Tanggal Penerbitan:</span>
+                          <div>
+                            <label className="text-[11px] text-slate-500 block mb-1">Kota / Tempat Terbit Rapor</label>
+                            <input
+                              type="text"
+                              value={raporConfig.tempatRapor}
+                              onChange={(e) => updateRaporConfig({ tempatRapor: e.target.value })}
+                              placeholder="Jakarta / Bandung / Surabaya..."
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="text-[11px] text-slate-500 block mb-1">Tanggal Rapor STS (Tengah Semester)</label>
+                              <input
+                                type="text"
+                                value={raporConfig.tanggalRaporSTS || raporConfig.tanggalRapor}
+                                onChange={(e) => updateRaporConfig({ tanggalRaporSTS: e.target.value })}
+                                placeholder="Contoh: 27 Maret 2026"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-500 block mb-1">Tanggal Rapor SAS (Akhir Semester)</label>
+                              <input
+                                type="text"
+                                value={raporConfig.tanggalRaporSAS || raporConfig.tanggalRapor}
+                                onChange={(e) => updateRaporConfig({ tanggalRaporSAS: e.target.value })}
+                                placeholder="Contoh: 19 Juni 2026"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Kepala Sekolah Penandatangan */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-700 dark:text-slate-200">Penandatangan Kepala Sekolah:</span>
+                            <label className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 font-semibold cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.showTtdKepsek ?? true}
+                                onChange={(e) => updateRaporConfig({ showTtdKepsek: e.target.checked })}
+                                className="rounded text-amber-500"
+                              />
+                              <span>Tampilkan TTD</span>
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="text-[11px] text-slate-500 block mb-1">Label Jabatan</label>
+                              <input
+                                type="text"
+                                value={raporConfig.labelKepalaSekolah || "Kepala Sekolah"}
+                                onChange={(e) => updateRaporConfig({ labelKepalaSekolah: e.target.value })}
+                                placeholder="Kepala Sekolah / Plt. Kepala Sekolah / Kepala Madrasah"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-500 block mb-1">Nama Kepala Sekolah (Kustom)</label>
+                              <input
+                                type="text"
+                                value={raporConfig.customKepalaSekolah ?? ""}
+                                onChange={(e) => updateRaporConfig({ customKepalaSekolah: e.target.value })}
+                                placeholder={`Bawaan: ${profile.kepalaSekolah}`}
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] text-slate-500 block mb-1">NIP Kepala Sekolah (Opsional)</label>
+                            <input
+                              type="text"
+                              value={raporConfig.nipKepalaSekolah ?? ""}
+                              onChange={(e) => updateRaporConfig({ nipKepalaSekolah: e.target.value })}
+                              placeholder="Contoh: 19800101 200501 1 002"
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Toggle Tanda Tangan Lainnya */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2.5">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Kolom Tanda Tangan Pendukung:</span>
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                              <span className="font-medium text-slate-700 dark:text-slate-200">Tampilkan Tanda Tangan Wali Kelas</span>
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.showTtdWali ?? true}
+                                onChange={(e) => updateRaporConfig({ showTtdWali: e.target.checked })}
+                                className="rounded text-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                              <span className="font-medium text-slate-700 dark:text-slate-200">Tampilkan Tanda Tangan Orang Tua / Wali Santri</span>
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.showTtdOrtu ?? true}
+                                onChange={(e) => updateRaporConfig({ showTtdOrtu: e.target.checked })}
+                                className="rounded text-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 4: FORMAT & TABEL RAPOR */}
+                    {formatRaporActiveTab === "format" && (
+                      <div className="space-y-4 text-xs">
+                        {/* Font Family */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Jenis Huruf Rapor (Font Family):</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { id: "sans", label: "Sans-Serif (Modern)", font: "font-sans" },
+                              { id: "serif", label: "Serif (Resmi / Times)", font: "font-serif" },
+                              { id: "mono", label: "Monospace (Ketik)", font: "font-mono" },
+                            ].map((f) => (
+                              <button
+                                key={f.id}
+                                type="button"
+                                onClick={() => updateRaporConfig({ fontFamilyRapor: f.id as any })}
+                                className={`py-2 px-2.5 rounded-lg border text-center cursor-pointer transition-all ${
+                                  (raporConfig.fontFamilyRapor || "sans") === f.id
+                                    ? "bg-amber-500 text-white border-amber-600 shadow-2xs font-bold"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                <span className={`block text-xs ${f.font}`}>{f.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Ukuran Font Tabel Nilai */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-700 dark:text-slate-200">Ukuran Font Tabel Nilai:</span>
+                            <span className="font-mono font-bold text-amber-600">{raporConfig.fontSizeTabelNilai || 11}px</span>
+                          </div>
+                          <div className="grid grid-cols-5 gap-1.5">
+                            {[9, 10, 11, 12, 13].map((sz) => (
+                              <button
+                                key={sz}
+                                type="button"
+                                onClick={() => updateRaporConfig({ fontSizeTabelNilai: sz })}
+                                className={`py-1.5 rounded-lg border text-center text-[11px] cursor-pointer ${
+                                  (raporConfig.fontSizeTabelNilai || 11) === sz
+                                    ? "bg-amber-500 text-white border-amber-600 font-bold shadow-2xs"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                {sz}px {sz === 11 ? "(Std)" : ""}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-slate-400">
+                            Pilih 9px atau 10px jika jumlah mata pelajaran banyak agar pas dalam 1 halaman cetak A4.
+                          </p>
+                        </div>
+
+                        {/* Ukuran Font Identitas Siswa */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-700 dark:text-slate-200">Ukuran Font Identitas Siswa:</span>
+                            <span className="font-mono font-bold text-amber-600">{raporConfig.fontSizeIdentitas || 12}px</span>
+                          </div>
+                          <div className="grid grid-cols-5 gap-1.5">
+                            {[10, 11, 12, 13, 14].map((sz) => (
+                              <button
+                                key={sz}
+                                type="button"
+                                onClick={() => updateRaporConfig({ fontSizeIdentitas: sz })}
+                                className={`py-1.5 rounded-lg border text-center text-[11px] cursor-pointer ${
+                                  (raporConfig.fontSizeIdentitas || 12) === sz
+                                    ? "bg-amber-500 text-white border-amber-600 font-bold shadow-2xs"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                {sz}px {sz === 12 ? "(Std)" : ""}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Kepadatan Baris Tabel (Padding) */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Kepadatan Baris Tabel (Spasi):</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { id: "kompak", label: "Kompak / Rapat", desc: "py-1" },
+                              { id: "sedang", label: "Sedang (Bawaan)", desc: "py-1.5" },
+                              { id: "longgar", label: "Longgar / Lapang", desc: "py-2.5" },
+                            ].map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => updateRaporConfig({ paddingTabel: p.id as any })}
+                                className={`py-2 px-2 rounded-lg border text-center cursor-pointer transition-all ${
+                                  (raporConfig.paddingTabel || "sedang") === p.id
+                                    ? "bg-amber-500 text-white border-amber-600 shadow-2xs font-bold"
+                                    : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                <span className="block text-xs">{p.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Komponen Kolom Rapor */}
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-2.5">
+                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Komponen Kolom & Rekap Rapor:</span>
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                              <span className="font-medium text-slate-700 dark:text-slate-200">Tampilkan Kolom KKM / KKTP</span>
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.showKkm ?? true}
+                                onChange={(e) => updateRaporConfig({ showKkm: e.target.checked })}
+                                className="rounded text-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                              <span className="font-medium text-slate-700 dark:text-slate-200">Tampilkan Kolom Predikat Nilai (A, B, C, D)</span>
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.showPredikat ?? true}
+                                onChange={(e) => updateRaporConfig({ showPredikat: e.target.checked })}
+                                className="rounded text-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                              <span className="font-medium text-slate-700 dark:text-slate-200">Tampilkan Kolom Catatan Guru / Capaian Kompetensi</span>
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.showCatatanGuru ?? true}
+                                onChange={(e) => updateRaporConfig({ showCatatanGuru: e.target.checked })}
+                                className="rounded text-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                              <span className="font-medium text-slate-700 dark:text-slate-200">Tampilkan Tabel Rekap Presensi / Kehadiran Siswa</span>
+                              <input
+                                type="checkbox"
+                                checked={raporConfig.showPresensi ?? true}
+                                onChange={(e) => updateRaporConfig({ showPresensi: e.target.checked })}
+                                className="rounded text-amber-500 w-4 h-4 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 5: URUTAN MATA PELAJARAN */}
+                    {formatRaporActiveTab === "urutan" && (
+                      <div className="space-y-3 text-xs">
+                        <div className="p-3 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-slate-800 dark:text-slate-100 block">Atur Urutan Tampil Mata Pelajaran</span>
+                            <span className="text-[11px] text-slate-500">Gunakan tombol Naik dan Turun untuk menyesuaikan urutan mata pelajaran per kelompok.</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateRaporConfig({ customMapelOrder: [] })}
+                            className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-bold hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Reset urutan ke urutan bawaan kurikulum"
+                          >
+                            Reset Urutan
+                          </button>
+                        </div>
+
+                        {/* List Reorder Groups */}
+                        {(() => {
+                          const renderReorderGroup = (title: string, groupList: any[], badgeColor: string) => (
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-800 dark:text-slate-100">{title}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeColor}`}>
+                                  {groupList.length} Mapel
+                                </span>
+                              </div>
+                              <div className="space-y-1.5">
+                                {groupList.map((item, idx) => (
+                                  <div
+                                    key={item.nama}
+                                    className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 font-bold text-[10px] flex items-center justify-center text-slate-600 dark:text-slate-400">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="font-semibold text-slate-800 dark:text-slate-200">{item.nama}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        disabled={idx === 0}
+                                        onClick={() => moveMapelInSection(item.nama, "up", groupList)}
+                                        className="p-1 rounded bg-slate-100 hover:bg-amber-500 hover:text-white dark:bg-slate-800 disabled:opacity-20 cursor-pointer transition-colors"
+                                        title="Pindah ke atas"
+                                      >
+                                        <ChevronUp className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={idx === groupList.length - 1}
+                                        onClick={() => moveMapelInSection(item.nama, "down", groupList)}
+                                        className="p-1 rounded bg-slate-100 hover:bg-amber-500 hover:text-white dark:bg-slate-800 disabled:opacity-20 cursor-pointer transition-colors"
+                                        title="Pindah ke bawah"
+                                      >
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+
+                          return (
+                            <div className="space-y-3">
+                              {renderReorderGroup("A. Muatan Wajib", previewWajib, "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300")}
+                              {renderReorderGroup("B. Muatan Lokal", previewMulok, "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300")}
+                              {renderReorderGroup("C. Kecerdasan Al-Qur'an", previewQuran, "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300")}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ========================================================= */}
+                {/* KOLOM KANAN: PRATINJAU LANGSUNG RAPOR (7 COLS)            */}
+                {/* ========================================================= */}
+                <div className="lg:col-span-7 flex flex-col h-full overflow-hidden bg-slate-100 dark:bg-slate-950">
+                  {/* Preview Controls Toolbar */}
+                  <div className="px-4 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                    {/* Switcher Tipe Rapor & Semester */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => setFormatPreviewType("tengah")}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            formatPreviewType === "tengah"
+                              ? "bg-amber-500 text-white shadow-2xs"
+                              : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                          }`}
+                        >
+                          Rapor STS (Tengah)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormatPreviewType("akhir")}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            formatPreviewType === "akhir"
+                              ? "bg-indigo-600 text-white shadow-2xs"
+                              : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
+                          }`}
+                        >
+                          Rapor SAS (Akhir)
+                        </button>
+                      </div>
+
+                      <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => setFormatPreviewSemester("Ganjil")}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                            formatPreviewSemester === "Ganjil"
+                              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold"
+                              : "text-slate-600 dark:text-slate-400"
+                          }`}
+                        >
+                          Ganjil
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormatPreviewSemester("Genap")}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                            formatPreviewSemester === "Genap"
+                              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs font-bold"
+                              : "text-slate-600 dark:text-slate-400"
+                          }`}
+                        >
+                          Genap
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Data Source & Zoom */}
+                    <div className="flex items-center gap-3">
+                      {/* Sumber Data */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-500 hidden xl:inline">Data:</span>
+                        <select
+                          value={formatPreviewSource}
+                          onChange={(e) => setFormatPreviewSource(e.target.value as any)}
+                          className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium cursor-pointer"
+                        >
+                          <option value="demo">Data Simulasi (Lengkap)</option>
+                          {siswaList.length > 0 && <option value="siswa">Pilih Siswa Nyata</option>}
+                        </select>
+
+                        {formatPreviewSource === "siswa" && siswaList.length > 0 && (
+                          <select
+                            value={formatPreviewSelectedSiswaId || siswaList[0]?.id}
+                            onChange={(e) => setFormatPreviewSelectedSiswaId(e.target.value)}
+                            className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium max-w-[140px] truncate cursor-pointer"
+                          >
+                            {siswaList.map((s) => (
+                              <option key={s.id} value={s.id}>{s.nama}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Zoom Controls */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => setFormatPreviewZoom(Math.max(60, formatPreviewZoom - 10))}
+                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300 cursor-pointer"
+                          title="Perkecil Pratinjau (-)"
+                        >
+                          <ZoomOut className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 w-10 text-center">
+                          {formatPreviewZoom}%
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFormatPreviewZoom(Math.min(130, formatPreviewZoom + 10))}
+                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300 cursor-pointer"
+                          title="Perbesar Pratinjau (+)"
+                        >
+                          <ZoomIn className="h-3.5 w-3.5" />
+                        </button>
+                        {formatPreviewZoom !== 100 && (
+                          <button
+                            type="button"
+                            onClick={() => setFormatPreviewZoom(100)}
+                            className="text-[10px] text-amber-600 font-bold ml-1 hover:underline cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scrollable Viewport with A4 Paper Simulation */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center items-start">
+                    <div
+                      id="format-rapor-preview-paper"
+                      style={{
+                        transform: `scale(${formatPreviewZoom / 100})`,
+                        transformOrigin: "top center",
+                        fontFamily: previewFontFamily,
+                      }}
+                      className="w-full max-w-[820px] bg-white text-black p-8 sm:p-10 shadow-2xl rounded-sm border border-slate-300 transition-transform duration-100"
+                    >
+                      {/* Kop Surat */}
+                      {renderOfficialLetterhead()}
+
+                      {/* Header Judul Rapor */}
+                      <div className="text-center mb-6">
+                        <h3
+                          style={{ fontSize: `${raporConfig.fontSizeJudulRapor || 16}px` }}
+                          className={`tracking-wider uppercase text-slate-900 leading-snug ${
+                            (raporConfig.boldJudulRapor ?? true) ? "font-extrabold" : "font-normal"
+                          } ${
+                            (raporConfig.underlineJudulRapor ?? true) ? "underline" : "no-underline"
+                          }`}
+                        >
+                          {previewJudulText}
+                        </h3>
+                        <p
+                          style={{ fontSize: `${raporConfig.fontSizeSubjudulRapor || 12}px` }}
+                          className={`mt-1 text-slate-700 ${
+                            raporConfig.boldSubjudulRapor ? "font-bold text-slate-900" : "font-medium"
+                          }`}
+                        >
+                          {previewSubjudulText}
+                        </p>
+                      </div>
+
+                      {/* Identitas Siswa */}
+                      <div
+                        style={{ fontSize: `${raporConfig.fontSizeIdentitas || 12}px` }}
+                        className="grid grid-cols-2 gap-4 mb-4 pb-2 text-slate-800"
+                      >
+                        <div className="space-y-1">
+                          <p>Nama Peserta Didik: <strong className="text-slate-900">{previewStudent.nama}</strong></p>
+                          <p>Nomor Induk / NISN: <strong className="text-slate-900">{previewStudent.nisn || "-"}</strong></p>
+                        </div>
+                        <div className="space-y-1">
+                          <p>Kelas: <strong className="text-slate-900">{previewStudent.kelas}</strong></p>
+                          <p>Semester: <strong className="text-slate-900">{formatPreviewSemester}</strong></p>
+                        </div>
+                      </div>
+
+                      {/* Tabel Nilai (STS vs SAS) */}
+                      {formatPreviewType === "tengah" ? (
+                        // ================= STS TABLE =================
+                        <table
+                          style={{ fontSize: `${raporConfig.fontSizeTabelNilai || 11}px` }}
+                          className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4 text-black"
+                        >
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-900 font-bold">
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-10`}>No</th>
+                              <th className={`border border-[#000000] ${previewCellPadding}`}>Mata Pelajaran</th>
+                              {raporConfig.showKkm !== false && (
+                                <th className={`border border-[#000000] ${previewCellPadding} text-center w-14`}>KKM</th>
+                              )}
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-24 bg-amber-50`}>
+                                Nilai Prestasi
+                              </th>
+                              {raporConfig.showPredikat !== false && (
+                                <th className={`border border-[#000000] ${previewCellPadding} text-center w-16`}>Predikat</th>
+                              )}
+                              {raporConfig.showCatatanGuru !== false && (
+                                <th className={`border border-[#000000] ${previewCellPadding}`}>Capaian Kompetensi / Catatan</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* Muatan Wajib */}
+                            {previewWajib.length > 0 && (
+                              <>
+                                <tr className="bg-slate-100/80 font-bold">
+                                  <td colSpan={6} className={`border border-[#000000] ${previewCellPadding} uppercase tracking-wider`}>
+                                    A. Muatan Wajib
+                                  </td>
+                                </tr>
+                                {previewWajib.map((item, idx) => (
+                                  <tr key={item.nama}>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{idx + 1}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} font-semibold`}>{item.nama}</td>
+                                    {raporConfig.showKkm !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
+                                    )}
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-slate-900`}>{item.uts}</td>
+                                    {raporConfig.showPredikat !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
+                                    )}
+                                    {raporConfig.showCatatanGuru !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+
+                            {/* Muatan Lokal */}
+                            {previewMulok.length > 0 && (
+                              <>
+                                <tr className="bg-slate-100/80 font-bold">
+                                  <td colSpan={6} className={`border border-[#000000] ${previewCellPadding} uppercase tracking-wider`}>
+                                    B. Muatan Lokal
+                                  </td>
+                                </tr>
+                                {previewMulok.map((item, idx) => (
+                                  <tr key={item.nama}>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{idx + 1}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} font-semibold`}>{item.nama}</td>
+                                    {raporConfig.showKkm !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
+                                    )}
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-slate-900`}>{item.uts}</td>
+                                    {raporConfig.showPredikat !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
+                                    )}
+                                    {raporConfig.showCatatanGuru !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+
+                            {/* Kecerdasan Quran */}
+                            {previewQuran.length > 0 && (
+                              <>
+                                <tr className="bg-slate-100/80 font-bold">
+                                  <td colSpan={6} className={`border border-[#000000] ${previewCellPadding} uppercase tracking-wider`}>
+                                    C. Kecerdasan Al-Qur'an
+                                  </td>
+                                </tr>
+                                {previewQuran.map((item, idx) => (
+                                  <tr key={item.nama}>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{idx + 1}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} font-semibold`}>{item.nama}</td>
+                                    {raporConfig.showKkm !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
+                                    )}
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono text-slate-900`}>{item.uts}</td>
+                                    {raporConfig.showPredikat !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
+                                    )}
+                                    {raporConfig.showCatatanGuru !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+                          </tbody>
+                        </table>
+                      ) : (
+                        // ================= SAS TABLE =================
+                        <table
+                          style={{ fontSize: `${raporConfig.fontSizeTabelNilai || 11}px` }}
+                          className="rapor-print-table w-full text-left border-collapse border border-[#000000] mb-4 text-black"
+                        >
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-900 font-bold">
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-8`}>No</th>
+                              <th className={`border border-[#000000] ${previewCellPadding}`}>Mata Pelajaran</th>
+                              {raporConfig.showKkm !== false && (
+                                <th className={`border border-[#000000] ${previewCellPadding} text-center w-12`}>KKM</th>
+                              )}
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-12`}>UH</th>
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-12`}>PTS</th>
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-12`}>PAS</th>
+                              <th className={`border border-[#000000] ${previewCellPadding} text-center w-14 bg-indigo-50 font-black`}>
+                                Akhir
+                              </th>
+                              {raporConfig.showPredikat !== false && (
+                                <th className={`border border-[#000000] ${previewCellPadding} text-center w-12`}>Pred</th>
+                              )}
+                              {raporConfig.showCatatanGuru !== false && (
+                                <th className={`border border-[#000000] ${previewCellPadding}`}>Capaian Kompetensi</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* Muatan Wajib */}
+                            {previewWajib.length > 0 && (
+                              <>
+                                <tr className="bg-slate-100/80 font-bold">
+                                  <td colSpan={9} className={`border border-[#000000] ${previewCellPadding} uppercase tracking-wider`}>
+                                    A. Muatan Wajib
+                                  </td>
+                                </tr>
+                                {previewWajib.map((item, idx) => (
+                                  <tr key={item.nama}>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{idx + 1}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} font-semibold`}>{item.nama}</td>
+                                    {raporConfig.showKkm !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
+                                    )}
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.tugas}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.uts}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.uas}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-black font-mono bg-indigo-50/50`}>{item.akhir}</td>
+                                    {raporConfig.showPredikat !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
+                                    )}
+                                    {raporConfig.showCatatanGuru !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+
+                            {/* Muatan Lokal */}
+                            {previewMulok.length > 0 && (
+                              <>
+                                <tr className="bg-slate-100/80 font-bold">
+                                  <td colSpan={9} className={`border border-[#000000] ${previewCellPadding} uppercase tracking-wider`}>
+                                    B. Muatan Lokal
+                                  </td>
+                                </tr>
+                                {previewMulok.map((item, idx) => (
+                                  <tr key={item.nama}>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{idx + 1}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} font-semibold`}>{item.nama}</td>
+                                    {raporConfig.showKkm !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
+                                    )}
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.tugas}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.uts}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.uas}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-black font-mono bg-indigo-50/50`}>{item.akhir}</td>
+                                    {raporConfig.showPredikat !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
+                                    )}
+                                    {raporConfig.showCatatanGuru !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+
+                            {/* Kecerdasan Quran */}
+                            {previewQuran.length > 0 && (
+                              <>
+                                <tr className="bg-slate-100/80 font-bold">
+                                  <td colSpan={9} className={`border border-[#000000] ${previewCellPadding} uppercase tracking-wider`}>
+                                    C. Kecerdasan Al-Qur'an
+                                  </td>
+                                </tr>
+                                {previewQuran.map((item, idx) => (
+                                  <tr key={item.nama}>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{idx + 1}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} font-semibold`}>{item.nama}</td>
+                                    {raporConfig.showKkm !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.kkm}</td>
+                                    )}
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.tugas}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.uts}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-mono`}>{item.uas}</td>
+                                    <td className={`border border-[#000000] ${previewCellPadding} text-center font-black font-mono bg-indigo-50/50`}>{item.akhir}</td>
+                                    {raporConfig.showPredikat !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-center font-bold font-mono`}>{item.predikat}</td>
+                                    )}
+                                    {raporConfig.showCatatanGuru !== false && (
+                                      <td className={`border border-[#000000] ${previewCellPadding} text-[10px] leading-tight`}>{item.catatan}</td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {/* Tabel Rekap Presensi */}
+                      {raporConfig.showPresensi !== false && (
+                        <div className="mt-4 mb-5 max-w-sm">
+                          <p className="font-bold text-xs uppercase mb-1 text-slate-800">Kehadiran (Presensi):</p>
+                          <table
+                            style={{ fontSize: `${Math.max(9, (raporConfig.fontSizeTabelNilai || 11) - 1)}px` }}
+                            className="rapor-print-table w-full border-collapse border border-[#000000]"
+                          >
+                            <tbody>
+                              <tr>
+                                <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">1. Sakit</td>
+                                <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">1 hari</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">2. Izin</td>
+                                <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">0 hari</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-[#000000] px-3 py-1 font-medium text-slate-800">3. Tanpa Keterangan</td>
+                                <td className="border border-[#000000] px-3 py-1 text-center font-bold font-mono text-slate-900 w-24">0 hari</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* Area Titimangsa & Tanda Tangan */}
+                      <div className="pt-6 border-0 text-xs">
+                        {/* Titimangsa Alamat dan Tanggal */}
+                        <div className="flex justify-end mb-2 pr-4">
+                          <p className="text-slate-800 font-medium">
+                            {raporConfig.tempatRapor || "Jakarta"}, {previewTgl}
+                          </p>
+                        </div>
+
+                        {/* Grid Kolom TTD */}
+                        <div className="grid grid-cols-3 text-center gap-4">
+                          {/* Kolom 1: Kepala Sekolah */}
+                          <div>
+                            {raporConfig.showTtdKepsek !== false && (
+                              <>
+                                <p className="text-slate-600">Mengetahui,</p>
+                                <p className="text-slate-800 font-medium">{previewKepsekLabel},</p>
+                                <div className="h-16" />
+                                <p className="font-bold underline">{previewKepsekNama}</p>
+                                {raporConfig.nipKepalaSekolah && (
+                                  <p className="text-[10px] text-slate-600 mt-0.5">
+                                    NIP. {raporConfig.nipKepalaSekolah}
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {/* Kolom 2: Wali Kelas */}
+                          <div>
+                            {raporConfig.showTtdWali !== false && (
+                              <>
+                                <p className="text-slate-600 invisible">Mengetahui,</p>
+                                <p className="text-slate-800 font-medium">Wali Kelas,</p>
+                                <div className="h-16" />
+                                <p className="font-bold underline">{previewWaliNama}</p>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Kolom 3: Orang Tua / Wali Siswa */}
+                          <div>
+                            {raporConfig.showTtdOrtu !== false && (
+                              <>
+                                <p className="text-slate-600 invisible">Mengetahui,</p>
+                                <p className="text-slate-800 font-medium">Orang Tua / Wali Santri,</p>
+                                <div className="h-16" />
+                                <p className="font-bold underline">
+                                  {previewStudent.namaWali || "................................................"}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

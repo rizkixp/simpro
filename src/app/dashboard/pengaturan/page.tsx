@@ -70,6 +70,7 @@ export default function PengaturanPage() {
     nilaiList,
     sppList,
     clearAllDatabase,
+    clearNilaiDanSpp,
   } = useSchoolData();
 
   // Backup & Restore Database States
@@ -79,6 +80,7 @@ export default function PengaturanPage() {
   const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
   const [restoreErrorMsg, setRestoreErrorMsg] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
+  const [isClearingNilaiSpp, setIsClearingNilaiSpp] = useState(false);
   const [selectedBackupFile, setSelectedBackupFile] = useState<{
     name: string;
     size: string;
@@ -283,6 +285,24 @@ export default function PengaturanPage() {
       alert("Terjadi kendala saat mengosongkan database: " + (err?.message || err));
     } finally {
       setIsClearing(false);
+    }
+  };
+
+  const handleClearNilaiDanSpp = async () => {
+    const confirmed = confirm(
+      "KONFIRMASI PENGOSONGAN DATA NILAI & SPP:\n\nApakah Anda yakin ingin mengosongkan seluruh data Rekap Nilai Siswa dan Tagihan SPP?\n\nData Siswa, Guru, Kelas, dan Jadwal akan tetap aman.\n\nKlik OK untuk mengosongkan data Rekap Nilai dan Tagihan SPP."
+    );
+    if (!confirmed) return;
+
+    setIsClearingNilaiSpp(true);
+    try {
+      await clearNilaiDanSpp();
+      alert("Data Rekap Nilai Siswa dan Tagihan SPP berhasil dikosongkan 100%!");
+    } catch (err: any) {
+      console.error("Gagal mengosongkan nilai & tagihan:", err);
+      alert("Terjadi kendala saat mengosongkan data: " + (err?.message || err));
+    } finally {
+      setIsClearingNilaiSpp(false);
     }
   };
 
@@ -1487,19 +1507,35 @@ export default function PengaturanPage() {
           {/* Action Buttons */}
           {canEdit && (
             <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={handleClearDatabase}
-                disabled={isClearing}
-                className="px-4 py-2.5 rounded-xl border border-rose-300 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {isClearing ? (
-                  <RefreshCw className="h-4 w-4 animate-spin text-rose-600" />
-                ) : (
-                  <Trash2 className="h-4 w-4 text-rose-600" />
-                )}
-                <span>{isClearing ? "Mengosongkan Database..." : "Kosongkan Semua Database (100% Bersih)"}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClearNilaiDanSpp}
+                  disabled={isClearingNilaiSpp || isClearing}
+                  className="px-4 py-2.5 rounded-xl border border-amber-300 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60 text-xs"
+                >
+                  {isClearingNilaiSpp ? (
+                    <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 text-amber-600" />
+                  )}
+                  <span>{isClearingNilaiSpp ? "Mengosongkan Nilai & SPP..." : "Kosongkan Nilai & SPP Saja"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearDatabase}
+                  disabled={isClearing || isClearingNilaiSpp}
+                  className="px-4 py-2.5 rounded-xl border border-rose-300 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60 text-xs"
+                >
+                  {isClearing ? (
+                    <RefreshCw className="h-4 w-4 animate-spin text-rose-600" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 text-rose-600" />
+                  )}
+                  <span>{isClearing ? "Mengosongkan Database..." : "Kosongkan Semua Database (100% Bersih)"}</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-3">
                 {isSaved && (
