@@ -408,7 +408,42 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
       setProfile(load("profile", INITIAL_SCHOOL_PROFILE));
       const loadedSiswa = load("siswa", INITIAL_SISWA);
-      setSiswaList(loadedSiswa && loadedSiswa.length > 0 ? loadedSiswa : INITIAL_SISWA);
+      const baseSiswaList = loadedSiswa && loadedSiswa.length > 0 ? loadedSiswa : INITIAL_SISWA;
+      const waliCleanMigrationKey = "sim_data_siswa_wali_cleared_v1";
+      const hasMigratedWali = typeof window !== "undefined" && localStorage.getItem(waliCleanMigrationKey) === "true";
+      const dummyWalies = new Set([
+        "Wali Murid",
+        "Ir. Bambang Sudirman",
+        "Drs. Hendra Setiawan",
+        "Agus Santoso",
+        "Sri Wahyuni",
+        "Suparman",
+        "Rachmat Hidayat",
+        "Erwin Ardiansyah",
+        "Mulyadi",
+      ]);
+      const sanitizedSiswa = baseSiswaList.map((s: any) => {
+        if (!hasMigratedWali && (dummyWalies.has(s.namaWali) || (s.id?.startsWith("sis-00") && dummyWalies.has(s.namaWali)))) {
+          return {
+            ...s,
+            namaWali: "",
+            noHpWali: "",
+          };
+        }
+        if (s.namaWali === "Wali Murid") {
+          return {
+            ...s,
+            namaWali: "",
+            noHpWali: s.noHpWali === "0812-0000-0000" ? "" : s.noHpWali,
+          };
+        }
+        return s;
+      });
+      if (typeof window !== "undefined" && !hasMigratedWali) {
+        localStorage.setItem(waliCleanMigrationKey, "true");
+        localStorage.setItem("sim_data_siswa", JSON.stringify(sanitizedSiswa));
+      }
+      setSiswaList(sanitizedSiswa);
       const loadedGuru = load("guru", INITIAL_GURU);
       const baseGuruList = loadedGuru && loadedGuru.length > 0 ? loadedGuru : INITIAL_GURU;
       const sanitizedGuru = baseGuruList.map((g: any) => ({

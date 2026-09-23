@@ -121,7 +121,7 @@ export default function PenggunaPage() {
       setAddPhone(found.noHpWali || "");
       setAddPassword(generateRandomPassword("siswa"));
     } else if (addRole === "ortu") {
-      setAddName(`${found.namaWali} (Wali ${found.nama})`);
+      setAddName(found.namaWali ? `${found.namaWali} (Wali ${found.nama})` : `Wali ${found.nama}`);
       setAddEmail(`wali.${found.nisn}@sekolah.id`);
       setAddNisnOrNip(found.nisn);
       setAddKelas(found.kelas);

@@ -111,7 +111,7 @@ export default function SiswaManagementPage() {
     const matchSearch =
       s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.nisn.includes(searchTerm) ||
-      s.namaWali.toLowerCase().includes(searchTerm.toLowerCase());
+      (s.namaWali || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchKelas = teacherScope.isTeacher || selectedKelas === "Semua" || s.kelas === selectedKelas;
     return matchSearch && matchKelas;
   });
@@ -183,7 +183,7 @@ export default function SiswaManagementPage() {
       tempatLahir: "Jakarta",
       alamat: "",
       namaWali: "",
-      noHpWali: "0812-",
+      noHpWali: "",
       status: "Aktif",
     });
     setParsedStudents([]);
@@ -457,8 +457,8 @@ export default function SiswaManagementPage() {
           tanggalLahir: formatBirthDate(rawTgl),
           tempatLahir: rawTempat.trim() || "Jakarta",
           alamat: rawAlamat.trim() || "-",
-          namaWali: rawWali.trim() || "Wali Murid",
-          noHpWali: rawHp.trim() || "0812-0000-0000",
+          namaWali: rawWali.trim(),
+          noHpWali: rawHp.trim(),
           status: normalizeStatus(rawStatus),
           isValid,
           errorMsg,
@@ -864,8 +864,8 @@ export default function SiswaManagementPage() {
                     <td className="px-4 py-3.5 font-semibold">
                       {siswa.jenisKelamin === "L" ? "Laki-laki" : "Perempuan"}
                     </td>
-                    <td className="px-4 py-3.5">{siswa.namaWali}</td>
-                    <td className="px-4 py-3.5 font-mono text-slate-500">{siswa.noHpWali}</td>
+                    <td className="px-4 py-3.5">{siswa.namaWali || "-"}</td>
+                    <td className="px-4 py-3.5 font-mono text-slate-500">{siswa.noHpWali || "-"}</td>
                     <td className="px-4 py-3.5">
                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getStatusBadgeClass(siswa.status)}`}>
                         {siswa.status}
@@ -966,13 +966,13 @@ export default function SiswaManagementPage() {
               <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-700">
                 <span className="text-slate-500">Nama Orang Tua / Wali:</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">
-                  {selectedSiswa.namaWali}
+                  {selectedSiswa.namaWali || "-"}
                 </span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">Kontak Darurat / WhatsApp:</span>
                 <span className="font-mono font-medium text-blue-600 dark:text-blue-400">
-                  {selectedSiswa.noHpWali}
+                  {selectedSiswa.noHpWali || "-"}
                 </span>
               </div>
             </div>
@@ -1418,7 +1418,7 @@ export default function SiswaManagementPage() {
                                       {s.kelas}
                                     </span>
                                   </td>
-                                  <td className="px-3 py-2">{s.namaWali}</td>
+                                   <td className="px-3 py-2">{s.namaWali || "-"}</td>
                                   <td className="px-3 py-2 text-right">
                                     {!s.isValid ? (
                                       <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 text-[10px] font-bold">
