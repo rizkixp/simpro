@@ -29,6 +29,7 @@ import {
   Settings2,
   CheckSquare,
   Square,
+  Check,
   RefreshCw,
   SlidersHorizontal,
   Zap,
@@ -783,29 +784,6 @@ export default function JadwalPage() {
     setTargetMapel(null);
   };
 
-  // Bulk Delete Actions
-  const toggleSelectDelete = (id: string) => {
-    setSelectedIdsToDelete((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const toggleSelectAllFiltered = () => {
-    if (selectedIdsToDelete.length === filteredJadwal.length) {
-      setSelectedIdsToDelete([]);
-    } else {
-      setSelectedIdsToDelete(filteredJadwal.map((j) => j.id));
-    }
-  };
-
-  const handleExecuteBulkDelete = () => {
-    if (selectedIdsToDelete.length === 0) return;
-    bulkDeleteJadwal(selectedIdsToDelete);
-    setIsBulkDeleteModalOpen(false);
-    showToast(`Sebanyak ${selectedIdsToDelete.length} jadwal berhasil dihapus.`, "success");
-    setSelectedIdsToDelete([]);
-  };
-
   // Print Handler (Membuka Modal Pratinjau Cetak Senin s/d Jumat)
   const handleOpenPrintModal = () => {
     if (teacherScope.isTeacher) {
@@ -926,6 +904,37 @@ export default function JadwalPage() {
         return startA - startB;
       });
   }, [jadwalList, selectedKelas, selectedHari, selectedMapel, searchTerm, teacherScope]);
+
+  // Multi-select & Bulk Delete Helpers
+  const isAllFilteredSelected =
+    filteredJadwal.length > 0 &&
+    filteredJadwal.every((j) => selectedIdsToDelete.includes(j.id));
+
+  const toggleSelectDelete = (id: string) => {
+    setSelectedIdsToDelete((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllFiltered = () => {
+    if (isAllFilteredSelected) {
+      const filteredIdSet = new Set(filteredJadwal.map((j) => j.id));
+      setSelectedIdsToDelete((prev) => prev.filter((id) => !filteredIdSet.has(id)));
+    } else {
+      const deletableIds = filteredJadwal
+        .filter((j) => !teacherScope.isTeacher || (teacherScope.isClassAccessible(j.kelas) && teacherScope.isSubjectAccessible(j.mapel)))
+        .map((j) => j.id);
+      setSelectedIdsToDelete((prev) => Array.from(new Set([...prev, ...deletableIds])));
+    }
+  };
+
+  const handleExecuteBulkDelete = () => {
+    if (selectedIdsToDelete.length === 0) return;
+    bulkDeleteJadwal(selectedIdsToDelete);
+    setIsBulkDeleteModalOpen(false);
+    showToast(`Sebanyak ${selectedIdsToDelete.length} jadwal berhasil dihapus.`, "success");
+    setSelectedIdsToDelete([]);
+  };
 
   // Helper to check if an item in the list has an active overlap
   const checkItemOverlap = (item: JadwalPelajaran) => {
@@ -1384,6 +1393,42 @@ export default function JadwalPage() {
                   </button>
                 </div>
 
+                {/* Select All & Delete Action Buttons */}
+                <button
+                  type="button"
+                  onClick={toggleSelectAllFiltered}
+                  disabled={filteredJadwal.length === 0}
+                  className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                    isAllFilteredSelected
+                      ? "bg-rose-600 text-white border-rose-600 shadow-sm shadow-rose-600/20"
+                      : "bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+                  }`}
+                  title={
+                    isAllFilteredSelected
+                      ? "Batalkan pilihan semua"
+                      : "Pilih semua jadwal sesi ini"
+                  }
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>
+                    {isAllFilteredSelected
+                      ? "Batal Pilih"
+                      : `Pilih Semua (${filteredJadwal.length})`}
+                  </span>
+                </button>
+
+                {selectedIdsToDelete.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsBulkDeleteModalOpen(true)}
+                    className="px-3 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer animate-in fade-in"
+                    title={`Hapus ${selectedIdsToDelete.length} jadwal terpilih`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus ({selectedIdsToDelete.length})</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => handleOpenAddModal()}
@@ -1438,6 +1483,45 @@ export default function JadwalPage() {
             </div>
           </div>
 
+          {/* Floating Bulk Action Bar */}
+          {selectedIdsToDelete.length > 0 && (
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50/90 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 no-print shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-rose-600 text-white text-xs font-bold shadow-xs">
+                  {selectedIdsToDelete.length}
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    {selectedIdsToDelete.length} jadwal dipilih
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Pilih aksi untuk menghapus seluruh sesi jadwal yang ditandai dari agenda KBM.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedIdsToDelete([])}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  <span>Batalkan Pilihan</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-md shadow-rose-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Hapus {selectedIdsToDelete.length} Jadwal Terpilih</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Schedule List Content */}
           {filteredJadwal.length === 0 ? (
             <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm text-slate-400">
@@ -1464,20 +1548,32 @@ export default function JadwalPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredJadwal.map((item) => {
                 const overlappingWith = checkItemOverlap(item);
+                const isChecked = selectedIdsToDelete.includes(item.id);
                 return (
                   <div
                     key={item.id}
                     className={`group p-5 rounded-2xl bg-white dark:bg-slate-900 border shadow-sm transition-all flex flex-col justify-between ${
-                      overlappingWith
+                      isChecked
+                        ? "border-rose-400 dark:border-rose-600 ring-2 ring-rose-500/50 bg-rose-50/15 dark:bg-rose-950/20"
+                        : overlappingWith
                         ? "border-amber-300 dark:border-amber-800/80 hover:border-amber-400"
                         : "border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 hover:shadow-md"
                     }`}
                   >
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs border border-indigo-100 dark:border-indigo-900/40">
-                          {item.hari}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSelectDelete(item.id)}
+                            className="rounded text-rose-600 focus:ring-rose-500 dark:bg-slate-800 w-4 h-4 cursor-pointer"
+                            title="Tandai jadwal untuk dihapus"
+                          />
+                          <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs border border-indigo-100 dark:border-indigo-900/40">
+                            {item.hari}
+                          </span>
+                        </div>
                         {item.jamMulai && item.jamMulai !== "-" ? (
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
                             <Clock className="h-3.5 w-3.5 text-indigo-500" />
@@ -1573,6 +1669,15 @@ export default function JadwalPage() {
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/50 text-[13px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      <th className="py-3 px-4 w-10 text-center no-print">
+                        <input
+                          type="checkbox"
+                          checked={isAllFilteredSelected}
+                          onChange={toggleSelectAllFiltered}
+                          className="rounded text-rose-600 focus:ring-rose-500 dark:bg-slate-800 w-4 h-4 cursor-pointer"
+                          title={isAllFilteredSelected ? "Batalkan pilihan semua" : "Pilih semua jadwal"}
+                        />
+                      </th>
                       <th className="py-3 px-4">Hari</th>
                       <th className="py-3 px-4">Jam Belajar</th>
                       <th className="py-3 px-4">Kelas</th>
@@ -1584,15 +1689,27 @@ export default function JadwalPage() {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {filteredJadwal.map((item) => {
                       const overlappingWith = checkItemOverlap(item);
+                      const isChecked = selectedIdsToDelete.includes(item.id);
                       return (
                       <tr
                         key={item.id}
                         className={`transition-colors ${
-                          overlappingWith
+                          isChecked
+                            ? "bg-rose-50/50 dark:bg-rose-950/30 hover:bg-rose-50/70"
+                            : overlappingWith
                             ? "bg-amber-50/30 dark:bg-amber-950/20 hover:bg-amber-50/60"
                             : "hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
                         }`}
                       >
+                        <td className="py-3 px-4 text-center no-print" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSelectDelete(item.id)}
+                            className="rounded text-rose-600 focus:ring-rose-500 dark:bg-slate-800 w-4 h-4 cursor-pointer"
+                            title="Tandai jadwal untuk dihapus"
+                          />
+                        </td>
                         <td className="py-3 px-4">
                           <span className="font-semibold text-slate-900 dark:text-white px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 text-xs">
                             {item.hari}
