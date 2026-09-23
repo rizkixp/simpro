@@ -352,6 +352,44 @@ interface SchoolDataContextType {
 
 
 
+// Tombstone tracker to ensure deleted items (kelas, siswa, guru, mapel, jadwal, nilai, dll)
+// are permanently deleted across refreshes and never resurrected by defaults or cloud sync
+export const getDeletedIds = (): Set<string> => {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem("sim_deleted_ids");
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
+};
+
+export const recordDeletedId = (id: string | string[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    const ids = Array.isArray(id) ? id : [id];
+    const current = getDeletedIds();
+    ids.forEach((i) => {
+      if (i && typeof i === "string") current.add(i.trim());
+    });
+    localStorage.setItem("sim_deleted_ids", JSON.stringify(Array.from(current)));
+  } catch {}
+};
+
+export const removeDeletedId = (id: string | string[]) => {
+  if (typeof window === "undefined") return;
+  try {
+    const ids = Array.isArray(id) ? id : [id];
+    const current = getDeletedIds();
+    ids.forEach((i) => {
+      if (i && typeof i === "string") current.delete(i.trim());
+    });
+    localStorage.setItem("sim_deleted_ids", JSON.stringify(Array.from(current)));
+  } catch {}
+};
+
 const SchoolDataContext = createContext<SchoolDataContextType | undefined>(undefined);
 
 export function SchoolDataProvider({ children }: { children: React.ReactNode }) {
@@ -477,7 +515,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     try {
       const load = <T,>(key: string, fallback: T): T => {
         const item = localStorage.getItem(`sim_data_${key}`);
-        return item ? JSON.parse(item) : fallback;
+        if (item === null) return fallback;
+        try {
+          return JSON.parse(item);
+        } catch {
+          return fallback;
+        }
       };
 
       const isCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
@@ -539,234 +582,268 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           mutabaahList: load("mutabaah", []),
         };
       } else {
-        setProfile(load("profile", INITIAL_SCHOOL_PROFILE));
-        const loadedSiswa = load("siswa", INITIAL_SISWA);
-        const baseSiswaList = loadedSiswa && loadedSiswa.length > 0 ? loadedSiswa : INITIAL_SISWA;
+        const deletedIds = getDeletedIds();
+
+        // 1. Profile
+        const loadedProfile = load("profile", INITIAL_SCHOOL_PROFILE);
+        setProfile(loadedProfile);
+
+        // 2. Siswa
+        const rawSiswa = localStorage.getItem("sim_data_siswa");
+        let baseSiswaList: Siswa[] = rawSiswa !== null ? (JSON.parse(rawSiswa) || []) : INITIAL_SISWA;
+        baseSiswaList = baseSiswaList.filter((s) => !deletedIds.has(s.id));
         const waliCleanMigrationKey = "sim_data_siswa_wali_cleared_v1";
         const hasMigratedWali = typeof window !== "undefined" && localStorage.getItem(waliCleanMigrationKey) === "true";
-      const dummyWalies = new Set([
-        "Wali Murid",
-        "Ir. Bambang Sudirman",
-        "Drs. Hendra Setiawan",
-        "Agus Santoso",
-        "Sri Wahyuni",
-        "Suparman",
-        "Rachmat Hidayat",
-        "Erwin Ardiansyah",
-        "Mulyadi",
-      ]);
-      const sanitizedSiswa = baseSiswaList.map((s: any) => {
-        if (!hasMigratedWali && (dummyWalies.has(s.namaWali) || (s.id?.startsWith("sis-00") && dummyWalies.has(s.namaWali)))) {
-          return {
-            ...s,
-            namaWali: "",
-            noHpWali: "",
-          };
-        }
-        if (s.namaWali === "Wali Murid") {
-          return {
-            ...s,
-            namaWali: "",
-            noHpWali: s.noHpWali === "0812-0000-0000" ? "" : s.noHpWali,
-          };
-        }
-        return s;
-      });
-      if (typeof window !== "undefined" && !hasMigratedWali) {
-        localStorage.setItem(waliCleanMigrationKey, "true");
-        localStorage.setItem("sim_data_siswa", JSON.stringify(sanitizedSiswa));
-      }
-      setSiswaList(sanitizedSiswa);
-      latestDataRef.current.siswaList = sanitizedSiswa;
-      const loadedGuru = load("guru", INITIAL_GURU);
-      const baseGuruList = loadedGuru && loadedGuru.length > 0 ? loadedGuru : INITIAL_GURU;
-      const sanitizedGuru = baseGuruList.map((g: any) => ({
-        ...g,
-        id: g.id || `gur-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-        nama: g.nama || "Tenaga Pendidik",
-        nip: g.nip || "198001012005011001",
-        gelar: g.gelar || "",
-        jenisKelamin: g.jenisKelamin === "P" ? "P" : "L",
-        mataPelajaran: Array.isArray(g.mataPelajaran)
-          ? g.mataPelajaran
-          : typeof g.mataPelajaran === "string" && g.mataPelajaran.trim()
-          ? g.mataPelajaran.split(",").map((s: string) => s.trim())
-          : ["Umum"],
-        kelasWali: g.kelasWali || "",
-        pendidikanTerakhir: g.pendidikanTerakhir || "S1 Pendidikan",
-        statusKepegawaian: g.statusKepegawaian || "PNS",
-        email: g.email || `${(g.nama || "guru").toLowerCase().replace(/[^a-z0-9]/g, "")}@sekolah.id`,
-        noHp: g.noHp || "0812-3456-7890",
-        avatar: g.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(g.nama || "Guru")}`,
-      }));
-      setGuruList(sanitizedGuru);
-      const loadedKelas = load("kelas", INITIAL_KELAS);
-      const baseKelasList = loadedKelas && loadedKelas.length > 0 ? loadedKelas : INITIAL_KELAS;
-      const mergedKelas = [...baseKelasList];
-      INITIAL_KELAS.forEach((ik) => {
-        if (!mergedKelas.some((k) => k.id === ik.id || k.nama.toLowerCase() === ik.nama.toLowerCase())) {
-          mergedKelas.push(ik);
-        }
-      });
-      setKelasList(mergedKelas);
-      const loadedMapel = load("mapel", INITIAL_MAPEL);
-      const mergedMapel = [...(loadedMapel && loadedMapel.length > 0 ? loadedMapel : INITIAL_MAPEL)];
-      INITIAL_MAPEL.forEach((im) => {
-        if (!mergedMapel.some((m) => m.id === im.id || m.nama.toLowerCase() === im.nama.toLowerCase())) {
-          mergedMapel.push(im);
-        }
-      });
-      setMapelList(mergedMapel);
-      const loadedJadwal = load("jadwal", INITIAL_JADWAL);
-      let mergedJadwal = [...(loadedJadwal && loadedJadwal.length > 0 ? loadedJadwal : INITIAL_JADWAL)];
-      mergedJadwal = mergedJadwal.map((j) => {
-        if (j.id === "jdw-01" && j.mapel === "Upacara & PAI") {
-          return { ...j, mapel: "Pendidikan Agama Islam" };
-        }
-        if (j.id === "jdw-08" && j.mapel === "Kajian Islam & Tahfidz") {
-          return { ...j, mapel: "Pendidikan Lingkungan & Budaya (PLBJ)" };
-        }
-        return j;
-      });
-      INITIAL_JADWAL.forEach((ij) => {
-        if (!mergedJadwal.some((j) => j.id === ij.id)) {
-          mergedJadwal.push(ij);
-        }
-      });
-      setJadwalList(mergedJadwal);
-      setPresensiList(load("presensi", INITIAL_PRESENSI));
-
-      const loadedNilai = load("nilai", INITIAL_NILAI);
-      let mergedNilai = [...(loadedNilai && loadedNilai.length > 0 ? loadedNilai : INITIAL_NILAI)];
-      INITIAL_NILAI.forEach((inil) => {
-        if (!mergedNilai.some((n) => n.id === inil.id)) {
-          mergedNilai.push(inil);
-        }
-      });
-
-      // Migration: Kosongkan nilai default SAS (Ganjil & Genap) pada browser pengguna
-      const sasMigrationKey = "sim_data_nilai_sas_cleared_v1";
-      if (typeof window !== "undefined" && localStorage.getItem(sasMigrationKey) !== "true") {
-        mergedNilai = mergedNilai.map((n) => {
-          if (n.id.startsWith("nil-") || !n.hasSas) {
+        const dummyWalies = new Set([
+          "Wali Murid",
+          "Ir. Bambang Sudirman",
+          "Drs. Hendra Setiawan",
+          "Agus Santoso",
+          "Sri Wahyuni",
+          "Suparman",
+          "Rachmat Hidayat",
+          "Erwin Ardiansyah",
+          "Mulyadi",
+        ]);
+        const sanitizedSiswa = baseSiswaList.map((s: any) => {
+          if (!hasMigratedWali && (dummyWalies.has(s.namaWali) || (s.id?.startsWith("sis-00") && dummyWalies.has(s.namaWali)))) {
             return {
-              ...n,
-              uas: 0,
-              nilaiAkhir: 0,
-              predikat: undefined,
-              hasSas: false,
-              hasSts: typeof n.nilaiMid === "number" || (typeof n.uts === "number" && n.uts > 0),
+              ...s,
+              namaWali: "",
+              noHpWali: "",
             };
           }
-          return n;
-        });
-        localStorage.setItem(sasMigrationKey, "true");
-        localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
-      }
-
-      // Migration: Bersihkan rekaman nilai IPAS untuk Kelas 1 yang tidak ada dalam kurikulum/jadwal
-      const ipasCleanMigrationKey = "sim_data_nilai_ipas_k1_cleared_v1";
-      if (typeof window !== "undefined" && localStorage.getItem(ipasCleanMigrationKey) !== "true") {
-        mergedNilai = mergedNilai.filter((n) => {
-          const isK1 = n.kelas && (n.kelas.toLowerCase().includes("kelas 1") || n.kelas.trim() === "1");
-          const isIpas = n.mapel && n.mapel.toLowerCase().includes("ilmu pengetahuan alam");
-          return !(isK1 && isIpas);
-        });
-        localStorage.setItem(ipasCleanMigrationKey, "true");
-        localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
-      }
-
-      setNilaiList(mergedNilai);
-      setSppList(load("spp", INITIAL_SPP));
-      setJenisTagihanList(load("jenis_tagihan", INITIAL_JENIS_TAGIHAN));
-      setPengumumanList(load("pengumuman", INITIAL_PENGUMUMAN));
-      const savedTab = localStorage.getItem("sim_data_tabungan");
-      if (savedTab && (savedTab.includes("tab-001") || savedTab.includes("Ahmad Rizky"))) {
-        localStorage.setItem("sim_data_tabungan", JSON.stringify([]));
-        localStorage.setItem("sim_data_transaksi_tabungan", JSON.stringify([]));
-        setTabunganList([]);
-        setTransaksiTabunganList([]);
-      } else {
-        setTabunganList(load("tabungan", INITIAL_TABUNGAN));
-        setTransaksiTabunganList(load("transaksi_tabungan", INITIAL_TRANSAKSI_TABUNGAN));
-      }
-      setPesertaTransportList(load("peserta_transport", INITIAL_PESERTA_TRANSPORT));
-      setSppTransportRecords(load("spp_transport_records", INITIAL_SPP_TRANSPORT_RECORDS));
-      setTransaksiSPPTransportList(load("transaksi_spp_transport", INITIAL_TRANSAKSI_SPP_TRANSPORT));
-
-      // Load LMS Data with automatic merging of new default items
-      const loadedMateri = load("lms_materi", INITIAL_LMS_MATERI);
-      const mergedMateri = Array.isArray(loadedMateri) ? [...loadedMateri] : [...INITIAL_LMS_MATERI];
-      INITIAL_LMS_MATERI.forEach((im) => {
-        if (!mergedMateri.some((m) => m.id === im.id)) {
-          mergedMateri.push(im);
-        }
-      });
-      setLmsMateriList(mergedMateri);
-
-      const loadedTugas = load("lms_tugas", INITIAL_LMS_TUGAS);
-      const mergedTugas = Array.isArray(loadedTugas) ? [...loadedTugas] : [...INITIAL_LMS_TUGAS];
-      INITIAL_LMS_TUGAS.forEach((it) => {
-        if (!mergedTugas.some((t) => t.id === it.id)) {
-          mergedTugas.push(it);
-        }
-      });
-      setLmsTugasList(mergedTugas);
-
-      setLmsSubmissionList(load("lms_submissions", INITIAL_LMS_SUBMISSIONS));
-
-      const loadedKuis = load("lms_kuis", INITIAL_LMS_KUIS);
-      const mergedKuis = Array.isArray(loadedKuis) ? [...loadedKuis] : [...INITIAL_LMS_KUIS];
-      INITIAL_LMS_KUIS.forEach((ik) => {
-        if (!mergedKuis.some((k) => k.id === ik.id)) {
-          mergedKuis.push(ik);
-        }
-      });
-      setLmsKuisList(mergedKuis);
-
-      setLmsKuisAttemptList(load("lms_attempts", INITIAL_LMS_ATTEMPTS));
-      setLmsForumList(load("lms_forum", INITIAL_LMS_FORUM));
-      const loadedBank = load("lms_bank_soal", INITIAL_LMS_BANK_SOAL);
-      if (Array.isArray(loadedBank) && loadedBank.length > 0 && Array.isArray((loadedBank[0] as any)?.soalList)) {
-        const mergedBank = [...loadedBank];
-        INITIAL_LMS_BANK_SOAL.forEach((ib) => {
-          if (!mergedBank.some((b) => b.id === ib.id)) {
-            mergedBank.push(ib);
+          if (s.namaWali === "Wali Murid") {
+            return {
+              ...s,
+              namaWali: "",
+              noHpWali: s.noHpWali === "0812-0000-0000" ? "" : s.noHpWali,
+            };
           }
+          return s;
         });
-        setLmsBankSoalList(mergedBank);
-      } else {
-        setLmsBankSoalList(INITIAL_LMS_BANK_SOAL);
-        saveState("lms_bank_soal", INITIAL_LMS_BANK_SOAL);
-      }
-
-      const loadedJadwalMateri = load("lms_jadwal_materi", INITIAL_LMS_JADWAL_MATERI);
-      const mergedJadwalMateri = Array.isArray(loadedJadwalMateri) ? [...loadedJadwalMateri] : [...INITIAL_LMS_JADWAL_MATERI];
-      INITIAL_LMS_JADWAL_MATERI.forEach((ij) => {
-        if (!mergedJadwalMateri.some((j) => j.id === ij.id)) {
-          mergedJadwalMateri.push(ij);
+        if (typeof window !== "undefined" && !hasMigratedWali) {
+          localStorage.setItem(waliCleanMigrationKey, "true");
+          localStorage.setItem("sim_data_siswa", JSON.stringify(sanitizedSiswa));
         }
-      });
-      setLmsJadwalMateriList(mergedJadwalMateri);
+        setSiswaList(sanitizedSiswa);
 
-      // Islamic School Flagship Hydration
-      const loadedTahfidz = load("tahfidz", INITIAL_TAHFIDZ_RECORDS);
-      const mergedTahfidz = Array.isArray(loadedTahfidz) ? [...loadedTahfidz] : [...INITIAL_TAHFIDZ_RECORDS];
-      INITIAL_TAHFIDZ_RECORDS.forEach((it) => {
-        if (!mergedTahfidz.some((t) => t.id === it.id)) {
-          mergedTahfidz.push(it);
-        }
-      });
-      setTahfidzList(mergedTahfidz);
+        // 3. Guru
+        const rawGuru = localStorage.getItem("sim_data_guru");
+        let baseGuruList: Guru[] = rawGuru !== null ? (JSON.parse(rawGuru) || []) : INITIAL_GURU;
+        baseGuruList = baseGuruList.filter((g) => !deletedIds.has(g.id));
+        const sanitizedGuru = baseGuruList.map((g: any) => ({
+          ...g,
+          id: g.id || `gur-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          nama: g.nama || "Tenaga Pendidik",
+          nip: g.nip || "198001012005011001",
+          gelar: g.gelar || "",
+          jenisKelamin: g.jenisKelamin === "P" ? "P" : "L",
+          mataPelajaran: Array.isArray(g.mataPelajaran)
+            ? g.mataPelajaran
+            : typeof g.mataPelajaran === "string" && g.mataPelajaran.trim()
+            ? g.mataPelajaran.split(",").map((s: string) => s.trim())
+            : ["Umum"],
+          kelasWali: g.kelasWali || "",
+          pendidikanTerakhir: g.pendidikanTerakhir || "S1 Pendidikan",
+          statusKepegawaian: g.statusKepegawaian || "PNS",
+          email: g.email || `${(g.nama || "guru").toLowerCase().replace(/[^a-z0-9]/g, "")}@sekolah.id`,
+          noHp: g.noHp || "0812-3456-7890",
+          avatar: g.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(g.nama || "Guru")}`,
+        }));
+        setGuruList(sanitizedGuru);
 
-      const loadedMutabaah = load("mutabaah", INITIAL_MUTABAAH_RECORDS);
-      const mergedMutabaah = Array.isArray(loadedMutabaah) ? [...loadedMutabaah] : [...INITIAL_MUTABAAH_RECORDS];
-      INITIAL_MUTABAAH_RECORDS.forEach((im) => {
-        if (!mergedMutabaah.some((m) => m.id === im.id)) {
-          mergedMutabaah.push(im);
+        // 4. Kelas (Otoritatif dari localStorage tanpa re-injeksi INITIAL_KELAS)
+        const rawKelas = localStorage.getItem("sim_data_kelas");
+        let baseKelasList: Kelas[] = rawKelas !== null ? (JSON.parse(rawKelas) || []) : INITIAL_KELAS;
+        baseKelasList = baseKelasList.filter((k) => !deletedIds.has(k.id));
+        setKelasList(baseKelasList);
+
+        // 5. Mapel (Otoritatif dari localStorage tanpa re-injeksi INITIAL_MAPEL)
+        const rawMapel = localStorage.getItem("sim_data_mapel");
+        let baseMapelList: MataPelajaran[] = rawMapel !== null ? (JSON.parse(rawMapel) || []) : INITIAL_MAPEL;
+        baseMapelList = baseMapelList.filter((m) => !deletedIds.has(m.id));
+        setMapelList(baseMapelList);
+
+        // 6. Jadwal (Otoritatif dari localStorage tanpa re-injeksi INITIAL_JADWAL)
+        const rawJadwal = localStorage.getItem("sim_data_jadwal");
+        let baseJadwalList: JadwalPelajaran[] = rawJadwal !== null ? (JSON.parse(rawJadwal) || []) : INITIAL_JADWAL;
+        baseJadwalList = baseJadwalList.filter((j) => !deletedIds.has(j.id));
+        baseJadwalList = baseJadwalList.map((j) => {
+          if (j.id === "jdw-01" && j.mapel === "Upacara & PAI") {
+            return { ...j, mapel: "Pendidikan Agama Islam" };
+          }
+          if (j.id === "jdw-08" && j.mapel === "Kajian Islam & Tahfidz") {
+            return { ...j, mapel: "Pendidikan Lingkungan & Budaya (PLBJ)" };
+          }
+          return j;
+        });
+        setJadwalList(baseJadwalList);
+
+        // 7. Presensi
+        const rawPresensi = localStorage.getItem("sim_data_presensi");
+        let basePresensiList: PresensiRecord[] = rawPresensi !== null ? (JSON.parse(rawPresensi) || []) : INITIAL_PRESENSI;
+        basePresensiList = basePresensiList.filter((p) => !deletedIds.has(p.id));
+        setPresensiList(basePresensiList);
+
+        // 8. Nilai (Otoritatif dari localStorage tanpa re-injeksi INITIAL_NILAI)
+        const rawNilai = localStorage.getItem("sim_data_nilai");
+        let mergedNilai: NilaiSiswa[] = rawNilai !== null ? (JSON.parse(rawNilai) || []) : INITIAL_NILAI;
+        mergedNilai = mergedNilai.filter((n) => !deletedIds.has(n.id));
+
+        // Migration: Kosongkan nilai default SAS (Ganjil & Genap) pada browser pengguna
+        const sasMigrationKey = "sim_data_nilai_sas_cleared_v1";
+        if (typeof window !== "undefined" && localStorage.getItem(sasMigrationKey) !== "true") {
+          mergedNilai = mergedNilai.map((n) => {
+            if (n.id.startsWith("nil-") || !n.hasSas) {
+              return {
+                ...n,
+                uas: 0,
+                nilaiAkhir: 0,
+                predikat: undefined,
+                hasSas: false,
+                hasSts: typeof n.nilaiMid === "number" || (typeof n.uts === "number" && n.uts > 0),
+              };
+            }
+            return n;
+          });
+          localStorage.setItem(sasMigrationKey, "true");
+          localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
         }
-      });
-      setMutabaahList(mergedMutabaah);
+
+        // Migration: Bersihkan rekaman nilai IPAS untuk Kelas 1 yang tidak ada dalam kurikulum/jadwal
+        const ipasCleanMigrationKey = "sim_data_nilai_ipas_k1_cleared_v1";
+        if (typeof window !== "undefined" && localStorage.getItem(ipasCleanMigrationKey) !== "true") {
+          mergedNilai = mergedNilai.filter((n) => {
+            const isK1 = n.kelas && (n.kelas.toLowerCase().includes("kelas 1") || n.kelas.trim() === "1");
+            const isIpas = n.mapel && n.mapel.toLowerCase().includes("ilmu pengetahuan alam");
+            return !(isK1 && isIpas);
+          });
+          localStorage.setItem(ipasCleanMigrationKey, "true");
+          localStorage.setItem("sim_data_nilai", JSON.stringify(mergedNilai));
+        }
+        setNilaiList(mergedNilai);
+
+        // 9. SPP & Jenis Tagihan
+        const rawSpp = localStorage.getItem("sim_data_spp");
+        const loadedSpp: TagihanSiswa[] = (rawSpp !== null ? (JSON.parse(rawSpp) || []) : INITIAL_SPP).filter((s: any) => !deletedIds.has(s.id));
+        setSppList(loadedSpp);
+
+        const rawJenisTagihan = localStorage.getItem("sim_data_jenis_tagihan");
+        const loadedJenisTagihan: JenisTagihan[] = (rawJenisTagihan !== null ? (JSON.parse(rawJenisTagihan) || []) : INITIAL_JENIS_TAGIHAN).filter((j: any) => !deletedIds.has(j.id));
+        setJenisTagihanList(loadedJenisTagihan);
+
+        // 10. Pengumuman
+        const rawPengumuman = localStorage.getItem("sim_data_pengumuman");
+        const loadedPengumuman: Pengumuman[] = (rawPengumuman !== null ? (JSON.parse(rawPengumuman) || []) : INITIAL_PENGUMUMAN).filter((p: any) => !deletedIds.has(p.id));
+        setPengumumanList(loadedPengumuman);
+
+        // 11. Tabungan
+        const savedTab = localStorage.getItem("sim_data_tabungan");
+        let loadedTabungan: TabunganSiswa[] = [];
+        let loadedTransaksiTabungan: TransaksiTabungan[] = [];
+        if (savedTab && (savedTab.includes("tab-001") || savedTab.includes("Ahmad Rizky"))) {
+          localStorage.setItem("sim_data_tabungan", JSON.stringify([]));
+          localStorage.setItem("sim_data_transaksi_tabungan", JSON.stringify([]));
+          loadedTabungan = [];
+          loadedTransaksiTabungan = [];
+        } else {
+          loadedTabungan = load("tabungan", INITIAL_TABUNGAN);
+          loadedTransaksiTabungan = load("transaksi_tabungan", INITIAL_TRANSAKSI_TABUNGAN);
+        }
+        setTabunganList(loadedTabungan);
+        setTransaksiTabunganList(loadedTransaksiTabungan);
+
+        // 12. Transport
+        const loadedPesertaTransport = load("peserta_transport", INITIAL_PESERTA_TRANSPORT);
+        const loadedSppTransportRecords = load("spp_transport_records", INITIAL_SPP_TRANSPORT_RECORDS);
+        const loadedTransaksiSPPTransportList = load("transaksi_spp_transport", INITIAL_TRANSAKSI_SPP_TRANSPORT);
+        setPesertaTransportList(loadedPesertaTransport);
+        setSppTransportRecords(loadedSppTransportRecords);
+        setTransaksiSPPTransportList(loadedTransaksiSPPTransportList);
+
+        // 13. LMS Data (Otoritatif tanpa re-injeksi default yang telah dihapus)
+        const rawMateri = localStorage.getItem("sim_data_lms_materi");
+        const baseMateri: LMSMateri[] = (rawMateri !== null ? (JSON.parse(rawMateri) || []) : INITIAL_LMS_MATERI).filter((m: any) => !deletedIds.has(m.id));
+        setLmsMateriList(baseMateri);
+
+        const rawTugas = localStorage.getItem("sim_data_lms_tugas");
+        const baseTugas: LMSTugas[] = (rawTugas !== null ? (JSON.parse(rawTugas) || []) : INITIAL_LMS_TUGAS).filter((t: any) => !deletedIds.has(t.id));
+        setLmsTugasList(baseTugas);
+
+        const loadedSubmissions: LMSSubmission[] = load("lms_submissions", INITIAL_LMS_SUBMISSIONS);
+        setLmsSubmissionList(loadedSubmissions);
+
+        const rawKuis = localStorage.getItem("sim_data_lms_kuis");
+        const baseKuis: LMSKuis[] = (rawKuis !== null ? (JSON.parse(rawKuis) || []) : INITIAL_LMS_KUIS).filter((k: any) => !deletedIds.has(k.id));
+        setLmsKuisList(baseKuis);
+
+        const loadedAttempts: LMSKuisAttempt[] = load("lms_attempts", INITIAL_LMS_ATTEMPTS);
+        setLmsKuisAttemptList(loadedAttempts);
+
+        const loadedForum: LMSForumDiskusi[] = load("lms_forum", INITIAL_LMS_FORUM);
+        setLmsForumList(loadedForum);
+
+        const loadedMeetings: LMSVirtualMeeting[] = load("lms_meetings", INITIAL_LMS_MEETINGS);
+        setLmsMeetingList(loadedMeetings);
+
+        const rawBank = localStorage.getItem("sim_data_lms_bank_soal");
+        let baseBank: LMSBankSoal[] = [];
+        if (rawBank !== null) {
+          try {
+            baseBank = JSON.parse(rawBank);
+          } catch {
+            baseBank = INITIAL_LMS_BANK_SOAL;
+          }
+        } else {
+          baseBank = INITIAL_LMS_BANK_SOAL;
+        }
+        baseBank = baseBank.filter((b: any) => !deletedIds.has(b.id));
+        setLmsBankSoalList(baseBank);
+
+        const rawJadwalMateri = localStorage.getItem("sim_data_lms_jadwal_materi");
+        const baseJadwalMateri: LMSJadwalMateri[] = (rawJadwalMateri !== null ? (JSON.parse(rawJadwalMateri) || []) : INITIAL_LMS_JADWAL_MATERI).filter((j: any) => !deletedIds.has(j.id));
+        setLmsJadwalMateriList(baseJadwalMateri);
+
+        // 14. Islamic School Flagship (Tahfidz & Mutaba'ah)
+        const rawTahfidz = localStorage.getItem("sim_data_tahfidz");
+        const baseTahfidz: TahfidzRecord[] = (rawTahfidz !== null ? (JSON.parse(rawTahfidz) || []) : INITIAL_TAHFIDZ_RECORDS).filter((t: any) => !deletedIds.has(t.id));
+        setTahfidzList(baseTahfidz);
+
+        const rawMutabaah = localStorage.getItem("sim_data_mutabaah");
+        const baseMutabaah: MutabaahRecord[] = (rawMutabaah !== null ? (JSON.parse(rawMutabaah) || []) : INITIAL_MUTABAAH_RECORDS).filter((m: any) => !deletedIds.has(m.id));
+        setMutabaahList(baseMutabaah);
+
+        // Populate latestDataRef immediately for thread safety and sync alignment
+        latestDataRef.current = {
+          profile: loadedProfile,
+          siswaList: sanitizedSiswa,
+          guruList: sanitizedGuru,
+          kelasList: baseKelasList,
+          mapelList: baseMapelList,
+          jadwalList: baseJadwalList,
+          presensiList: basePresensiList,
+          nilaiList: mergedNilai,
+          jenisTagihanList: loadedJenisTagihan,
+          sppList: loadedSpp,
+          tabunganList: loadedTabungan,
+          transaksiTabunganList: loadedTransaksiTabungan,
+          pesertaTransportList: loadedPesertaTransport,
+          sppTransportRecords: loadedSppTransportRecords,
+          transaksiSPPTransportList: loadedTransaksiSPPTransportList,
+          pengumumanList: loadedPengumuman,
+          lmsMateriList: baseMateri,
+          lmsTugasList: baseTugas,
+          lmsSubmissionList: loadedSubmissions,
+          lmsKuisList: baseKuis,
+          lmsKuisAttemptList: loadedAttempts,
+          lmsForumList: loadedForum,
+          lmsMeetingList: loadedMeetings,
+          lmsBankSoalList: baseBank,
+          lmsJadwalMateriList: baseJadwalMateri,
+          tahfidzList: baseTahfidz,
+          mutabaahList: baseMutabaah,
+        };
       }
 
       // Nonaktifkan automatic push ke Supabase secara default
@@ -856,9 +933,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     return () => clearInterval(interval);
   }, [isAutoPushEnabled]);
 
-  // Helper for background Supabase persistence without blocking UI (hanya berjalan jika isAutoPushEnabled aktif)
+  // Helper for background Supabase persistence without blocking UI
   const persistSupabase = (action: () => Promise<boolean | any>) => {
-    if (isAutoPushEnabled && SupabaseSchoolService.isConfigured()) {
+    if (SupabaseSchoolService.isConfigured()) {
       action().catch((err) => {
         console.warn("[Supabase] Background persistence warning:", err);
       });
@@ -1007,11 +1084,16 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           return merged;
         });
       }
+      const deletedIds = getDeletedIds();
+
       if (Array.isArray(data.siswa)) {
         const localSiswa = latestDataRef.current.siswaList || [];
-        const remoteSiswa = data.siswa;
+        const stale = data.siswa.filter((s) => deletedIds.has(s.id)).map((s) => s.id);
+        if (stale.length > 0) SupabaseSchoolService.bulkDeleteSiswa(stale).catch(() => {});
+        const remoteSiswa = data.siswa.filter((s) => !deletedIds.has(s.id));
         const mergedSiswa = [...remoteSiswa];
         localSiswa.forEach((loc) => {
+          if (deletedIds.has(loc.id)) return;
           const exists = mergedSiswa.some(
             (rem) => rem.id === loc.id || (Boolean(loc.nisn?.trim()) && Boolean(rem.nisn?.trim()) && rem.nisn.trim() === loc.nisn.trim())
           );
@@ -1025,9 +1107,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       }
       if (Array.isArray(data.guru)) {
         const localGuru = latestDataRef.current.guruList || [];
-        const remoteGuru = data.guru;
+        const stale = data.guru.filter((g) => deletedIds.has(g.id)).map((g) => g.id);
+        if (stale.length > 0) {
+          stale.forEach((id) => SupabaseSchoolService.deleteGuru(id).catch(() => {}));
+        }
+        const remoteGuru = data.guru.filter((g) => !deletedIds.has(g.id));
         const mergedGuru = [...remoteGuru];
         localGuru.forEach((loc) => {
+          if (deletedIds.has(loc.id)) return;
           const exists = mergedGuru.some(
             (rem) => rem.id === loc.id || (Boolean(loc.nip?.trim()) && Boolean(rem.nip?.trim()) && rem.nip.trim() === loc.nip.trim())
           );
@@ -1041,9 +1128,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       }
       if (Array.isArray(data.kelas)) {
         const localKelas = latestDataRef.current.kelasList || [];
-        const remoteKelas = data.kelas;
+        const stale = data.kelas.filter((k) => deletedIds.has(k.id)).map((k) => k.id);
+        if (stale.length > 0) {
+          stale.forEach((id) => SupabaseSchoolService.deleteKelas(id).catch(() => {}));
+        }
+        const remoteKelas = data.kelas.filter((k) => !deletedIds.has(k.id));
         const mergedKelas = [...remoteKelas];
         localKelas.forEach((loc) => {
+          if (deletedIds.has(loc.id)) return;
           const exists = mergedKelas.some(
             (rem) => rem.id === loc.id || (Boolean(rem.nama) && Boolean(loc.nama) && rem.nama.toLowerCase().trim() === loc.nama.toLowerCase().trim())
           );
@@ -1057,9 +1149,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       }
       if (Array.isArray(data.mapel)) {
         const localMapel = latestDataRef.current.mapelList || [];
-        const remoteMapel = data.mapel;
+        const stale = data.mapel.filter((m) => deletedIds.has(m.id)).map((m) => m.id);
+        if (stale.length > 0) {
+          stale.forEach((id) => SupabaseSchoolService.deleteMapel(id).catch(() => {}));
+        }
+        const remoteMapel = data.mapel.filter((m) => !deletedIds.has(m.id));
         const mergedMapel = [...remoteMapel];
         localMapel.forEach((loc) => {
+          if (deletedIds.has(loc.id)) return;
           const exists = mergedMapel.some(
             (rem) => rem.id === loc.id || (Boolean(rem.nama) && Boolean(loc.nama) && rem.nama.toLowerCase().trim() === loc.nama.toLowerCase().trim())
           );
@@ -1073,9 +1170,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       }
       if (Array.isArray(data.jadwal)) {
         const localJadwal = latestDataRef.current.jadwalList || [];
-        const remoteJadwal = data.jadwal;
+        const stale = data.jadwal.filter((j) => deletedIds.has(j.id)).map((j) => j.id);
+        if (stale.length > 0) {
+          SupabaseSchoolService.bulkDeleteJadwal(stale).catch(() => {});
+        }
+        const remoteJadwal = data.jadwal.filter((j) => !deletedIds.has(j.id));
         const mergedJadwal = [...remoteJadwal];
         localJadwal.forEach((loc) => {
+          if (deletedIds.has(loc.id)) return;
           const exists = mergedJadwal.some((rem) => rem.id === loc.id);
           if (!exists) {
             mergedJadwal.push(loc);
@@ -1087,9 +1189,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       }
       if (Array.isArray(data.presensi)) {
         const localPresensi = latestDataRef.current.presensiList || [];
-        const remotePresensi = data.presensi;
+        const remotePresensi = data.presensi.filter((p) => !deletedIds.has(p.id));
         const mergedPresensi = [...remotePresensi];
         localPresensi.forEach((loc) => {
+          if (deletedIds.has(loc.id)) return;
           const exists = mergedPresensi.some(
             (rem) => rem.id === loc.id || (rem.siswaId === loc.siswaId && rem.tanggal === loc.tanggal)
           );
@@ -1103,8 +1206,14 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       }
       if (Array.isArray(data.nilai)) {
         const localNilai = latestDataRef.current.nilaiList || [];
-        const mergedNilai = [...data.nilai];
+        const stale = data.nilai.filter((n) => deletedIds.has(n.id)).map((n) => n.id);
+        if (stale.length > 0) {
+          stale.forEach((id) => SupabaseSchoolService.deleteNilai(id).catch(() => {}));
+        }
+        const remoteNilai = data.nilai.filter((n) => !deletedIds.has(n.id));
+        const mergedNilai = [...remoteNilai];
         localNilai.forEach((loc) => {
+          if (deletedIds.has(loc.id)) return;
           const idx = mergedNilai.findIndex(
             (rem) =>
               rem.id === loc.id ||
@@ -1125,9 +1234,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         saveState("nilai", mergedNilai, true);
       }
       if (Array.isArray(data.jenisTagihan)) {
-        setJenisTagihanList(data.jenisTagihan);
-        latestDataRef.current.jenisTagihanList = data.jenisTagihan;
-        saveState("jenis_tagihan", data.jenisTagihan, true);
+        const stale = data.jenisTagihan.filter((t) => deletedIds.has(t.id)).map((t) => t.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteJenisTagihan(id).catch(() => {}));
+        const filtered = data.jenisTagihan.filter((t) => !deletedIds.has(t.id));
+        setJenisTagihanList(filtered);
+        latestDataRef.current.jenisTagihanList = filtered;
+        saveState("jenis_tagihan", filtered, true);
       }
       if (Array.isArray(data.tabungan)) {
         setTabunganList(data.tabungan);
@@ -1155,19 +1267,28 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         saveState("transaksi_spp_transport", data.transaksiSPPTransport, true);
       }
       if (Array.isArray(data.pengumuman)) {
-        setPengumumanList(data.pengumuman);
-        latestDataRef.current.pengumumanList = data.pengumuman;
-        saveState("pengumuman", data.pengumuman, true);
+        const stale = data.pengumuman.filter((p) => deletedIds.has(p.id)).map((p) => p.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deletePengumuman(id).catch(() => {}));
+        const filtered = data.pengumuman.filter((p) => !deletedIds.has(p.id));
+        setPengumumanList(filtered);
+        latestDataRef.current.pengumumanList = filtered;
+        saveState("pengumuman", filtered, true);
       }
       if (Array.isArray(data.lmsMateri)) {
-        setLmsMateriList(data.lmsMateri);
-        latestDataRef.current.lmsMateriList = data.lmsMateri;
-        saveState("lms_materi", data.lmsMateri, true);
+        const stale = data.lmsMateri.filter((m) => deletedIds.has(m.id)).map((m) => m.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteLMSMateri(id).catch(() => {}));
+        const filtered = data.lmsMateri.filter((m) => !deletedIds.has(m.id));
+        setLmsMateriList(filtered);
+        latestDataRef.current.lmsMateriList = filtered;
+        saveState("lms_materi", filtered, true);
       }
       if (Array.isArray(data.lmsTugas)) {
-        setLmsTugasList(data.lmsTugas);
-        latestDataRef.current.lmsTugasList = data.lmsTugas;
-        saveState("lms_tugas", data.lmsTugas, true);
+        const stale = data.lmsTugas.filter((t) => deletedIds.has(t.id)).map((t) => t.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteLMSTugas(id).catch(() => {}));
+        const filtered = data.lmsTugas.filter((t) => !deletedIds.has(t.id));
+        setLmsTugasList(filtered);
+        latestDataRef.current.lmsTugasList = filtered;
+        saveState("lms_tugas", filtered, true);
       }
       if (Array.isArray(data.lmsSubmissions)) {
         setLmsSubmissionList(data.lmsSubmissions);
@@ -1175,9 +1296,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         saveState("lms_submissions", data.lmsSubmissions, true);
       }
       if (Array.isArray(data.lmsKuis)) {
-        setLmsKuisList(data.lmsKuis);
-        latestDataRef.current.lmsKuisList = data.lmsKuis;
-        saveState("lms_kuis", data.lmsKuis, true);
+        const stale = data.lmsKuis.filter((k) => deletedIds.has(k.id)).map((k) => k.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteLMSKuis(id).catch(() => {}));
+        const filtered = data.lmsKuis.filter((k) => !deletedIds.has(k.id));
+        setLmsKuisList(filtered);
+        latestDataRef.current.lmsKuisList = filtered;
+        saveState("lms_kuis", filtered, true);
       }
       if (Array.isArray(data.lmsAttempts)) {
         setLmsKuisAttemptList(data.lmsAttempts);
@@ -1190,29 +1314,44 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         saveState("lms_forum", data.lmsForum, true);
       }
       if (Array.isArray(data.lmsMeetings)) {
-        setLmsMeetingList(data.lmsMeetings);
-        latestDataRef.current.lmsMeetingList = data.lmsMeetings;
-        saveState("lms_meetings", data.lmsMeetings, true);
+        const stale = data.lmsMeetings.filter((m) => deletedIds.has(m.id)).map((m) => m.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteLMSMeeting(id).catch(() => {}));
+        const filtered = data.lmsMeetings.filter((m) => !deletedIds.has(m.id));
+        setLmsMeetingList(filtered);
+        latestDataRef.current.lmsMeetingList = filtered;
+        saveState("lms_meetings", filtered, true);
       }
       if (Array.isArray(data.lmsBankSoal)) {
-        setLmsBankSoalList(data.lmsBankSoal);
-        latestDataRef.current.lmsBankSoalList = data.lmsBankSoal;
-        saveState("lms_bank_soal", data.lmsBankSoal, true);
+        const stale = data.lmsBankSoal.filter((b) => deletedIds.has(b.id)).map((b) => b.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteLMSBankSoal(id).catch(() => {}));
+        const filtered = data.lmsBankSoal.filter((b) => !deletedIds.has(b.id));
+        setLmsBankSoalList(filtered);
+        latestDataRef.current.lmsBankSoalList = filtered;
+        saveState("lms_bank_soal", filtered, true);
       }
       if (Array.isArray(data.lmsJadwalMateri)) {
-        setLmsJadwalMateriList(data.lmsJadwalMateri);
-        latestDataRef.current.lmsJadwalMateriList = data.lmsJadwalMateri;
-        saveState("lms_jadwal_materi", data.lmsJadwalMateri, true);
+        const stale = data.lmsJadwalMateri.filter((j) => deletedIds.has(j.id)).map((j) => j.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteLMSJadwalMateri(id).catch(() => {}));
+        const filtered = data.lmsJadwalMateri.filter((j) => !deletedIds.has(j.id));
+        setLmsJadwalMateriList(filtered);
+        latestDataRef.current.lmsJadwalMateriList = filtered;
+        saveState("lms_jadwal_materi", filtered, true);
       }
       if (Array.isArray(data.tahfidz)) {
-        setTahfidzList(data.tahfidz);
-        latestDataRef.current.tahfidzList = data.tahfidz;
-        saveState("tahfidz", data.tahfidz, true);
+        const stale = data.tahfidz.filter((t) => deletedIds.has(t.id)).map((t) => t.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteTahfidzRecord(id).catch(() => {}));
+        const filtered = data.tahfidz.filter((t) => !deletedIds.has(t.id));
+        setTahfidzList(filtered);
+        latestDataRef.current.tahfidzList = filtered;
+        saveState("tahfidz", filtered, true);
       }
       if (Array.isArray(data.mutabaah)) {
-        setMutabaahList(data.mutabaah);
-        latestDataRef.current.mutabaahList = data.mutabaah;
-        saveState("mutabaah", data.mutabaah, true);
+        const stale = data.mutabaah.filter((m) => deletedIds.has(m.id)).map((m) => m.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteMutabaahRecord(id).catch(() => {}));
+        const filtered = data.mutabaah.filter((m) => !deletedIds.has(m.id));
+        setMutabaahList(filtered);
+        latestDataRef.current.mutabaahList = filtered;
+        saveState("mutabaah", filtered, true);
       }
 
       setIsSupabaseConnected(true);
@@ -1276,6 +1415,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         siswaData.avatar ||
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(siswaData.nama)}`,
     };
+    removeDeletedId(newSiswa.id);
+    if (newSiswa.nisn) removeDeletedId(newSiswa.nisn);
     const updated = [newSiswa, ...siswaList];
     latestDataRef.current.siswaList = updated;
     setSiswaList(updated);
@@ -1292,6 +1433,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         s.avatar ||
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.nama)}`,
     }));
+    created.forEach((s) => {
+      removeDeletedId(s.id);
+      if (s.nisn) removeDeletedId(s.nisn);
+    });
     setSiswaList((prev) => {
       const updated = [...created, ...prev];
       latestDataRef.current.siswaList = updated;
@@ -1317,6 +1462,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const deleteSiswa = (id: string) => {
+    const siswaToDelete = siswaList.find((s) => s.id === id);
+    recordDeletedId(id);
+    if (siswaToDelete?.nisn) recordDeletedId(siswaToDelete.nisn);
     const updated = siswaList.filter((s) => s.id !== id);
     latestDataRef.current.siswaList = updated;
     setSiswaList(updated);
@@ -1327,6 +1475,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const bulkDeleteSiswa = (ids: string[]) => {
     if (!ids || ids.length === 0) return;
     const idSet = new Set(ids);
+    const nisnList = siswaList
+      .filter((s) => idSet.has(s.id) && s.nisn)
+      .map((s) => s.nisn);
+    recordDeletedId([...ids, ...nisnList]);
     const updated = siswaList.filter((s) => !idSet.has(s.id));
     latestDataRef.current.siswaList = updated;
     setSiswaList(updated);
@@ -1343,6 +1495,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         guruData.avatar ||
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(guruData.nama)}`,
     };
+    removeDeletedId(newGuru.id);
+    if (newGuru.nip) removeDeletedId(newGuru.nip);
     const updated = [newGuru, ...guruList];
     latestDataRef.current.guruList = updated;
     setGuruList(updated);
@@ -1362,6 +1516,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const deleteGuru = (id: string) => {
+    const guruToDelete = guruList.find((g) => g.id === id);
+    recordDeletedId(id);
+    if (guruToDelete?.nip) recordDeletedId(guruToDelete.nip);
     const updated = guruList.filter((g) => g.id !== id);
     latestDataRef.current.guruList = updated;
     setGuruList(updated);
@@ -1376,6 +1533,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `cls-${Date.now()}`,
       jumlahSiswa: 0,
     };
+    removeDeletedId(newKelas.id);
+    if (newKelas.nama) removeDeletedId(newKelas.nama);
     const updated = [...kelasList, newKelas];
     latestDataRef.current.kelasList = updated;
     setKelasList(updated);
@@ -1464,6 +1623,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const kelasToDelete = kelasList.find((k) => k.id === id);
     if (!kelasToDelete) return;
 
+    recordDeletedId(id);
+    if (kelasToDelete.nama) {
+      recordDeletedId(kelasToDelete.nama);
+    }
     const targetNama = targetKelasForStudents || "Belum Ditentukan";
 
     // Remove from kelasList
@@ -1480,8 +1643,22 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     latestDataRef.current.siswaList = updatedSiswa;
     setSiswaList(updatedSiswa);
     saveState("siswa", updatedSiswa);
+    const affectedStudents = updatedSiswa.filter((s) => s.kelas === targetNama);
+    if (affectedStudents.length > 0) {
+      persistSupabase(async () => {
+        for (const s of affectedStudents) {
+          await SupabaseSchoolService.upsertSiswa(s);
+        }
+        return true;
+      });
+    }
 
     // Reassign schedule belonging to this class
+    const deletedScheduleIds = jadwalList.filter((j) => j.kelas === kelasToDelete.nama).map((j) => j.id);
+    if (deletedScheduleIds.length > 0) {
+      recordDeletedId(deletedScheduleIds);
+      persistSupabase(() => SupabaseSchoolService.bulkDeleteJadwal(deletedScheduleIds));
+    }
     const updatedJadwal = jadwalList.filter((j) => j.kelas !== kelasToDelete.nama);
     latestDataRef.current.jadwalList = updatedJadwal;
     setJadwalList(updatedJadwal);
@@ -1514,6 +1691,8 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       kategori: mapelData.kategori || "Wajib",
       kkm: Number(mapelData.kkm) || 75,
     };
+    removeDeletedId(newMapel.id);
+    if (newMapel.nama) removeDeletedId(newMapel.nama);
     const updated = [...mapelList, newMapel];
     latestDataRef.current.mapelList = updated;
     setMapelList(updated);
@@ -1582,6 +1761,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const mapelToDelete = mapelList.find((m) => m.id === id);
     if (!mapelToDelete) return;
 
+    recordDeletedId(id);
+    if (mapelToDelete.nama) {
+      recordDeletedId(mapelToDelete.nama);
+    }
     const updated = mapelList.filter((m) => m.id !== id);
     latestDataRef.current.mapelList = updated;
     setMapelList(updated);
@@ -1595,6 +1778,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       ...jadwalData,
       id: `jdw-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     };
+    removeDeletedId(newJadwal.id);
     const updated = [...jadwalList, newJadwal];
     latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
@@ -1607,6 +1791,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       ...item,
       id: `jdw-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
     }));
+    removeDeletedId(newItems.map((i) => i.id));
     const updated = [...jadwalList, ...newItems];
     latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
@@ -1626,6 +1811,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const deleteJadwal = (id: string) => {
+    recordDeletedId(id);
     const updated = jadwalList.filter((j) => j.id !== id);
     latestDataRef.current.jadwalList = updated;
     setJadwalList(updated);
@@ -1634,6 +1820,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const bulkDeleteJadwal = (ids: string[]) => {
+    recordDeletedId(ids);
     const idSet = new Set(ids);
     const updated = jadwalList.filter((j) => !idSet.has(j.id));
     latestDataRef.current.jadwalList = updated;
@@ -1767,14 +1954,19 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const deleteNilai = (id: string) => {
+    recordDeletedId(id);
     const updated = nilaiList.filter((n) => n.id !== id);
+    latestDataRef.current.nilaiList = updated;
     setNilaiList(updated);
     saveState("nilai", updated);
     persistSupabase(() => SupabaseSchoolService.deleteNilai(id));
   };
 
   const deleteNilaiBySiswa = (siswaId: string) => {
+    const deletedIds = nilaiList.filter((n) => n.siswaId === siswaId).map((n) => n.id);
+    if (deletedIds.length > 0) recordDeletedId(deletedIds);
     const updated = nilaiList.filter((n) => n.siswaId !== siswaId);
+    latestDataRef.current.nilaiList = updated;
     setNilaiList(updated);
     saveState("nilai", updated);
     persistSupabase(() => SupabaseSchoolService.deleteNilaiBySiswa(siswaId));
@@ -1786,7 +1978,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       ...data,
       id: `jt-${Date.now()}`,
     };
+    removeDeletedId(newJenis.id);
     const updated = [...jenisTagihanList, newJenis];
+    latestDataRef.current.jenisTagihanList = updated;
     setJenisTagihanList(updated);
     saveState("jenis_tagihan", updated);
     persistSupabase(() => SupabaseSchoolService.upsertJenisTagihan(newJenis));
@@ -1800,6 +1994,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const newNama = data.nama || oldNama;
 
     const updated = jenisTagihanList.map((j) => (j.id === id ? { ...j, ...data } : j));
+    latestDataRef.current.jenisTagihanList = updated;
     setJenisTagihanList(updated);
     saveState("jenis_tagihan", updated);
     const target = updated.find((j) => j.id === id);
@@ -1812,6 +2007,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       const updatedBills = sppList.map((b) =>
         b.kategori === oldNama ? { ...b, kategori: newNama } : b
       );
+      latestDataRef.current.sppList = updatedBills;
       setSppList(updatedBills);
       saveState("spp", updatedBills);
     }
@@ -1821,7 +2017,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const itemToDelete = jenisTagihanList.find((j) => j.id === id);
     if (!itemToDelete) return;
 
+    recordDeletedId(id);
     const updated = jenisTagihanList.filter((j) => j.id !== id);
+    latestDataRef.current.jenisTagihanList = updated;
     setJenisTagihanList(updated);
     saveState("jenis_tagihan", updated);
     persistSupabase(() => SupabaseSchoolService.deleteJenisTagihan(id));
@@ -1830,6 +2028,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updatedBills = sppList.map((b) =>
       b.kategori === itemToDelete.nama ? { ...b, kategori: fallbackNama } : b
     );
+    latestDataRef.current.sppList = updatedBills;
     setSppList(updatedBills);
     saveState("spp", updatedBills);
   };
@@ -1995,15 +2194,21 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `ann-${Date.now()}`,
       tanggal: today,
     };
+    removeDeletedId(newPengumuman.id);
     const updated = [newPengumuman, ...pengumumanList];
+    latestDataRef.current.pengumumanList = updated;
     setPengumumanList(updated);
     saveState("pengumuman", updated);
+    persistSupabase(() => SupabaseSchoolService.upsertPengumuman(newPengumuman));
   };
 
   const deletePengumuman = (id: string) => {
+    recordDeletedId(id);
     const updated = pengumumanList.filter((p) => p.id !== id);
+    latestDataRef.current.pengumumanList = updated;
     setPengumumanList(updated);
     saveState("pengumuman", updated);
+    persistSupabase(() => SupabaseSchoolService.deletePengumuman(id));
   };
 
   // Tabungan Actions
@@ -2499,9 +2704,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const deleteMateri = (id: string) => {
+    recordDeletedId(id);
     const updated = lmsMateriList.filter((m) => m.id !== id);
+    latestDataRef.current.lmsMateriList = updated;
     setLmsMateriList(updated);
     saveState("lms_materi", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteLMSMateri(id));
   };
 
   const toggleBacaMateri = (materiId: string, siswaId: string) => {
@@ -2523,7 +2731,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `tgs-${Date.now()}`,
       createdAt: new Date().toISOString().split("T")[0],
     };
+    removeDeletedId(newTugas.id);
     const updated = [newTugas, ...lmsTugasList];
+    latestDataRef.current.lmsTugasList = updated;
     setLmsTugasList(updated);
     saveState("lms_tugas", updated);
     return newTugas;
@@ -2531,14 +2741,18 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const updateTugas = (id: string, data: Partial<LMSTugas>) => {
     const updated = lmsTugasList.map((t) => (t.id === id ? { ...t, ...data } : t));
+    latestDataRef.current.lmsTugasList = updated;
     setLmsTugasList(updated);
     saveState("lms_tugas", updated);
   };
 
   const deleteTugas = (id: string) => {
+    recordDeletedId(id);
     const updated = lmsTugasList.filter((t) => t.id !== id);
+    latestDataRef.current.lmsTugasList = updated;
     setLmsTugasList(updated);
     saveState("lms_tugas", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteLMSTugas(id));
   };
 
   const submitTugas = (data: {
@@ -2610,16 +2824,21 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `quiz-${Date.now()}`,
       createdAt: new Date().toISOString().split("T")[0],
     };
+    removeDeletedId(newKuis.id);
     const updated = [newKuis, ...lmsKuisList];
+    latestDataRef.current.lmsKuisList = updated;
     setLmsKuisList(updated);
     saveState("lms_kuis", updated);
     return newKuis;
   };
 
   const deleteKuis = (id: string) => {
+    recordDeletedId(id);
     const updated = lmsKuisList.filter((q) => q.id !== id);
+    latestDataRef.current.lmsKuisList = updated;
     setLmsKuisList(updated);
     saveState("lms_kuis", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteLMSKuis(id));
   };
 
   const submitKuisAttempt = (attemptData: Omit<LMSKuisAttempt, "id" | "selesaiPada">): LMSKuisAttempt => {
@@ -2672,16 +2891,21 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       ...meetingData,
       id: `meet-${Date.now()}`,
     };
+    removeDeletedId(newMeeting.id);
     const updated = [newMeeting, ...lmsMeetingList];
+    latestDataRef.current.lmsMeetingList = updated;
     setLmsMeetingList(updated);
     saveState("lms_meetings", updated);
     return newMeeting;
   };
 
   const deleteMeeting = (id: string) => {
+    recordDeletedId(id);
     const updated = lmsMeetingList.filter((m) => m.id !== id);
+    latestDataRef.current.lmsMeetingList = updated;
     setLmsMeetingList(updated);
     saveState("lms_meetings", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteLMSMeeting(id));
   };
 
   // Bank Soal Handlers
@@ -2691,7 +2915,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `pkt-bs-${Date.now()}`,
       createdAt: new Date().toISOString().split("T")[0],
     };
+    removeDeletedId(newBank.id);
     const updated = [newBank, ...lmsBankSoalList];
+    latestDataRef.current.lmsBankSoalList = updated;
     setLmsBankSoalList(updated);
     saveState("lms_bank_soal", updated);
     return newBank;
@@ -2701,14 +2927,18 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const updated = lmsBankSoalList.map((b) =>
       b.id === id ? { ...b, ...updatedData, updatedAt: new Date().toISOString().split("T")[0] } : b
     );
+    latestDataRef.current.lmsBankSoalList = updated;
     setLmsBankSoalList(updated);
     saveState("lms_bank_soal", updated);
   };
 
   const deleteBankSoal = (id: string) => {
+    recordDeletedId(id);
     const updated = lmsBankSoalList.filter((b) => b.id !== id);
+    latestDataRef.current.lmsBankSoalList = updated;
     setLmsBankSoalList(updated);
     saveState("lms_bank_soal", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteLMSBankSoal(id));
   };
 
   const addSoalToBank = (bankId: string, soalData: Omit<LMSBankSoalItem, "id">) => {
@@ -2807,7 +3037,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `jdw-mat-${Date.now()}`,
       createdAt: new Date().toISOString().split("T")[0],
     };
+    removeDeletedId(newItem.id);
     const updated = [newItem, ...lmsJadwalMateriList];
+    latestDataRef.current.lmsJadwalMateriList = updated;
     setLmsJadwalMateriList(updated);
     saveState("lms_jadwal_materi", updated);
     return newItem;
@@ -2815,14 +3047,18 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const updateJadwalMateri = (id: string, data: Partial<LMSJadwalMateri>) => {
     const updated = lmsJadwalMateriList.map((item) => (item.id === id ? { ...item, ...data } : item));
+    latestDataRef.current.lmsJadwalMateriList = updated;
     setLmsJadwalMateriList(updated);
     saveState("lms_jadwal_materi", updated);
   };
 
   const deleteJadwalMateri = (id: string) => {
+    recordDeletedId(id);
     const updated = lmsJadwalMateriList.filter((item) => item.id !== id);
+    latestDataRef.current.lmsJadwalMateriList = updated;
     setLmsJadwalMateriList(updated);
     saveState("lms_jadwal_materi", updated);
+    persistSupabase(() => SupabaseSchoolService.deleteLMSJadwalMateri(id));
   };
 
   const toggleRealisasiJadwal = (
@@ -2866,7 +3102,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       id: `thf-${Date.now()}-${Math.floor(10 + Math.random() * 90)}`,
       createdAt: new Date().toISOString(),
     };
+    removeDeletedId(newRecord.id);
     const updated = [newRecord, ...tahfidzList];
+    latestDataRef.current.tahfidzList = updated;
     setTahfidzList(updated);
     saveState("tahfidz", updated);
     persistSupabase(() => SupabaseSchoolService.upsertTahfidzRecord(newRecord));
@@ -2874,6 +3112,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
   const updateTahfidzRecord = (id: string, data: Partial<TahfidzRecord>) => {
     const updated = tahfidzList.map((t) => (t.id === id ? { ...t, ...data } : t));
+    latestDataRef.current.tahfidzList = updated;
     setTahfidzList(updated);
     saveState("tahfidz", updated);
     const target = updated.find((t) => t.id === id);
@@ -2883,7 +3122,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const deleteTahfidzRecord = (id: string) => {
+    recordDeletedId(id);
     const updated = tahfidzList.filter((t) => t.id !== id);
+    latestDataRef.current.tahfidzList = updated;
     setTahfidzList(updated);
     saveState("tahfidz", updated);
     persistSupabase(() => SupabaseSchoolService.deleteTahfidzRecord(id));
@@ -2982,7 +3223,9 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   const deleteMutabaahRecord = (id: string) => {
+    recordDeletedId(id);
     const updated = mutabaahList.filter((m) => m.id !== id);
+    latestDataRef.current.mutabaahList = updated;
     setMutabaahList(updated);
     saveState("mutabaah", updated);
     persistSupabase(() => SupabaseSchoolService.deleteMutabaahRecord(id));
@@ -3024,6 +3267,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     if (typeof window !== "undefined") {
       localStorage.clear();
       localStorage.removeItem("sim_database_cleared");
+      localStorage.removeItem("sim_deleted_ids");
     }
   };
 
@@ -3104,6 +3348,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     // 4. Mark database as explicitly cleared in localStorage
     if (typeof window !== "undefined") {
       localStorage.setItem("sim_database_cleared", "true");
+      localStorage.removeItem("sim_deleted_ids");
       const keysToClear = [
         "siswa",
         "guru",
@@ -3285,6 +3530,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
     if (typeof window !== "undefined") {
       localStorage.removeItem("sim_database_cleared");
+      localStorage.removeItem("sim_deleted_ids");
     }
 
     // Emergency snapshot before restoring in case user wants to roll back

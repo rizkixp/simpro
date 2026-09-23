@@ -37,23 +37,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // 1. Instant hydration from localStorage
         let currentUsers = DEMO_USERS;
+        let deletedIds = new Set<string>();
+        try {
+          const rawDel = localStorage.getItem("sim_deleted_ids");
+          if (rawDel) {
+            const arr = JSON.parse(rawDel);
+            if (Array.isArray(arr)) deletedIds = new Set(arr);
+          }
+        } catch {}
+
         const savedUsers = localStorage.getItem("sim_auth_users");
-        if (savedUsers) {
+        if (savedUsers !== null) {
           try {
             const parsed: User[] = JSON.parse(savedUsers);
-            const merged = [...parsed];
-            for (const demoU of DEMO_USERS) {
-              if (!merged.some((u) => u.id === demoU.id)) {
-                merged.push(demoU);
-              }
-            }
-            currentUsers = merged;
-            setUserList(merged);
+            const filtered = parsed.filter((u) => !deletedIds.has(u.id));
+            currentUsers = filtered;
+            setUserList(filtered);
           } catch {
-            setUserList(DEMO_USERS);
+            const isCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
+            currentUsers = isCleared ? [] : DEMO_USERS.filter((u) => !deletedIds.has(u.id));
+            setUserList(currentUsers);
           }
         } else {
-          setUserList(DEMO_USERS);
+          const isCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
+          currentUsers = isCleared ? [] : DEMO_USERS.filter((u) => !deletedIds.has(u.id));
+          setUserList(currentUsers);
         }
 
         const savedUser = localStorage.getItem("sim_auth_user");
@@ -90,13 +98,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (SupabaseSchoolService.isConfigured()) {
           const remoteUsers = await SupabaseSchoolService.getUsers();
           if (remoteUsers && remoteUsers.length > 0) {
-            setUserList(remoteUsers);
-            localStorage.setItem("sim_auth_users", JSON.stringify(remoteUsers));
+            const stale = remoteUsers.filter((u) => deletedIds.has(u.id)).map((u) => u.id);
+            if (stale.length > 0) {
+              stale.forEach((id) => SupabaseSchoolService.deleteUser(id).catch(() => {}));
+            }
+            const filteredUsers = remoteUsers.filter((u) => !deletedIds.has(u.id));
+            setUserList(filteredUsers);
+            localStorage.setItem("sim_auth_users", JSON.stringify(filteredUsers));
 
             // Anti-tamper recheck against remote authoritative source
             setUser((activeUser) => {
               if (!activeUser) return null;
-              const remoteMatched = remoteUsers.find((u) => u.id === activeUser.id);
+              const remoteMatched = filteredUsers.find((u) => u.id === activeUser.id);
               if (remoteMatched) {
                 if (remoteMatched.status === "Nonaktif") {
                   localStorage.removeItem("sim_auth_user");
@@ -114,10 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return activeUser;
             });
           } else if (remoteUsers && remoteUsers.length === 0) {
-            // Table is empty, seed DEMO_USERS into Supabase with hashed passwords
-            for (const u of DEMO_USERS) {
-              const secureHash = await hashPassword(u.password || "password123");
-              await SupabaseSchoolService.upsertUser({ ...u, password: secureHash });
+            const isExplicitlyCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
+            if (!isExplicitlyCleared) {
+              // Table is empty, seed DEMO_USERS into Supabase with hashed passwords
+              for (const u of DEMO_USERS) {
+                const secureHash = await hashPassword(u.password || "password123");
+                await SupabaseSchoolService.upsertUser({ ...u, password: secureHash });
+              }
             }
           }
         }
@@ -250,6 +266,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const updated = [newUser, ...userList];
     setUserList(updated);
     localStorage.setItem("sim_auth_users", JSON.stringify(updated));
+    try {
+      const raw = localStorage.getItem("sim_deleted_ids");
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          const filtered = arr.filter((i) => i !== newUser.id);
+          localStorage.setItem("sim_deleted_ids", JSON.stringify(filtered));
+        }
+      }
+    } catch {}
 
     if (SupabaseSchoolService.isConfigured()) {
       SupabaseSchoolService.upsertUser(newUser).catch((err) =>
@@ -292,6 +318,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const updated = userList.filter((u) => u.id !== id);
     setUserList(updated);
     localStorage.setItem("sim_auth_users", JSON.stringify(updated));
+    try {
+      const raw = localStorage.getItem("sim_deleted_ids");
+      const arr = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(arr) && !arr.includes(id)) {
+        arr.push(id);
+        localStorage.setItem("sim_deleted_ids", JSON.stringify(arr));
+      }
+    } catch {}
 
     if (SupabaseSchoolService.isConfigured()) {
       SupabaseSchoolService.deleteUser(id).catch((err) =>
@@ -353,6 +387,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
     setUserList(secureDemoUsers);
     localStorage.setItem("sim_auth_users", JSON.stringify(secureDemoUsers));
+    try {
+      const raw = localStorage.getItem("sim_deleted_ids");
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          const demoIds = new Set(DEMO_USERS.map((u) => u.id));
+          const filtered = arr.filter((i) => !demoIds.has(i));
+          localStorage.setItem("sim_deleted_ids", JSON.stringify(filtered));
+        }
+      }
+    } catch {}
+
     if (SupabaseSchoolService.isConfigured()) {
       for (const u of secureDemoUsers) {
         SupabaseSchoolService.upsertUser(u).catch(console.error);
