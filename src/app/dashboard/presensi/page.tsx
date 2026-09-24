@@ -91,7 +91,7 @@ export default function PresensiPage() {
   const todayStr = new Date().toISOString().split("T")[0];
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
-  const canEdit = user?.role === "admin" || user?.role === "guru";
+  const canEdit = !user || user.role === "admin" || user.role === "guru" || (user.role as string) === "wali_kelas" || (user.role as string) === "kepala_sekolah";
 
   // Find attendance record for selected date
   const getStudentRecord = (siswaId: string): PresensiRecord | undefined => {
@@ -364,9 +364,28 @@ export default function PresensiPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <a
+            href="/templates/template_presensi_harian.xlsx"
+            download="template_presensi_harian.xlsx"
+            className="px-3.5 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-xs font-semibold border border-purple-200 dark:border-purple-800 transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Download Template Presensi Excel Siap Pakai Langsung"
+          >
+            <Download className="h-4 w-4" />
+            <span>Unduh Template Excel</span>
+          </a>
+
+          <button
+            onClick={() => setIsImportExcelOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Unggah / Impor Presensi Siswa via Excel (.xlsx / .csv)"
+          >
+            <UploadCloud className="h-4 w-4" />
+            <span>Import Excel Presensi</span>
+          </button>
+
           <button
             onClick={handleExportExcel}
-            className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-200 dark:border-emerald-800 transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold border border-emerald-200 dark:border-emerald-800 transition-all flex items-center gap-1.5 cursor-pointer"
             title="Download Rekap Presensi Excel"
           >
             <FileSpreadsheet className="h-4 w-4" />
@@ -376,17 +395,8 @@ export default function PresensiPage() {
           {canEdit && (
             <>
               <button
-                onClick={() => setIsImportExcelOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all flex items-center gap-1.5"
-                title="Unggah / Impor Presensi Siswa via Excel (.xlsx / .csv)"
-              >
-                <UploadCloud className="h-4 w-4" />
-                <span>Import Excel Presensi</span>
-              </button>
-
-              <button
                 onClick={handleSetAllHadir}
-                className="px-4 py-2 rounded-xl bg-purple-600/90 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all flex items-center gap-2"
+                className="px-4 py-2 rounded-xl bg-purple-600/90 hover:bg-purple-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="h-4 w-4" />
                 <span>Tandai Semua Hadir ({classStudents.length})</span>
@@ -394,7 +404,7 @@ export default function PresensiPage() {
 
               <button
                 onClick={() => setIsBulkResetConfirmOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:border-rose-800 transition-all flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-slate-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:border-rose-800 transition-all flex items-center gap-1.5 cursor-pointer"
                 title="Reset seluruh absensi kelas ini pada tanggal terpilih"
               >
                 <RotateCcw className="h-4 w-4" />

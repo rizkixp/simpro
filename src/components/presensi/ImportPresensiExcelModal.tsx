@@ -103,10 +103,16 @@ export default function ImportPresensiExcelModal({
 
     siswaList.forEach((s) => {
       if (s.nisn) {
-        nisnMap.set(s.nisn.trim().toLowerCase(), s);
+        const clean = s.nisn.trim().toLowerCase();
+        nisnMap.set(clean, s);
+        const digits = clean.replace(/\D/g, "");
+        if (digits) nisnMap.set(digits, s);
       }
       if (s.nama) {
-        nameMap.set(s.nama.trim().toLowerCase(), s);
+        const cleanName = s.nama.trim().toLowerCase();
+        nameMap.set(cleanName, s);
+        const strippedName = cleanName.replace(/[^a-z0-9]/g, "");
+        if (strippedName) nameMap.set(strippedName, s);
       }
     });
 
@@ -300,18 +306,47 @@ export default function ImportPresensiExcelModal({
       }
 
       const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
 
-      if (jsonData.length === 0) {
+      if (rawRows.length === 0) {
         alert("File kosong atau format baris data tidak terdeteksi.");
         setIsParsing(false);
         return;
       }
 
-      // Check if format is Matrix/Mingguan (contains columns formatted like "Senin (2026-09-22)" or date strings)
-      const firstRow = jsonData[0];
-      const headerKeys = Object.keys(firstRow);
+      // Search for the header row index (even if there are titles or empty lines at top)
+      let headerRowIndex = 0;
+      for (let r = 0; r < Math.min(rawRows.length, 12); r++) {
+        const rowStr = rawRows[r].map((c) => String(c).toLowerCase()).join(" ");
+        if (
+          rowStr.includes("nisn") ||
+          rowStr.includes("nama") ||
+          (rowStr.includes("no") && (rowStr.includes("kelas") || rowStr.includes("hadir") || rowStr.includes("status")))
+        ) {
+          headerRowIndex = r;
+          break;
+        }
+      }
 
+      const headerKeys = rawRows[headerRowIndex].map((h, i) => String(h || `col_${i}`).trim());
+      const dataRows = rawRows.slice(headerRowIndex + 1).filter((r) => r.some((c) => String(c).trim() !== ""));
+
+      if (dataRows.length === 0) {
+        alert("Tidak ada baris data siswa yang ditemukan setelah baris judul.");
+        setIsParsing(false);
+        return;
+      }
+
+      // Build JSON rows
+      const jsonData: any[] = dataRows.map((row) => {
+        const obj: any = {};
+        headerKeys.forEach((key, kIdx) => {
+          obj[key] = row[kIdx] !== undefined ? row[kIdx] : "";
+        });
+        return obj;
+      });
+
+      // Check if format is Matrix/Mingguan (contains columns formatted like "Senin (2026-09-22)" or date strings)
       const dateColumns: Array<{ key: string; dateStr: string }> = [];
       headerKeys.forEach((key) => {
         // Look for date inside parenthesis like "Senin (2026-09-22)"
@@ -345,12 +380,14 @@ export default function ImportPresensiExcelModal({
           const rawKelas = getColVal(row, "kelas", "rombel");
 
           // Find student in school database
-          let matchedStudent = rawNisn
-            ? studentLookup.nisnMap.get(rawNisn.toLowerCase())
-            : undefined;
-
+          let matchedStudent = undefined;
+          if (rawNisn) {
+            const clean = rawNisn.toLowerCase().trim();
+            matchedStudent = studentLookup.nisnMap.get(clean) || studentLookup.nisnMap.get(clean.replace(/\D/g, ""));
+          }
           if (!matchedStudent && rawNama) {
-            matchedStudent = studentLookup.nameMap.get(rawNama.toLowerCase());
+            const clean = rawNama.toLowerCase().trim();
+            matchedStudent = studentLookup.nameMap.get(clean) || studentLookup.nameMap.get(clean.replace(/[^a-z0-9]/g, ""));
           }
 
           dateColumns.forEach((col, colIdx) => {
@@ -389,12 +426,14 @@ export default function ImportPresensiExcelModal({
           const rawStatus = getColVal(row, "status", "kehadiran", "statuskehadiran", "presensi", "absensi");
           const rawKet = getColVal(row, "keterangan", "ket", "alasan", "note", "catatan");
 
-          let matchedStudent = rawNisn
-            ? studentLookup.nisnMap.get(rawNisn.toLowerCase())
-            : undefined;
-
+          let matchedStudent = undefined;
+          if (rawNisn) {
+            const clean = rawNisn.toLowerCase().trim();
+            matchedStudent = studentLookup.nisnMap.get(clean) || studentLookup.nisnMap.get(clean.replace(/\D/g, ""));
+          }
           if (!matchedStudent && rawNama) {
-            matchedStudent = studentLookup.nameMap.get(rawNama.toLowerCase());
+            const clean = rawNama.toLowerCase().trim();
+            matchedStudent = studentLookup.nameMap.get(clean) || studentLookup.nameMap.get(clean.replace(/[^a-z0-9]/g, ""));
           }
 
           const resolvedDate = overrideDateWithModal
@@ -606,27 +645,37 @@ export default function ImportPresensiExcelModal({
               <button
                 type="button"
                 onClick={handleDownloadHarianTemplate}
-                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                 title="Unduh format presensi 1 hari untuk rombel terpilih"
               >
                 <FileSpreadsheet className="h-3.5 w-3.5" />
-                <span>Format Harian (.xlsx)</span>
+                <span>Unduh Sesuai Rombel ({modalKelas})</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleDownloadMingguanTemplate}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
-                title="Unduh format presensi 5 hari (Senin - Jumat) dalam 1 tabel"
+              <a
+                href="/templates/template_presensi_harian.xlsx"
+                download="template_presensi_harian.xlsx"
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                title="Download file template presensi harian seluruh 130 siswa (.xlsx)"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>File Harian 130 Siswa (.xlsx)</span>
+              </a>
+
+              <a
+                href="/templates/template_presensi_mingguan.xlsx"
+                download="template_presensi_mingguan.xlsx"
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                title="Download file template presensi mingguan seluruh 130 siswa (.xlsx)"
               >
                 <Layers className="h-3.5 w-3.5" />
-                <span>Format Mingguan Sen-Jum (.xlsx)</span>
-              </button>
+                <span>File Mingguan Sen-Jum (.xlsx)</span>
+              </a>
 
               <button
                 type="button"
                 onClick={handleDownloadCsvTemplate}
-                className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+                className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                 title="Unduh format CSV sederhana"
               >
                 <FileText className="h-3.5 w-3.5" />
