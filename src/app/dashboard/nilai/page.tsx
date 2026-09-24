@@ -12,6 +12,7 @@ import {
   calculateSemesterGrade,
   formatDateIndo,
 } from "@/lib/utils";
+import { exportSingleRaporXls, exportBatchRaporXls } from "@/lib/exportRaporExcel";
 import {
   Award,
   Search,
@@ -62,6 +63,7 @@ import {
   School,
   ZoomIn,
   ZoomOut,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function NilaiManagementPage() {
@@ -82,6 +84,17 @@ export default function NilaiManagementPage() {
     presensiList,
     jadwalList,
   } = useSchoolData();
+
+  const canEdit = user?.role === "admin" || user?.role === "guru";
+  const isAdmin = user?.role === "admin";
+
+  const baseSiswaList = teacherScope.isTeacher
+    ? teacherScope.filterByAssignedClass(siswaList)
+    : siswaList;
+
+  const baseNilaiList = teacherScope.isTeacher
+    ? teacherScope.filterBySubject(teacherScope.filterByAssignedClass(nilaiList))
+    : nilaiList;
 
   // Notification feedback state
   const [notification, setNotification] = useState<{
@@ -300,6 +313,38 @@ export default function NilaiManagementPage() {
   const [isLegerSaving, setIsLegerSaving] = useState<boolean>(false);
   const [isLegerImporting, setIsLegerImporting] = useState<boolean>(false);
   const legerFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Mode Tampilan Tabel Utama: Leger Matriks (Input Langsung) vs Ringkasan Siswa
+  const [mainTableViewMode, setMainTableViewMode] = useState<"leger" | "ringkasan">("leger");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const mainLegerFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Daftar mata pelajaran aktif untuk tabel leger pada halaman utama
+  const activeLegerMapels = useMemo(() => {
+    const targetKelas =
+      teacherScope.isTeacher && teacherScope.assignedClass
+        ? teacherScope.assignedClass
+        : selectedKelas;
+    if (selectedMapel !== "Semua") {
+      const found = mapelList.find(
+        (m) => m.nama.trim().toLowerCase() === selectedMapel.trim().toLowerCase()
+      );
+      if (found) return [found];
+    }
+    const { mapels } = getAvailableMapelForClass(targetKelas);
+    return mapels.length > 0 ? mapels : mapelList;
+  }, [selectedKelas, selectedMapel, teacherScope, jadwalList, nilaiList, mapelList]);
+
+  // Daftar siswa aktif untuk tabel leger pada halaman utama
+  const activeTargetStudents = useMemo(() => {
+    return baseSiswaList.filter((s) => {
+      if (teacherScope.isTeacher && teacherScope.assignedClass) {
+        return isClassMatch(s.kelas, teacherScope.assignedClass);
+      }
+      if (selectedKelas === "Semua") return true;
+      return isClassMatch(s.kelas, selectedKelas);
+    });
+  }, [baseSiswaList, teacherScope, selectedKelas]);
 
   // Daftar mata pelajaran khusus rombel/kelas yang sedang dipilih pada Leger Rombel
   const currentLegerMapelList = useMemo(() => {
@@ -2101,17 +2146,6 @@ export default function NilaiManagementPage() {
     catatan: "Memiliki pemahaman konsep yang baik, pertahankan prestasimu.",
   });
 
-  const canEdit = user?.role === "admin" || user?.role === "guru";
-  const isAdmin = user?.role === "admin";
-
-  const baseSiswaList = teacherScope.isTeacher
-    ? teacherScope.filterByAssignedClass(siswaList)
-    : siswaList;
-
-  const baseNilaiList = teacherScope.isTeacher
-    ? teacherScope.filterBySubject(teacherScope.filterByAssignedClass(nilaiList))
-    : nilaiList;
-
   // Grade resolution helpers with automatic calculation fallback
   const getStudentMid = (n: NilaiSiswa) => {
     // Nilai STS murni 100% dari Ujian STS (uts)
@@ -2790,6 +2824,9 @@ export default function NilaiManagementPage() {
   // =========================================================================
   // LOGIKA INPUT NILAI DARI LEGER NILAI ROMBEL (MATRIKS 1 KELAS x MAPEL KELAS)
   // =========================================================================
+  const prevTabRef = useRef(activeRaporTab);
+  const prevKelasRef = useRef(selectedKelas);
+
   const initLegerInputScores = (
     kelasTarget: string,
     typeTarget: "tengah" | "akhir",
@@ -2823,6 +2860,8 @@ export default function NilaiManagementPage() {
                 ? rec.uts
                 : typeof rec.nilaiMid === "number" && rec.nilaiMid > 0
                 ? rec.nilaiMid
+                : rec.uts === 0
+                ? 0
                 : "";
             initialScores[key] = val;
           } else {
@@ -2831,6 +2870,8 @@ export default function NilaiManagementPage() {
                 ? rec.uas
                 : typeof rec.nilaiAkhir === "number" && rec.nilaiAkhir > 0 && rec.hasSas
                 ? rec.nilaiAkhir
+                : rec.uas === 0
+                ? 0
                 : "";
             initialScores[key] = val;
           }
@@ -2840,7 +2881,41 @@ export default function NilaiManagementPage() {
       });
     });
     setLegerInputScores(initialScores);
+    setHasUnsavedChanges(false);
   };
+
+  // Sinkronisasi otomatis data nilai ke state leger saat load atau ganti filter kelas / tab
+  useEffect(() => {
+    const isFilterChanged =
+      prevTabRef.current !== activeRaporTab ||
+      prevKelasRef.current !== selectedKelas;
+
+    prevTabRef.current = activeRaporTab;
+    prevKelasRef.current = selectedKelas;
+
+    // Jika filter kelas/tab berganti, selalu muat data baru
+    // Jika hanya nilaiList.length berubah tapi ada perubahan belum disimpan, jangan timpa
+    if (!isFilterChanged && hasUnsavedChanges) {
+      return;
+    }
+
+    const targetKelas =
+      teacherScope.isTeacher && teacherScope.assignedClass
+        ? teacherScope.assignedClass
+        : selectedKelas;
+    initLegerInputScores(
+      targetKelas,
+      isTengah ? "tengah" : "akhir",
+      activeSemester
+    );
+  }, [
+    selectedKelas,
+    activeRaporTab,
+    teacherScope.assignedClass,
+    nilaiList.length,
+    activeSemester,
+    isTengah,
+  ]);
 
   const handleLegerScoreChange = (
     siswaId: string,
@@ -2859,12 +2934,15 @@ export default function NilaiManagementPage() {
       ...prev,
       [key]: cleanVal,
     }));
+    setHasUnsavedChanges(true);
   };
 
   const handleFillKkmForMapel = (mapelNama: string, kkmValue: number) => {
+    const targetStudents = isBatchRaporOpen ? batchStudents : activeTargetStudents;
+    let count = 0;
     setLegerInputScores((prev) => {
       const updated = { ...prev };
-      batchStudents.forEach((s) => {
+      targetStudents.forEach((s) => {
         const key = `${s.id}_${mapelNama}`;
         if (
           updated[key] === "" ||
@@ -2872,22 +2950,28 @@ export default function NilaiManagementPage() {
           Number(updated[key]) === 0
         ) {
           updated[key] = kkmValue;
+          count++;
         }
       });
       return updated;
     });
+    setHasUnsavedChanges(true);
     setNotification({
       type: "success",
-      message: `Nilai KKM (${kkmValue}) berhasil diisikan untuk siswa yang nilainya masih kosong pada mapel "${mapelNama}".`,
+      message: `Nilai KKM (${kkmValue}) berhasil diisikan untuk ${count} siswa yang nilainya masih kosong pada mapel "${mapelNama}". Pastikan klik "Simpan Nilai Leger".`,
     });
   };
 
   const handleFillAllKkmEmpty = () => {
     let count = 0;
+    const targetStudents = isBatchRaporOpen ? batchStudents : activeTargetStudents;
+    const targetMapels = isBatchRaporOpen ? currentLegerMapelList : activeLegerMapels;
+    const targetKelas = isBatchRaporOpen ? batchSelectedKelas : selectedKelas;
+
     setLegerInputScores((prev) => {
       const updated = { ...prev };
-      batchStudents.forEach((s) => {
-        currentLegerMapelList.forEach((m) => {
+      targetStudents.forEach((s) => {
+        targetMapels.forEach((m) => {
           const key = `${s.id}_${m.nama}`;
           if (
             updated[key] === "" ||
@@ -2901,24 +2985,31 @@ export default function NilaiManagementPage() {
       });
       return updated;
     });
+    setHasUnsavedChanges(true);
     setNotification({
       type: "success",
-      message: `Berhasil mengisi ${count} nilai kosong dengan standar KKM mata pelajaran Kelas ${batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas}.`,
+      message: `Berhasil mengisi ${count} nilai kosong dengan standar KKM mata pelajaran Kelas ${targetKelas === "Semua" ? "Semua Kelas" : targetKelas}. Pastikan klik "Simpan Nilai Leger".`,
     });
   };
 
   // Unduh Format / Template Excel Leger Rombel (dilengkapi daftar siswa dan mapel kelas aktif)
   const handleDownloadLegerExcelTemplate = () => {
     try {
+      const targetStudents = isBatchRaporOpen ? batchStudents : activeTargetStudents;
+      const targetMapels = isBatchRaporOpen ? currentLegerMapelList : activeLegerMapels;
+      const targetKelas = isBatchRaporOpen ? batchSelectedKelas : selectedKelas;
+      const targetSemester = isBatchRaporOpen ? batchRaporSemester : activeSemester;
+      const targetType = isBatchRaporOpen ? batchRaporType : (isTengah ? "tengah" : "akhir");
+
       const classNameClean =
-        batchSelectedKelas === "Semua"
+        targetKelas === "Semua"
           ? "Semua_Kelas"
-          : batchSelectedKelas.replace(/[^a-zA-Z0-9]/g, "_");
-      const typeLabel = batchRaporType === "tengah" ? "STS_Mid" : "SAS_Akhir";
-      const fileName = `Format_Leger_Nilai_${classNameClean}_${typeLabel}_Sem_${batchRaporSemester}.xlsx`;
+          : targetKelas.replace(/[^a-zA-Z0-9]/g, "_");
+      const typeLabel = targetType === "tengah" ? "STS_Mid" : "SAS_Akhir";
+      const fileName = `Format_Leger_Nilai_${classNameClean}_${typeLabel}_Sem_${targetSemester}.xlsx`;
 
       // Bangun baris data Excel terstruktur
-      const rows = batchStudents.map((s, idx) => {
+      const rows = targetStudents.map((s, idx) => {
         const row: Record<string, string | number> = {
           "No": idx + 1,
           "NISN": s.nisn || "",
@@ -2926,9 +3017,9 @@ export default function NilaiManagementPage() {
           "Kelas": s.kelas,
         };
 
-        currentLegerMapelList.forEach((m) => {
+        targetMapels.forEach((m) => {
           const key = `${s.id}_${m.nama}`;
-          const currentVal = isLegerEditMode ? (legerInputScores[key] ?? "") : "";
+          const currentVal = legerInputScores[key] ?? "";
           row[m.nama] = currentVal !== "" ? Number(currentVal) : "";
         });
 
@@ -2943,7 +3034,7 @@ export default function NilaiManagementPage() {
         { wch: 16 }, // NISN
         { wch: 30 }, // Nama Siswa
         { wch: 20 }, // Kelas
-        ...currentLegerMapelList.map((m) => ({
+        ...targetMapels.map((m) => ({
           wch: Math.max(m.nama.length + 4, 12),
         })),
       ];
@@ -3053,6 +3144,9 @@ export default function NilaiManagementPage() {
         ...legerInputScores,
       };
 
+      const targetStudents = isBatchRaporOpen ? batchStudents : activeTargetStudents;
+      const targetMapels = isBatchRaporOpen ? currentLegerMapelList : activeLegerMapels;
+
       jsonData.forEach((row) => {
         const rowKeys = Object.keys(row);
         const nisnKey = rowKeys.find((k) => {
@@ -3074,8 +3168,8 @@ export default function NilaiManagementPage() {
         const rawNisn = nisnKey ? String(row[nisnKey]).trim() : "";
         const rawNama = namaKey ? String(row[namaKey]).trim() : "";
 
-        // Cari siswa yang cocok di batchStudents
-        const student = batchStudents.find((s) => {
+        // Cari siswa yang cocok di targetStudents
+        const student = targetStudents.find((s) => {
           // 1. Cek NISN
           if (rawNisn && s.nisn) {
             const rawNisnClean = cleanDigits(rawNisn);
@@ -3099,8 +3193,8 @@ export default function NilaiManagementPage() {
         if (!student) return;
         matchedStudentsCount++;
 
-        // Cocokkan setiap mata pelajaran di currentLegerMapelList
-        currentLegerMapelList.forEach((m) => {
+        // Cocokkan setiap mata pelajaran di targetMapels
+        targetMapels.forEach((m) => {
           const mapelNorm = cleanNorm(m.nama);
 
           // Cari kolom di Excel yang bukan metadata dan cocok dengan mapel
@@ -3158,6 +3252,7 @@ export default function NilaiManagementPage() {
       }
 
       setLegerInputScores(updatedScores);
+      setHasUnsavedChanges(true);
       setNotification({
         type: "success",
         message: `Berhasil mengimpor nilai untuk ${matchedStudentsCount} siswa (${importedScoresCount} nilai mata pelajaran). Periksa nilai pada tabel dan klik "Simpan Nilai Leger" untuk menyimpan ke sistem.`,
@@ -3172,6 +3267,8 @@ export default function NilaiManagementPage() {
       if (e.target) {
         e.target.value = "";
       }
+      if (legerFileInputRef.current) legerFileInputRef.current.value = "";
+      if (mainLegerFileInputRef.current) mainLegerFileInputRef.current.value = "";
     }
   };
 
@@ -3180,8 +3277,14 @@ export default function NilaiManagementPage() {
     try {
       const itemsToSave: (Omit<NilaiSiswa, "id"> & { id?: string })[] = [];
 
-      batchStudents.forEach((s) => {
-        currentLegerMapelList.forEach((m) => {
+      const targetStudents = isBatchRaporOpen ? batchStudents : activeTargetStudents;
+      const targetMapels = isBatchRaporOpen ? currentLegerMapelList : activeLegerMapels;
+      const targetSemester = isBatchRaporOpen ? batchRaporSemester : activeSemester;
+      const targetType = isBatchRaporOpen ? batchRaporType : (isTengah ? "tengah" : "akhir");
+      const targetKelas = isBatchRaporOpen ? batchSelectedKelas : selectedKelas;
+
+      targetStudents.forEach((s) => {
+        targetMapels.forEach((m) => {
           const key = `${s.id}_${m.nama}`;
           const rawVal = legerInputScores[key];
 
@@ -3189,13 +3292,13 @@ export default function NilaiManagementPage() {
             (n) =>
               n.siswaId === s.id &&
               n.mapel?.trim().toLowerCase() === m.nama?.trim().toLowerCase() &&
-              (n.semester || "Ganjil").trim().toLowerCase() === batchRaporSemester.trim().toLowerCase()
+              (n.semester || "Ganjil").trim().toLowerCase() === targetSemester.trim().toLowerCase()
           );
 
           if (rawVal !== "" && rawVal !== undefined) {
             const numVal = Number(rawVal);
             if (!isNaN(numVal) && numVal >= 0 && numVal <= 100) {
-              if (batchRaporType === "tengah") {
+              if (targetType === "tengah") {
                 const { nilaiMid, predikatMid } = calculateMidGrade(numVal);
                 itemsToSave.push({
                   id: existing?.id,
@@ -3204,7 +3307,7 @@ export default function NilaiManagementPage() {
                   nisn: s.nisn,
                   kelas: s.kelas,
                   mapel: m.nama,
-                  semester: batchRaporSemester,
+                  semester: targetSemester,
                   tahunAjaran: profile.tahunAjaranAktif,
                   tugas: existing?.tugas || 0,
                   uts: numVal,
@@ -3237,7 +3340,7 @@ export default function NilaiManagementPage() {
                   nisn: s.nisn,
                   kelas: s.kelas,
                   mapel: m.nama,
-                  semester: batchRaporSemester,
+                  semester: targetSemester,
                   tahunAjaran: profile.tahunAjaranAktif,
                   tugas: uhVal,
                   uts: stsVal,
@@ -3266,14 +3369,15 @@ export default function NilaiManagementPage() {
         // Update state legerInputScores agar nilai tetap ada di tabel setelah tombol simpan diklik
         const updatedInitial: Record<string, string | number> = { ...legerInputScores };
         itemsToSave.forEach((item) => {
-          const val = (batchRaporType === "tengah" ? item.uts : item.uas) ?? "";
+          const val = (targetType === "tengah" ? item.uts : item.uas) ?? "";
           updatedInitial[`${item.siswaId}_${item.mapel}`] = val;
         });
         setLegerInputScores(updatedInitial);
+        setHasUnsavedChanges(false);
 
         setNotification({
           type: "success",
-          message: `Berhasil menyimpan ${itemsToSave.length} rekaman nilai dari Leger untuk ${batchStudents.length} siswa Kelas ${batchSelectedKelas === "Semua" ? "Semua Kelas" : batchSelectedKelas} (${batchRaporType === "tengah" ? "STS" : "SAS"} - Semester ${batchRaporSemester})! Data telah tersimpan di sistem.`,
+          message: `Berhasil menyimpan ${itemsToSave.length} rekaman nilai dari Leger untuk ${targetStudents.length} siswa Kelas ${targetKelas === "Semua" ? "Semua Kelas" : targetKelas} (${targetType === "tengah" ? "STS" : "SAS"} - Semester ${targetSemester})! Data telah tersimpan di sistem & database cloud.`,
         });
       } else {
         setNotification({
@@ -3397,6 +3501,88 @@ export default function NilaiManagementPage() {
         document.title = prevTitle;
       }
     }, 1500);
+  };
+
+  // Export Single Student Rapor to Excel (.xlsx / .xls)
+  const handleExportSingleRapor = (
+    siswa: Siswa,
+    type?: JenisRapor,
+    sem?: "Ganjil" | "Genap",
+    format: "xlsx" | "xls" = "xlsx"
+  ) => {
+    try {
+      const activeType = type || raporPrintType || activeAssessmentType;
+      const activeSem = sem || raporPrintSemester || activeSemester;
+      const studentRecords = nilaiList.filter(
+        (n) =>
+          n.siswaId === siswa.id &&
+          (n.semester || "Ganjil").toLowerCase() === activeSem.toLowerCase() &&
+          (activeType === "tengah" ? isRecordStsFilled(n) : isRecordSasFilled(n))
+      );
+      const att = getStudentAttendance(siswa.id, siswa.nama);
+      const fileName = exportSingleRaporXls(
+        {
+          siswa,
+          type: activeType,
+          semester: activeSem,
+          studentRecords,
+          mapelList,
+          profile,
+          kelasList,
+          guruList,
+          attendance: att,
+          raporConfig,
+        },
+        format
+      );
+      setNotification({
+        type: "success",
+        message: `Rapor ${activeType.toUpperCase()} untuk "${siswa.nama}" berhasil diekspor ke format Excel (${fileName}).`,
+      });
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: `Gagal mengekspor rapor ke Excel: ${err?.message || err}`,
+      });
+    }
+  };
+
+  // Export Batch Student Rapor to Excel (.xlsx / .xls)
+  const handleExportBatchRapor = (format: "xlsx" | "xls" = "xlsx") => {
+    try {
+      if (batchStudents.length === 0) {
+        setNotification({
+          type: "error",
+          message: "Tidak ada siswa pada rombel yang dipilih untuk diekspor.",
+        });
+        return;
+      }
+      const fileName = exportBatchRaporXls(
+        {
+          batchStudents,
+          type: batchRaporType,
+          semester: batchRaporSemester,
+          selectedKelas: batchSelectedKelas,
+          nilaiList,
+          mapelList,
+          profile,
+          kelasList,
+          guruList,
+          getAttendance: getStudentAttendance,
+          raporConfig,
+        },
+        format
+      );
+      setNotification({
+        type: "success",
+        message: `Bundel Rapor ${batchRaporType.toUpperCase()} kelas "${batchSelectedKelas}" berhasil diekspor ke Excel (${fileName}) lengkap dengan rekap nilai & lembar rapor per siswa.`,
+      });
+    } catch (err: any) {
+      setNotification({
+        type: "error",
+        message: `Gagal mengekspor bundel rapor ke Excel: ${err?.message || err}`,
+      });
+    }
   };
 
   // Format clean international phone number for WhatsApp (e.g. 0812... -> 62812...)
@@ -3759,32 +3945,19 @@ export default function NilaiManagementPage() {
             <span>Leger Nilai Rombel</span>
           </button>
 
-          {/* Tombol Input Nilai Siswa 1 Kelas dari Leger Rombel */}
+          {/* Tombol Simpan Nilai Leger */}
           <button
-            onClick={() => {
-              const targetKelas =
-                teacherScope.isTeacher && teacherScope.assignedClass
-                  ? teacherScope.assignedClass
-                  : selectedKelas !== "Semua"
-                  ? selectedKelas
-                  : kelasList[0]?.nama || "Semua";
-              setBatchRaporViewMode("leger");
-              setIsLegerEditMode(true);
-              setBatchRaporType(isTengah ? "tengah" : "akhir");
-              setBatchRaporSemester(activeSemester);
-              setBatchSelectedKelas(targetKelas);
-              initLegerInputScores(
-                targetKelas,
-                isTengah ? "tengah" : "akhir",
-                activeSemester
-              );
-              setIsBatchRaporOpen(true);
-            }}
-            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs font-bold shadow-md shadow-purple-600/25 transition-all flex items-center gap-2 cursor-pointer"
-            title="Input dan edit nilai seluruh siswa 1 rombel sekaligus dalam format matriks leger nilai"
+            onClick={handleSaveLegerScores}
+            disabled={isLegerSaving}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white text-xs font-bold shadow-md shadow-emerald-600/25 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            title="Simpan seluruh perubahan nilai pada tabel leger ke sistem & cloud database"
           >
-            <TableProperties className="h-4 w-4" />
-            <span>Input Nilai Leger Rombel</span>
+            {isLegerSaving ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            <span>{isLegerSaving ? "Menyimpan Nilai..." : "Simpan Nilai Leger"}</span>
           </button>
         </div>
       </div>
@@ -4079,10 +4252,428 @@ export default function NilaiManagementPage() {
         </div>
       </div>
 
-      {/* Nilai Table: Menampilkan Seluruh Siswa (Default Belum Diisi jika belum ada nilai) */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+      {/* Nilai Table Container: Mode Matriks Leger & Mode Ringkasan */}
+      {(() => {
+        // Kalkulasi live ranking siswa untuk mode leger
+        const rankedStudentIds = (() => {
+          const scoresWithAvg = filteredSiswa.map((s) => {
+            const scs = activeLegerMapels.map((m) => {
+              const raw = legerInputScores[`${s.id}_${m.nama}`];
+              if (raw !== "" && raw !== undefined) {
+                const num = Number(raw);
+                return isNaN(num) ? 0 : num;
+              }
+              return 0;
+            });
+            const filled = scs.filter((v) => v > 0);
+            const avg = filled.length > 0 ? filled.reduce((a, b) => a + b, 0) / filled.length : 0;
+            return { id: s.id, avg };
+          });
+          scoresWithAvg.sort((a, b) => b.avg - a.avg);
+          const rankMap = new Map<string, number>();
+          scoresWithAvg.forEach((item, idx) => {
+            rankMap.set(item.id, idx + 1);
+          });
+          return rankMap;
+        })();
+
+        return (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
+            {/* Top Toolbar Tabel Leger & Ringkasan */}
+            <div className="p-4 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white shadow-sm shrink-0">
+                  <TableProperties className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="flex items-center flex-wrap gap-2">
+                    <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                      {mainTableViewMode === "leger"
+                        ? "Input Nilai Langsung Matriks Leger"
+                        : "Ringkasan Status Pengisian Nilai Siswa"}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      {isTengah ? "STS (Mid)" : "SAS (Akhir)"} &bull; Semester {activeSemester}
+                    </span>
+                    {hasUnsavedChanges && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                        Ada Nilai Belum Disimpan
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {mainTableViewMode === "leger"
+                      ? "Ketik nilai (0-100) langsung pada sel mapel. Total, rata-rata, predikat, dan ketuntasan terhitung otomatis."
+                      : "Daftar ringkasan keterisian nilai per peserta didik."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center flex-wrap gap-2">
+                {/* Mode Switcher */}
+                <div className="flex items-center bg-slate-200/80 dark:bg-slate-700/80 p-0.5 rounded-xl text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setMainTableViewMode("leger")}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      mainTableViewMode === "leger"
+                        ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <TableProperties className="h-3.5 w-3.5" />
+                    <span>Matriks Leger</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMainTableViewMode("ringkasan")}
+                    className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      mainTableViewMode === "ringkasan"
+                        ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    <span>Ringkasan Siswa</span>
+                  </button>
+                </div>
+
+                {mainTableViewMode === "leger" && (
+                  <>
+                    {/* Format Excel */}
+                    <button
+                      type="button"
+                      onClick={handleDownloadLegerExcelTemplate}
+                      className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/60 text-teal-800 dark:text-teal-300 border border-teal-300 dark:border-teal-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                      title="Unduh format tabel Excel untuk pengisian offline"
+                    >
+                      <Download className="h-3.5 w-3.5 text-teal-600" />
+                      <span className="hidden md:inline">Format Excel</span>
+                    </button>
+
+                    {/* Impor Excel */}
+                    <input
+                      ref={mainLegerFileInputRef}
+                      type="file"
+                      accept=".xlsx, .xls"
+                      onChange={handleProcessLegerExcelFile}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => mainLegerFileInputRef.current?.click()}
+                      disabled={isLegerImporting}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm disabled:opacity-50"
+                      title="Impor nilai dari file Excel ke tabel leger"
+                    >
+                      {isLegerImporting ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5 text-indigo-600" />
+                      )}
+                      <span className="hidden md:inline">{isLegerImporting ? "Mengimpor..." : "Impor Excel"}</span>
+                    </button>
+
+                    {/* Isi KKM Kosong */}
+                    <button
+                      type="button"
+                      onClick={handleFillAllKkmEmpty}
+                      className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                      title="Otomatis isi seluruh nilai kosong dengan standar KKM mapel"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                      <span>Isi KKM Kosong</span>
+                    </button>
+
+                    {/* Simpan Nilai Leger */}
+                    <button
+                      type="button"
+                      onClick={handleSaveLegerScores}
+                      disabled={isLegerSaving || isLegerImporting}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
+                      title="Simpan seluruh perubahan nilai pada tabel leger ke sistem & database cloud"
+                    >
+                      {isLegerSaving ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Save className="h-3.5 w-3.5" />
+                      )}
+                      <span>{isLegerSaving ? "Menyimpan..." : "Simpan Nilai Leger"}</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* TABEL 1: MODE MATRIKS LEGER (INPUT LANGSUNG) */}
+            {mainTableViewMode === "leger" ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="px-2 py-3 text-center w-9">No</th>
+                      <th className="px-3 py-3 min-w-[170px]">Peserta Didik</th>
+                      <th className="px-2 py-3 text-center w-16">Kelas</th>
+                      {activeLegerMapels.map((m) => (
+                        <th
+                          key={m.id}
+                          className="px-1.5 py-2.5 text-center min-w-[72px] border-l border-slate-200 dark:border-slate-700/60"
+                          title={`${m.nama} (KKM: ${m.kkm || 75})`}
+                        >
+                          <span className="block truncate max-w-[72px] font-extrabold text-slate-800 dark:text-slate-100">
+                            {m.kode || m.nama.substring(0, 4).toUpperCase()}
+                          </span>
+                          <span className="text-[9px] font-normal text-slate-500 dark:text-slate-400 block">
+                            KKM {m.kkm || 75}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleFillKkmForMapel(m.nama, m.kkm || 75)}
+                            className="mt-1 block mx-auto text-[8px] leading-tight px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800 cursor-pointer no-print transition-all"
+                            title={`Isi otomatis nilai kosong pada mapel ${m.nama} dengan KKM (${m.kkm || 75})`}
+                          >
+                            Isi KKM
+                          </button>
+                        </th>
+                      ))}
+                      <th className="px-2 py-3 text-center bg-slate-100 dark:bg-slate-800/80 w-16 border-l border-slate-200 dark:border-slate-700 font-bold">
+                        Total
+                      </th>
+                      <th className="px-2 py-3 text-center bg-amber-500/10 dark:bg-amber-500/20 text-amber-900 dark:text-amber-200 font-black w-14">
+                        Rata2
+                      </th>
+                      <th className="px-2 py-3 text-center bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-900 dark:text-emerald-200 font-bold w-12">
+                        Rank
+                      </th>
+                      <th className="px-2 py-3 text-center w-20">Status</th>
+                      <th className="px-3 py-3 text-right min-w-[130px]">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                    {filteredSiswa.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={activeLegerMapels.length + 8}
+                          className="px-5 py-12 text-center text-slate-400"
+                        >
+                          Tidak ada peserta didik yang sesuai dengan kriteria filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSiswa.map((s, index) => {
+                        const studentScores = activeLegerMapels.map((m) => {
+                          const key = `${s.id}_${m.nama}`;
+                          const raw = legerInputScores[key];
+                          if (raw !== "" && raw !== undefined) {
+                            const num = Number(raw);
+                            return isNaN(num) ? null : num;
+                          }
+                          return null;
+                        });
+
+                        const filledScores = studentScores.filter((sc): sc is number => sc !== null && sc > 0);
+                        const studentTotal = filledScores.reduce((a, b) => a + b, 0);
+                        const studentAvg =
+                          filledScores.length > 0 ? Math.round(studentTotal / filledScores.length) : 0;
+                        const studentPredikat =
+                          filledScores.length > 0
+                            ? isTengah
+                              ? calculateMidGrade(studentAvg).predikatMid
+                              : getPredikatFromScore(studentAvg)
+                            : "-";
+                        const isStudentTuntas = filledScores.length > 0 && studentAvg >= 75;
+                        const studentRank =
+                          studentAvg > 0 ? (rankedStudentIds.get(s.id) ?? index + 1) : "-";
+
+                        return (
+                          <tr
+                            key={s.id}
+                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                          >
+                            <td className="px-2 py-2 text-center font-mono text-slate-400 text-xs">
+                              {index + 1}
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <div className="h-7 w-7 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-sm">
+                                  {s.nama.substring(0, 2).toUpperCase()}
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-slate-900 dark:text-white block text-xs truncate max-w-[150px]">
+                                    {s.nama}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    NISN: {s.nisn}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                {s.kelas}
+                              </span>
+                            </td>
+
+                            {/* Input Cells for each mapel */}
+                            {activeLegerMapels.map((m) => {
+                              const key = `${s.id}_${m.nama}`;
+                              const rawVal = legerInputScores[key] ?? "";
+                              const numVal = Number(rawVal) || 0;
+                              const kkm = m.kkm || 75;
+                              const isFilled = rawVal !== "" && rawVal !== undefined;
+                              const isScoreTuntas = numVal >= kkm;
+
+                              return (
+                                <td
+                                  key={m.id}
+                                  className={`px-1 py-1.5 text-center border-l border-slate-100 dark:border-slate-800/60 ${
+                                    !isFilled
+                                      ? "bg-transparent"
+                                      : isScoreTuntas
+                                      ? "bg-emerald-50/40 dark:bg-emerald-950/20"
+                                      : "bg-rose-50/40 dark:bg-rose-950/20"
+                                  }`}
+                                >
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={rawVal}
+                                    placeholder="-"
+                                    onFocus={(e) => e.target.select()}
+                                    onChange={(e) =>
+                                      handleLegerScoreChange(s.id, m.nama, e.target.value)
+                                    }
+                                    className={`w-14 text-center font-mono text-xs font-bold py-1 px-1 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                                      !isFilled
+                                        ? "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                                        : isScoreTuntas
+                                        ? "border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-300 font-extrabold"
+                                        : "border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 font-black"
+                                    }`}
+                                    title={`${s.nama} - ${m.nama} (KKM: ${kkm})`}
+                                  />
+                                </td>
+                              );
+                            })}
+
+                            {/* Total */}
+                            <td className="px-2 py-2 text-center font-mono font-bold bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100 border-l border-slate-200 dark:border-slate-800">
+                              {studentTotal > 0 ? studentTotal : "-"}
+                            </td>
+
+                            {/* Rata2 */}
+                            <td className="px-2 py-2 text-center font-mono font-black text-amber-700 dark:text-amber-400 bg-amber-50/60 dark:bg-amber-950/30">
+                              {studentAvg > 0 ? studentAvg : "-"}
+                            </td>
+
+                            {/* Rank */}
+                            <td className="px-2 py-2 text-center font-bold">
+                              {studentAvg > 0 ? (
+                                <span className="font-extrabold text-emerald-700 dark:text-emerald-400 font-mono text-xs">
+                                  #{studentRank}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+
+                            {/* Status */}
+                            <td className="px-2 py-2 text-center">
+                              {studentAvg > 0 ? (
+                                isStudentTuntas ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                                    Tuntas
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-400">
+                                    Remedial
+                                  </span>
+                                )
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-400">
+                                  Kosong
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Aksi */}
+                            <td className="px-3 py-2 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenRapor(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                                  title={`Cetak E-Rapor ${isTengah ? "STS" : "SAS"} untuk ${s.nama}`}
+                                  className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors inline-flex items-center cursor-pointer"
+                                >
+                                  <Printer className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleExportSingleRapor(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                                  title={`Ekspor Rapor ${s.nama} (.xlsx)`}
+                                  className="p-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 transition-colors inline-flex items-center cursor-pointer"
+                                >
+                                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenWhatsAppModal(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                                  title="Kirim Ringkasan Nilai via WhatsApp"
+                                  className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors inline-flex items-center cursor-pointer"
+                                >
+                                  <MessageCircle className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+
+                  {/* Tfoot: Rekap Rata-Rata Kelas */}
+                  {filteredSiswa.length > 0 && (
+                    <tfoot className="bg-slate-100 dark:bg-slate-800/90 font-bold text-[11px] border-t-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200">
+                      <tr>
+                        <td colSpan={3} className="px-3 py-2.5 text-center font-extrabold uppercase">
+                          Rata-Rata Kelas ({filteredSiswa.length} Siswa)
+                        </td>
+                        {activeLegerMapels.map((m) => {
+                          const colScores = filteredSiswa
+                            .map((s) => Number(legerInputScores[`${s.id}_${m.nama}`]))
+                            .filter((v) => !isNaN(v) && v > 0);
+                          const colAvg =
+                            colScores.length > 0
+                              ? Math.round(colScores.reduce((a, b) => a + b, 0) / colScores.length)
+                              : 0;
+                          return (
+                            <td
+                              key={m.id}
+                              className={`px-1 py-2 text-center font-mono text-xs border-l border-slate-200 dark:border-slate-700 ${
+                                colAvg >= (m.kkm || 75)
+                                  ? "text-emerald-700 dark:text-emerald-400 font-extrabold"
+                                  : colAvg > 0
+                                  ? "text-rose-700 dark:text-rose-400 font-extrabold"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {colAvg > 0 ? colAvg : "-"}
+                            </td>
+                          );
+                        })}
+                        <td colSpan={5} className="px-3 py-2 text-left text-[10px] text-slate-500 dark:text-slate-400 font-normal">
+                          KKM Standar: 75 &bull; Real-time calculation
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            ) : (
+              /* TABEL 2: MODE RINGKASAN SISWA */
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
               {selectedMapel === "Semua" ? (
                 isTengah ? (
@@ -4487,6 +5078,16 @@ export default function NilaiManagementPage() {
                               <span>Cetak Rapor</span>
                             </button>
 
+                            {/* Tombol Ekspor XLS */}
+                            <button
+                              onClick={() => handleExportSingleRapor(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                              title={`Ekspor E-Rapor ${isTengah ? "STS" : "SAS"} (${s.nama}) ke Excel (.xlsx)`}
+                              className="p-1.5 px-2 rounded-xl bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 transition-colors inline-flex items-center gap-1 cursor-pointer font-bold text-xs"
+                            >
+                              <FileSpreadsheet className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                              <span className="hidden xl:inline text-[11px]">XLS</span>
+                            </button>
+
                             {/* Tombol WhatsApp */}
                             <button
                               onClick={() => handleOpenWhatsAppModal(s, isTengah ? "tengah" : "akhir", activeSemester)}
@@ -4770,6 +5371,16 @@ export default function NilaiManagementPage() {
                             <span>Cetak Rapor</span>
                           </button>
 
+                          {/* Tombol Ekspor XLS */}
+                          <button
+                            onClick={() => handleExportSingleRapor(s, isTengah ? "tengah" : "akhir", activeSemester)}
+                            title={`Ekspor E-Rapor ${isTengah ? "STS" : "SAS"} (${s.nama}) ke Excel (.xlsx)`}
+                            className="p-1.5 px-2 rounded-xl bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 transition-colors inline-flex items-center gap-1 cursor-pointer font-bold text-xs"
+                          >
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                            <span className="hidden xl:inline text-[11px]">XLS</span>
+                          </button>
+
                           {/* Tombol WhatsApp */}
                           <button
                             onClick={() => handleOpenWhatsAppModal(s, isTengah ? "tengah" : "akhir", activeSemester)}
@@ -4785,9 +5396,45 @@ export default function NilaiManagementPage() {
                 })
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  })()}
+
+  {/* Sticky Bottom Bar for Unsaved Changes in Leger */}
+  {hasUnsavedChanges && (
+    <div className="sticky bottom-4 mx-4 p-3.5 bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white rounded-2xl shadow-xl flex items-center justify-between gap-3 z-30 animate-pulse no-print border border-amber-300/40">
+      <div className="flex items-center gap-2.5">
+        <div className="p-1.5 rounded-lg bg-white/20">
+          <AlertTriangle className="h-5 w-5 text-white" />
+        </div>
+        <div>
+          <p className="text-xs font-bold leading-tight">
+            Ada perubahan nilai pada tabel yang belum disimpan!
+          </p>
+          <p className="text-[11px] text-amber-100">
+            Klik tombol simpan agar nilai terbaru tersimpan secara permanen ke database cloud.
+          </p>
         </div>
       </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={handleSaveLegerScores}
+          disabled={isLegerSaving}
+          className="px-4 py-2 rounded-xl bg-white hover:bg-amber-50 text-amber-900 text-xs font-extrabold shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all active:scale-95"
+        >
+          {isLegerSaving ? (
+            <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+          ) : (
+            <Save className="h-4 w-4 text-emerald-600" />
+          )}
+          <span>{isLegerSaving ? "Menyimpan Nilai..." : "Simpan Perubahan Sekarang"}</span>
+        </button>
+      </div>
+    </div>
+  )}
 
       {/* ========================================================= */}
       {/* MODAL 1: INPUT BULK NILAI SISWA (SELURUH MAPEL SEKALIGUS) */}
@@ -6366,6 +7013,23 @@ export default function NilaiManagementPage() {
 
                 <button
                   type="button"
+                  onClick={() =>
+                    handleExportSingleRapor(
+                      raporSiswa,
+                      raporPrintType,
+                      raporPrintSemester,
+                      "xlsx"
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-teal-700/20 transition-all cursor-pointer"
+                  title="Ekspor dokumen rapor siswa ini ke file spreadsheet Microsoft Excel (.xlsx / .xls)"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span>Ekspor Excel (.xlsx)</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleOpenWhatsAppModal(raporSiswa)}
                   className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-green-600/20 transition-all cursor-pointer"
                   title="Kirim ringkasan laporan hasil belajar langsung ke WhatsApp orang tua"
@@ -7486,6 +8150,22 @@ export default function NilaiManagementPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={() =>
+                    handleExportSingleRapor(
+                      raporSiswa,
+                      raporPrintType,
+                      raporPrintSemester,
+                      "xlsx"
+                    )
+                  }
+                  className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-teal-700/20 transition-all cursor-pointer"
+                  title="Ekspor dokumen rapor siswa ini ke file Excel (.xlsx)"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span>Ekspor Excel (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setRaporSiswa(null)}
                   className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
                 >
@@ -7798,6 +8478,27 @@ export default function NilaiManagementPage() {
                     >
                       <Download className="h-4 w-4" />
                       <span>Simpan / Ekspor PDF</span>
+                    </button>
+
+                    {/* Tombol Ekspor Excel */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (batchRaporViewMode === "bundel") {
+                          handleExportBatchRapor("xlsx");
+                        } else {
+                          handleDownloadLegerExcelTemplate();
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-teal-700/20 cursor-pointer transition-all"
+                      title={
+                        batchRaporViewMode === "bundel"
+                          ? "Ekspor bundel rapor seluruh siswa kelas ini ke file Excel (.xlsx) lengkap dengan rekap dan lembar per siswa"
+                          : "Unduh format leger nilai kelas aktif ke file Excel (.xlsx)"
+                      }
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                      <span>Ekspor Excel (.xlsx)</span>
                     </button>
 
                     {/* Kontrol Format & Kustomisasi Rapor (Hanya Admin) */}
@@ -9098,6 +9799,21 @@ export default function NilaiManagementPage() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => {
+                        if (batchRaporViewMode === "bundel") {
+                          handleExportBatchRapor("xlsx");
+                        } else {
+                          handleDownloadLegerExcelTemplate();
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-teal-700/20 transition-all cursor-pointer"
+                      title="Ekspor ke spreadsheet Excel (.xlsx)"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                      <span>Ekspor Excel (.xlsx)</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setIsBatchRaporOpen(false)}
                       className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer"
                     >
@@ -9843,6 +10559,23 @@ export default function NilaiManagementPage() {
                   >
                     <Printer className="h-3.5 w-3.5" />
                     <span className="hidden md:inline">Cetak / PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleExportSingleRapor(
+                        previewStudent,
+                        formatPreviewType,
+                        formatPreviewSemester,
+                        "xlsx"
+                      )
+                    }
+                    className="px-3.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-teal-700/20 transition-all cursor-pointer active:scale-95"
+                    title="Ekspor format rapor pratinjau ini ke file spreadsheet Excel (.xlsx)"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    <span className="hidden md:inline">Ekspor Excel (.xlsx)</span>
                   </button>
 
                   <button

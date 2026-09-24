@@ -633,6 +633,43 @@ export const SupabaseSchoolService = {
     return !error;
   },
 
+  async upsertPresensiBatch(records: PresensiRecord[]): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client || records.length === 0) return false;
+    const payload = records.map((rec) => ({
+      id: rec.id,
+      siswa_id: rec.siswaId,
+      siswa_nama: rec.siswaNama,
+      kelas: rec.kelas,
+      tanggal: rec.tanggal,
+      status: rec.status,
+      keterangan: rec.keterangan || null,
+    }));
+    const { error } = await client.from("presensi").upsert(payload, { onConflict: "id" });
+    return !error;
+  },
+
+  async deletePresensi(id: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("presensi").delete().eq("id", id);
+    return !error;
+  },
+
+  async deletePresensiBySiswaTanggal(siswaId: string, tanggal: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("presensi").delete().eq("siswa_id", siswaId).eq("tanggal", tanggal);
+    return !error;
+  },
+
+  async deletePresensiBySiswa(siswaId: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("presensi").delete().eq("siswa_id", siswaId);
+    return !error;
+  },
+
   // ==================== NILAI SISWA ====================
   async getNilaiList(): Promise<NilaiSiswa[] | null> {
     const client = getSupabaseBrowserClient();
@@ -842,6 +879,20 @@ export const SupabaseSchoolService = {
       tahun: t.tahun || null,
     }));
     const { error } = await client.from("tagihan_siswa").upsert(payload);
+    return !error;
+  },
+
+  async deleteTagihan(id: string): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return false;
+    const { error } = await client.from("tagihan_siswa").delete().eq("id", id);
+    return !error;
+  },
+
+  async bulkDeleteTagihan(ids: string[]): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client || ids.length === 0) return false;
+    const { error } = await client.from("tagihan_siswa").delete().in("id", ids);
     return !error;
   },
 
@@ -1722,9 +1773,12 @@ export const SupabaseSchoolService = {
         "mata_pelajaran",
         "jadwal_pelajaran",
         "presensi",
+        "nilai_siswa",
         "nilai",
+        "tagihan_siswa",
         "tagihan",
         "jenis_tagihan",
+        "tabungan_siswa",
         "tabungan",
         "transaksi_tabungan",
         "peserta_transportasi",
@@ -1735,8 +1789,11 @@ export const SupabaseSchoolService = {
         "lms_tugas",
         "lms_submissions",
         "lms_kuis",
+        "lms_attempts",
         "lms_kuis_attempts",
+        "lms_forum",
         "lms_forum_diskusi",
+        "lms_meetings",
         "lms_virtual_meetings",
         "lms_bank_soal",
         "lms_jadwal_materi",

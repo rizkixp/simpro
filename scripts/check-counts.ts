@@ -22,15 +22,39 @@ if (fs.existsSync(envLocalPath)) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function check() {
-  const { data: nilai, error: errNilai } = await supabase.from("nilai_siswa").select("id");
-  const { data: tagihan, error: errTagihan } = await supabase.from("tagihan_siswa").select("id");
-  const { data: sppTrans, error: errSppTrans } = await supabase.from("spp_transport_records").select("id");
-  const { data: transSpp, error: errTransSpp } = await supabase.from("transaksi_spp_transport").select("id");
+  const tables = [
+    "siswa",
+    "guru",
+    "kelas",
+    "mata_pelajaran",
+    "jadwal_pelajaran",
+    "presensi",
+    "nilai_siswa",
+    "tagihan_siswa",
+    "tabungan_siswa",
+    "transaksi_tabungan",
+    "peserta_transportasi",
+    "spp_transport_records",
+    "transaksi_spp_transport",
+    "pengumuman",
+  ];
 
-  console.log("nilai_siswa count:", nilai ? nilai.length : 0, "error:", errNilai?.message || "none");
-  console.log("tagihan_siswa count:", tagihan ? tagihan.length : 0, "error:", errTagihan?.message || "none");
-  console.log("spp_transport_records count:", sppTrans ? sppTrans.length : 0, "error:", errSppTrans?.message || "none");
-  console.log("transaksi_spp_transport count:", transSpp ? transSpp.length : 0, "error:", errTransSpp?.message || "none");
+  for (const t of tables) {
+    const { count, error } = await supabase.from(t).select("*", { count: "exact", head: true });
+    console.log(`${t} count:`, count ?? 0, "error:", error?.message || "none");
+  }
+
+  const dummySiswaIds = ["sis-001", "sis-002", "sis-003", "sis-004", "sis-005", "sis-006", "sis-007", "sis-008"];
+  const { data: dummySiswa } = await supabase.from("siswa").select("id, nama").in("id", dummySiswaIds);
+  console.log("\n--- AUDIT STATUS ---");
+  console.log("Dummy siswa found in Supabase:", dummySiswa?.length || 0, dummySiswa?.map(s => s.nama));
+  
+  const { count: realCount } = await supabase.from("siswa").select("*", { count: "exact", head: true }).not("id", "in", `(${dummySiswaIds.join(",")})`);
+  console.log("Real siswa SDI count in Supabase:", realCount || 0);
+
+  const dummyGuruIds = ["gur-001", "gur-002", "gur-003", "gur-004", "gur-005", "gur-006"];
+  const { data: dummyGuru } = await supabase.from("guru").select("id, nama").in("id", dummyGuruIds);
+  console.log("Dummy guru found in Supabase:", dummyGuru?.length || 0);
 }
 
 check();

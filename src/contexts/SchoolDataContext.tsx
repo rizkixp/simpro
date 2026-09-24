@@ -180,6 +180,26 @@ interface SchoolDataContextType {
       notifWaTerkirim?: boolean;
     }
   ) => void;
+  deletePresensi: (id: string) => void;
+  resetPresensiSiswa: (siswaId: string, tanggal?: string) => void;
+  clearAllPresensiSiswa: (siswaId: string) => void;
+  resetPresensiKelas: (kelas: string, tanggal?: string) => void;
+  batchUpdatePresensi: (
+    items: Array<{
+      siswaId: string;
+      status: StatusKehadiran;
+      keterangan?: string;
+      tanggal?: string;
+      extra?: {
+        waktuMasuk?: string;
+        waktuPulang?: string;
+        metode?: MetodePresensi;
+        terlambat?: boolean;
+        fotoSnapshot?: string;
+        notifWaTerkirim?: boolean;
+      };
+    }>
+  ) => void;
   nilaiList: NilaiSiswa[];
   saveNilai: (nilai: Omit<NilaiSiswa, "id"> & { id?: string }) => void;
   bulkSaveNilai: (items: (Omit<NilaiSiswa, "id"> & { id?: string })[]) => void;
@@ -419,36 +439,36 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
     return INITIAL_SCHOOL_PROFILE;
   });
-  const [siswaList, setSiswaList] = useState<Siswa[]>(INITIAL_SISWA);
-  const [guruList, setGuruList] = useState<Guru[]>(INITIAL_GURU);
-  const [kelasList, setKelasList] = useState<Kelas[]>(INITIAL_KELAS);
-  const [mapelList, setMapelList] = useState<MataPelajaran[]>(INITIAL_MAPEL);
-  const [jadwalList, setJadwalList] = useState<JadwalPelajaran[]>(INITIAL_JADWAL);
-  const [presensiList, setPresensiList] = useState<PresensiRecord[]>(INITIAL_PRESENSI);
-  const [nilaiList, setNilaiList] = useState<NilaiSiswa[]>(INITIAL_NILAI);
-  const [sppList, setSppList] = useState<TagihanSPP[]>(INITIAL_SPP);
-  const [jenisTagihanList, setJenisTagihanList] = useState<JenisTagihan[]>(INITIAL_JENIS_TAGIHAN);
-  const [pengumumanList, setPengumumanList] = useState<Pengumuman[]>(INITIAL_PENGUMUMAN);
-  const [tabunganList, setTabunganList] = useState<TabunganSiswa[]>(INITIAL_TABUNGAN);
-  const [transaksiTabunganList, setTransaksiTabunganList] = useState<TransaksiTabungan[]>(INITIAL_TRANSAKSI_TABUNGAN);
-  const [pesertaTransportList, setPesertaTransportList] = useState<PesertaTransportasi[]>(INITIAL_PESERTA_TRANSPORT);
-  const [sppTransportRecords, setSppTransportRecords] = useState<RecordSPPTransportTahunAjaran[]>(INITIAL_SPP_TRANSPORT_RECORDS);
-  const [transaksiSPPTransportList, setTransaksiSPPTransportList] = useState<TransaksiSPPTransport[]>(INITIAL_TRANSAKSI_SPP_TRANSPORT);
+  const [siswaList, setSiswaList] = useState<Siswa[]>([]);
+  const [guruList, setGuruList] = useState<Guru[]>([]);
+  const [kelasList, setKelasList] = useState<Kelas[]>([]);
+  const [mapelList, setMapelList] = useState<MataPelajaran[]>([]);
+  const [jadwalList, setJadwalList] = useState<JadwalPelajaran[]>([]);
+  const [presensiList, setPresensiList] = useState<PresensiRecord[]>([]);
+  const [nilaiList, setNilaiList] = useState<NilaiSiswa[]>([]);
+  const [sppList, setSppList] = useState<TagihanSPP[]>([]);
+  const [jenisTagihanList, setJenisTagihanList] = useState<JenisTagihan[]>([]);
+  const [pengumumanList, setPengumumanList] = useState<Pengumuman[]>([]);
+  const [tabunganList, setTabunganList] = useState<TabunganSiswa[]>([]);
+  const [transaksiTabunganList, setTransaksiTabunganList] = useState<TransaksiTabungan[]>([]);
+  const [pesertaTransportList, setPesertaTransportList] = useState<PesertaTransportasi[]>([]);
+  const [sppTransportRecords, setSppTransportRecords] = useState<RecordSPPTransportTahunAjaran[]>([]);
+  const [transaksiSPPTransportList, setTransaksiSPPTransportList] = useState<TransaksiSPPTransport[]>([]);
 
   // LMS States
-  const [lmsMateriList, setLmsMateriList] = useState<LMSMateri[]>(INITIAL_LMS_MATERI);
-  const [lmsTugasList, setLmsTugasList] = useState<LMSTugas[]>(INITIAL_LMS_TUGAS);
-  const [lmsSubmissionList, setLmsSubmissionList] = useState<LMSSubmission[]>(INITIAL_LMS_SUBMISSIONS);
-  const [lmsKuisList, setLmsKuisList] = useState<LMSKuis[]>(INITIAL_LMS_KUIS);
-  const [lmsKuisAttemptList, setLmsKuisAttemptList] = useState<LMSKuisAttempt[]>(INITIAL_LMS_ATTEMPTS);
-  const [lmsForumList, setLmsForumList] = useState<LMSForumDiskusi[]>(INITIAL_LMS_FORUM);
-  const [lmsMeetingList, setLmsMeetingList] = useState<LMSVirtualMeeting[]>(INITIAL_LMS_MEETINGS);
-  const [lmsBankSoalList, setLmsBankSoalList] = useState<LMSBankSoal[]>(INITIAL_LMS_BANK_SOAL);
-  const [lmsJadwalMateriList, setLmsJadwalMateriList] = useState<LMSJadwalMateri[]>(INITIAL_LMS_JADWAL_MATERI);
+  const [lmsMateriList, setLmsMateriList] = useState<LMSMateri[]>([]);
+  const [lmsTugasList, setLmsTugasList] = useState<LMSTugas[]>([]);
+  const [lmsSubmissionList, setLmsSubmissionList] = useState<LMSSubmission[]>([]);
+  const [lmsKuisList, setLmsKuisList] = useState<LMSKuis[]>([]);
+  const [lmsKuisAttemptList, setLmsKuisAttemptList] = useState<LMSKuisAttempt[]>([]);
+  const [lmsForumList, setLmsForumList] = useState<LMSForumDiskusi[]>([]);
+  const [lmsMeetingList, setLmsMeetingList] = useState<LMSVirtualMeeting[]>([]);
+  const [lmsBankSoalList, setLmsBankSoalList] = useState<LMSBankSoal[]>([]);
+  const [lmsJadwalMateriList, setLmsJadwalMateriList] = useState<LMSJadwalMateri[]>([]);
 
   // Islamic School Flagship States
-  const [tahfidzList, setTahfidzList] = useState<TahfidzRecord[]>(INITIAL_TAHFIDZ_RECORDS);
-  const [mutabaahList, setMutabaahList] = useState<MutabaahRecord[]>(INITIAL_MUTABAAH_RECORDS);
+  const [tahfidzList, setTahfidzList] = useState<TahfidzRecord[]>([]);
+  const [mutabaahList, setMutabaahList] = useState<MutabaahRecord[]>([]);
 
   // Supabase Cloud Integration States
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(false);
@@ -612,7 +632,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 2. Siswa
         const rawSiswa = localStorage.getItem("sim_data_siswa");
-        let baseSiswaList: Siswa[] = rawSiswa !== null ? (JSON.parse(rawSiswa) || []) : INITIAL_SISWA;
+        let baseSiswaList: Siswa[] = rawSiswa !== null ? (JSON.parse(rawSiswa) || []) : [];
         baseSiswaList = baseSiswaList.filter((s) => !deletedIds.has(s.id));
         const waliCleanMigrationKey = "sim_data_siswa_wali_cleared_v1";
         const hasMigratedWali = typeof window !== "undefined" && localStorage.getItem(waliCleanMigrationKey) === "true";
@@ -652,7 +672,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 3. Guru
         const rawGuru = localStorage.getItem("sim_data_guru");
-        let baseGuruList: Guru[] = rawGuru !== null ? (JSON.parse(rawGuru) || []) : INITIAL_GURU;
+        let baseGuruList: Guru[] = rawGuru !== null ? (JSON.parse(rawGuru) || []) : [];
         baseGuruList = baseGuruList.filter((g) => !deletedIds.has(g.id));
         const sanitizedGuru = baseGuruList.map((g: any) => ({
           ...g,
@@ -677,19 +697,19 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 4. Kelas (Otoritatif dari localStorage tanpa re-injeksi INITIAL_KELAS)
         const rawKelas = localStorage.getItem("sim_data_kelas");
-        let baseKelasList: Kelas[] = rawKelas !== null ? (JSON.parse(rawKelas) || []) : INITIAL_KELAS;
+        let baseKelasList: Kelas[] = rawKelas !== null ? (JSON.parse(rawKelas) || []) : [];
         baseKelasList = baseKelasList.filter((k) => !deletedIds.has(k.id));
         setKelasList(baseKelasList);
 
         // 5. Mapel (Otoritatif dari localStorage tanpa re-injeksi INITIAL_MAPEL)
         const rawMapel = localStorage.getItem("sim_data_mapel");
-        let baseMapelList: MataPelajaran[] = rawMapel !== null ? (JSON.parse(rawMapel) || []) : INITIAL_MAPEL;
+        let baseMapelList: MataPelajaran[] = rawMapel !== null ? (JSON.parse(rawMapel) || []) : [];
         baseMapelList = baseMapelList.filter((m) => !deletedIds.has(m.id));
         setMapelList(baseMapelList);
 
         // 6. Jadwal (Otoritatif dari localStorage tanpa re-injeksi INITIAL_JADWAL)
         const rawJadwal = localStorage.getItem("sim_data_jadwal");
-        let baseJadwalList: JadwalPelajaran[] = rawJadwal !== null ? (JSON.parse(rawJadwal) || []) : INITIAL_JADWAL;
+        let baseJadwalList: JadwalPelajaran[] = rawJadwal !== null ? (JSON.parse(rawJadwal) || []) : [];
         baseJadwalList = baseJadwalList.filter((j) => !deletedIds.has(j.id));
         baseJadwalList = baseJadwalList.map((j) => {
           if (j.id === "jdw-01" && j.mapel === "Upacara & PAI") {
@@ -704,13 +724,13 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 7. Presensi
         const rawPresensi = localStorage.getItem("sim_data_presensi");
-        let basePresensiList: PresensiRecord[] = rawPresensi !== null ? (JSON.parse(rawPresensi) || []) : INITIAL_PRESENSI;
+        let basePresensiList: PresensiRecord[] = rawPresensi !== null ? (JSON.parse(rawPresensi) || []) : [];
         basePresensiList = basePresensiList.filter((p) => !deletedIds.has(p.id));
         setPresensiList(basePresensiList);
 
         // 8. Nilai (Otoritatif dari localStorage tanpa re-injeksi INITIAL_NILAI)
         const rawNilai = localStorage.getItem("sim_data_nilai");
-        let mergedNilai: NilaiSiswa[] = rawNilai !== null ? (JSON.parse(rawNilai) || []) : INITIAL_NILAI;
+        let mergedNilai: NilaiSiswa[] = rawNilai !== null ? (JSON.parse(rawNilai) || []) : [];
         mergedNilai = mergedNilai.filter((n) => !deletedIds.has(n.id));
 
         // Migration: Kosongkan nilai default SAS (Ganjil & Genap) pada browser pengguna
@@ -755,7 +775,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 9. SPP & Jenis Tagihan
         const rawSpp = localStorage.getItem("sim_data_spp");
-        let loadedSpp: TagihanSiswa[] = (rawSpp !== null ? (JSON.parse(rawSpp) || []) : INITIAL_SPP).filter((s: any) => !deletedIds.has(s.id));
+        let loadedSpp: TagihanSiswa[] = (rawSpp !== null ? (JSON.parse(rawSpp) || []) : []).filter((s: any) => !deletedIds.has(s.id));
         if (needsNilaiSppReset) {
           loadedSpp = [];
           localStorage.setItem("sim_data_spp", JSON.stringify([]));
@@ -764,12 +784,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         setSppList(loadedSpp);
 
         const rawJenisTagihan = localStorage.getItem("sim_data_jenis_tagihan");
-        const loadedJenisTagihan: JenisTagihan[] = (rawJenisTagihan !== null ? (JSON.parse(rawJenisTagihan) || []) : INITIAL_JENIS_TAGIHAN).filter((j: any) => !deletedIds.has(j.id));
+        const loadedJenisTagihan: JenisTagihan[] = (rawJenisTagihan !== null ? (JSON.parse(rawJenisTagihan) || []) : []).filter((j: any) => !deletedIds.has(j.id));
         setJenisTagihanList(loadedJenisTagihan);
 
         // 10. Pengumuman
         const rawPengumuman = localStorage.getItem("sim_data_pengumuman");
-        const loadedPengumuman: Pengumuman[] = (rawPengumuman !== null ? (JSON.parse(rawPengumuman) || []) : INITIAL_PENGUMUMAN).filter((p: any) => !deletedIds.has(p.id));
+        const loadedPengumuman: Pengumuman[] = (rawPengumuman !== null ? (JSON.parse(rawPengumuman) || []) : []).filter((p: any) => !deletedIds.has(p.id));
         setPengumumanList(loadedPengumuman);
 
         // 11. Tabungan
@@ -782,43 +802,43 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           loadedTabungan = [];
           loadedTransaksiTabungan = [];
         } else {
-          loadedTabungan = load("tabungan", INITIAL_TABUNGAN);
-          loadedTransaksiTabungan = load("transaksi_tabungan", INITIAL_TRANSAKSI_TABUNGAN);
+          loadedTabungan = load("tabungan", []);
+          loadedTransaksiTabungan = load("transaksi_tabungan", []);
         }
         setTabunganList(loadedTabungan);
         setTransaksiTabunganList(loadedTransaksiTabungan);
 
         // 12. Transport
-        const loadedPesertaTransport = load("peserta_transport", INITIAL_PESERTA_TRANSPORT);
-        const loadedSppTransportRecords = load("spp_transport_records", INITIAL_SPP_TRANSPORT_RECORDS);
-        const loadedTransaksiSPPTransportList = load("transaksi_spp_transport", INITIAL_TRANSAKSI_SPP_TRANSPORT);
+        const loadedPesertaTransport = load("peserta_transport", []);
+        const loadedSppTransportRecords = load("spp_transport_records", []);
+        const loadedTransaksiSPPTransportList = load("transaksi_spp_transport", []);
         setPesertaTransportList(loadedPesertaTransport);
         setSppTransportRecords(loadedSppTransportRecords);
         setTransaksiSPPTransportList(loadedTransaksiSPPTransportList);
 
         // 13. LMS Data (Otoritatif tanpa re-injeksi default yang telah dihapus)
         const rawMateri = localStorage.getItem("sim_data_lms_materi");
-        const baseMateri: LMSMateri[] = (rawMateri !== null ? (JSON.parse(rawMateri) || []) : INITIAL_LMS_MATERI).filter((m: any) => !deletedIds.has(m.id));
+        const baseMateri: LMSMateri[] = (rawMateri !== null ? (JSON.parse(rawMateri) || []) : []).filter((m: any) => !deletedIds.has(m.id));
         setLmsMateriList(baseMateri);
 
         const rawTugas = localStorage.getItem("sim_data_lms_tugas");
-        const baseTugas: LMSTugas[] = (rawTugas !== null ? (JSON.parse(rawTugas) || []) : INITIAL_LMS_TUGAS).filter((t: any) => !deletedIds.has(t.id));
+        const baseTugas: LMSTugas[] = (rawTugas !== null ? (JSON.parse(rawTugas) || []) : []).filter((t: any) => !deletedIds.has(t.id));
         setLmsTugasList(baseTugas);
 
-        const loadedSubmissions: LMSSubmission[] = load("lms_submissions", INITIAL_LMS_SUBMISSIONS);
+        const loadedSubmissions: LMSSubmission[] = load("lms_submissions", []);
         setLmsSubmissionList(loadedSubmissions);
 
         const rawKuis = localStorage.getItem("sim_data_lms_kuis");
-        const baseKuis: LMSKuis[] = (rawKuis !== null ? (JSON.parse(rawKuis) || []) : INITIAL_LMS_KUIS).filter((k: any) => !deletedIds.has(k.id));
+        const baseKuis: LMSKuis[] = (rawKuis !== null ? (JSON.parse(rawKuis) || []) : []).filter((k: any) => !deletedIds.has(k.id));
         setLmsKuisList(baseKuis);
 
-        const loadedAttempts: LMSKuisAttempt[] = load("lms_attempts", INITIAL_LMS_ATTEMPTS);
+        const loadedAttempts: LMSKuisAttempt[] = load("lms_attempts", []);
         setLmsKuisAttemptList(loadedAttempts);
 
-        const loadedForum: LMSForumDiskusi[] = load("lms_forum", INITIAL_LMS_FORUM);
+        const loadedForum: LMSForumDiskusi[] = load("lms_forum", []);
         setLmsForumList(loadedForum);
 
-        const loadedMeetings: LMSVirtualMeeting[] = load("lms_meetings", INITIAL_LMS_MEETINGS);
+        const loadedMeetings: LMSVirtualMeeting[] = load("lms_meetings", []);
         setLmsMeetingList(loadedMeetings);
 
         const rawBank = localStorage.getItem("sim_data_lms_bank_soal");
@@ -827,25 +847,25 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           try {
             baseBank = JSON.parse(rawBank);
           } catch {
-            baseBank = INITIAL_LMS_BANK_SOAL;
+            baseBank = [];
           }
         } else {
-          baseBank = INITIAL_LMS_BANK_SOAL;
+          baseBank = [];
         }
         baseBank = baseBank.filter((b: any) => !deletedIds.has(b.id));
         setLmsBankSoalList(baseBank);
 
         const rawJadwalMateri = localStorage.getItem("sim_data_lms_jadwal_materi");
-        const baseJadwalMateri: LMSJadwalMateri[] = (rawJadwalMateri !== null ? (JSON.parse(rawJadwalMateri) || []) : INITIAL_LMS_JADWAL_MATERI).filter((j: any) => !deletedIds.has(j.id));
+        const baseJadwalMateri: LMSJadwalMateri[] = (rawJadwalMateri !== null ? (JSON.parse(rawJadwalMateri) || []) : []).filter((j: any) => !deletedIds.has(j.id));
         setLmsJadwalMateriList(baseJadwalMateri);
 
         // 14. Islamic School Flagship (Tahfidz & Mutaba'ah)
         const rawTahfidz = localStorage.getItem("sim_data_tahfidz");
-        const baseTahfidz: TahfidzRecord[] = (rawTahfidz !== null ? (JSON.parse(rawTahfidz) || []) : INITIAL_TAHFIDZ_RECORDS).filter((t: any) => !deletedIds.has(t.id));
+        const baseTahfidz: TahfidzRecord[] = (rawTahfidz !== null ? (JSON.parse(rawTahfidz) || []) : []).filter((t: any) => !deletedIds.has(t.id));
         setTahfidzList(baseTahfidz);
 
         const rawMutabaah = localStorage.getItem("sim_data_mutabaah");
-        const baseMutabaah: MutabaahRecord[] = (rawMutabaah !== null ? (JSON.parse(rawMutabaah) || []) : INITIAL_MUTABAAH_RECORDS).filter((m: any) => !deletedIds.has(m.id));
+        const baseMutabaah: MutabaahRecord[] = (rawMutabaah !== null ? (JSON.parse(rawMutabaah) || []) : []).filter((m: any) => !deletedIds.has(m.id));
         setMutabaahList(baseMutabaah);
 
         // Populate latestDataRef immediately for thread safety and sync alignment
@@ -955,14 +975,20 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  // 60-second periodic background push fallback when auto-push is enabled
+  // Auto-sync from Supabase Cloud when window regains focus or comes back online
   useEffect(() => {
-    if (!isAutoPushEnabled || !SupabaseSchoolService.isConfigured()) return;
-    const interval = setInterval(() => {
-      triggerAutoPush("periodic-interval");
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [isAutoPushEnabled]);
+    if (!SupabaseSchoolService.isConfigured()) return;
+    const handleSyncOnFocus = () => {
+      // Re-sync with Supabase to make sure data is identical across all devices/tabs
+      syncWithSupabase();
+    };
+    window.addEventListener("focus", handleSyncOnFocus);
+    window.addEventListener("online", handleSyncOnFocus);
+    return () => {
+      window.removeEventListener("focus", handleSyncOnFocus);
+      window.removeEventListener("online", handleSyncOnFocus);
+    };
+  }, []);
 
   // Helper for background Supabase persistence without blocking UI
   const persistSupabase = (action: () => Promise<boolean | any>) => {
@@ -1085,17 +1111,10 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       );
 
       if (!hasCloudData) {
-        const isExplicitlyCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
-        if (isExplicitlyCleared) {
-          console.log("[Supabase] Database sekolah dalam status dikosongkan. Menjaga cloud tetap kosong.");
-          setIsSupabaseConnected(true);
-          setLastSyncTime(new Date());
-          setIsSyncing(false);
-          return;
-        }
-        // First-time connected to fresh Supabase: auto seed so it's ready!
-        console.log("[Supabase] Database cloud masih kosong. Menjalankan auto-seeding awal...");
-        await seedDatabaseToCloud();
+        console.log("[Supabase] Database cloud masih kosong. Menjaga cloud tetap kosong (tidak auto-seeding data dummy).");
+        setIsSupabaseConnected(true);
+        setLastSyncTime(new Date());
+        setIsSyncing(false);
         return;
       }
 
@@ -1125,151 +1144,76 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       const deletedIds = getDeletedIds();
 
       if (Array.isArray(data.siswa)) {
-        const localSiswa = latestDataRef.current.siswaList || [];
         const stale = data.siswa.filter((s) => deletedIds.has(s.id)).map((s) => s.id);
         if (stale.length > 0) SupabaseSchoolService.bulkDeleteSiswa(stale).catch(() => {});
         const remoteSiswa = data.siswa.filter((s) => !deletedIds.has(s.id));
-        const mergedSiswa = [...remoteSiswa];
-        localSiswa.forEach((loc) => {
-          if (deletedIds.has(loc.id)) return;
-          const exists = mergedSiswa.some(
-            (rem) => rem.id === loc.id || (Boolean(loc.nisn?.trim()) && Boolean(rem.nisn?.trim()) && rem.nisn.trim() === loc.nisn.trim())
-          );
-          if (!exists) {
-            mergedSiswa.push(loc);
-          }
-        });
-        setSiswaList(mergedSiswa);
-        latestDataRef.current.siswaList = mergedSiswa;
-        saveState("siswa", mergedSiswa, true);
+        setSiswaList(remoteSiswa);
+        latestDataRef.current.siswaList = remoteSiswa;
+        saveState("siswa", remoteSiswa, true);
       }
       if (Array.isArray(data.guru)) {
-        const localGuru = latestDataRef.current.guruList || [];
         const stale = data.guru.filter((g) => deletedIds.has(g.id)).map((g) => g.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteGuru(id).catch(() => {}));
         }
         const remoteGuru = data.guru.filter((g) => !deletedIds.has(g.id));
-        const mergedGuru = [...remoteGuru];
-        localGuru.forEach((loc) => {
-          if (deletedIds.has(loc.id)) return;
-          const exists = mergedGuru.some(
-            (rem) => rem.id === loc.id || (Boolean(loc.nip?.trim()) && Boolean(rem.nip?.trim()) && rem.nip.trim() === loc.nip.trim())
-          );
-          if (!exists) {
-            mergedGuru.push(loc);
-          }
-        });
-        setGuruList(mergedGuru);
-        latestDataRef.current.guruList = mergedGuru;
-        saveState("guru", mergedGuru, true);
+        setGuruList(remoteGuru);
+        latestDataRef.current.guruList = remoteGuru;
+        saveState("guru", remoteGuru, true);
       }
       if (Array.isArray(data.kelas)) {
-        const localKelas = latestDataRef.current.kelasList || [];
         const stale = data.kelas.filter((k) => deletedIds.has(k.id)).map((k) => k.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteKelas(id).catch(() => {}));
         }
         const remoteKelas = data.kelas.filter((k) => !deletedIds.has(k.id));
-        const mergedKelas = [...remoteKelas];
-        localKelas.forEach((loc) => {
-          if (deletedIds.has(loc.id)) return;
-          const exists = mergedKelas.some(
-            (rem) => rem.id === loc.id || (Boolean(rem.nama) && Boolean(loc.nama) && rem.nama.toLowerCase().trim() === loc.nama.toLowerCase().trim())
-          );
-          if (!exists) {
-            mergedKelas.push(loc);
-          }
-        });
-        setKelasList(mergedKelas);
-        latestDataRef.current.kelasList = mergedKelas;
-        saveState("kelas", mergedKelas, true);
+        setKelasList(remoteKelas);
+        latestDataRef.current.kelasList = remoteKelas;
+        saveState("kelas", remoteKelas, true);
       }
       if (Array.isArray(data.mapel)) {
-        const localMapel = latestDataRef.current.mapelList || [];
         const stale = data.mapel.filter((m) => deletedIds.has(m.id)).map((m) => m.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteMapel(id).catch(() => {}));
         }
         const remoteMapel = data.mapel.filter((m) => !deletedIds.has(m.id));
-        const mergedMapel = [...remoteMapel];
-        localMapel.forEach((loc) => {
-          if (deletedIds.has(loc.id)) return;
-          const exists = mergedMapel.some(
-            (rem) => rem.id === loc.id || (Boolean(rem.nama) && Boolean(loc.nama) && rem.nama.toLowerCase().trim() === loc.nama.toLowerCase().trim())
-          );
-          if (!exists) {
-            mergedMapel.push(loc);
-          }
-        });
-        setMapelList(mergedMapel);
-        latestDataRef.current.mapelList = mergedMapel;
-        saveState("mapel", mergedMapel, true);
+        setMapelList(remoteMapel);
+        latestDataRef.current.mapelList = remoteMapel;
+        saveState("mapel", remoteMapel, true);
       }
       if (Array.isArray(data.jadwal)) {
-        const localJadwal = latestDataRef.current.jadwalList || [];
         const stale = data.jadwal.filter((j) => deletedIds.has(j.id)).map((j) => j.id);
         if (stale.length > 0) {
           SupabaseSchoolService.bulkDeleteJadwal(stale).catch(() => {});
         }
         const remoteJadwal = data.jadwal.filter((j) => !deletedIds.has(j.id));
-        const mergedJadwal = [...remoteJadwal];
-        localJadwal.forEach((loc) => {
-          if (deletedIds.has(loc.id)) return;
-          const exists = mergedJadwal.some((rem) => rem.id === loc.id);
-          if (!exists) {
-            mergedJadwal.push(loc);
-          }
-        });
-        setJadwalList(mergedJadwal);
-        latestDataRef.current.jadwalList = mergedJadwal;
-        saveState("jadwal", mergedJadwal, true);
+        setJadwalList(remoteJadwal);
+        latestDataRef.current.jadwalList = remoteJadwal;
+        saveState("jadwal", remoteJadwal, true);
       }
       if (Array.isArray(data.presensi)) {
-        const localPresensi = latestDataRef.current.presensiList || [];
         const remotePresensi = data.presensi.filter((p) => !deletedIds.has(p.id));
-        const mergedPresensi = [...remotePresensi];
-        localPresensi.forEach((loc) => {
-          if (deletedIds.has(loc.id)) return;
-          const exists = mergedPresensi.some(
-            (rem) => rem.id === loc.id || (rem.siswaId === loc.siswaId && rem.tanggal === loc.tanggal)
-          );
-          if (!exists) {
-            mergedPresensi.push(loc);
-          }
-        });
-        setPresensiList(mergedPresensi);
-        latestDataRef.current.presensiList = mergedPresensi;
-        saveState("presensi", mergedPresensi, true);
+        setPresensiList(remotePresensi);
+        latestDataRef.current.presensiList = remotePresensi;
+        saveState("presensi", remotePresensi, true);
       }
       if (Array.isArray(data.nilai)) {
-        const localNilai = latestDataRef.current.nilaiList || [];
         const stale = data.nilai.filter((n) => deletedIds.has(n.id)).map((n) => n.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteNilai(id).catch(() => {}));
         }
         const remoteNilai = data.nilai.filter((n) => !deletedIds.has(n.id));
-        const mergedNilai = [...remoteNilai];
-        localNilai.forEach((loc) => {
-          if (deletedIds.has(loc.id)) return;
-          const idx = mergedNilai.findIndex(
-            (rem) =>
-              rem.id === loc.id ||
-              (rem.siswaId === loc.siswaId &&
-                rem.mapel?.trim().toLowerCase() === loc.mapel?.trim().toLowerCase() &&
-                (rem.semester || "Ganjil").trim().toLowerCase() === (loc.semester || "Ganjil").trim().toLowerCase())
-          );
-          if (idx >= 0) {
-            if (loc.hasSts || loc.hasSas || (typeof loc.uts === "number" && loc.uts > 0) || (typeof loc.uas === "number" && loc.uas > 0)) {
-              mergedNilai[idx] = { ...mergedNilai[idx], ...loc };
-            }
-          } else {
-            mergedNilai.push(loc);
-          }
-        });
-        setNilaiList(mergedNilai);
-        latestDataRef.current.nilaiList = mergedNilai;
-        saveState("nilai", mergedNilai, true);
+        setNilaiList(remoteNilai);
+        latestDataRef.current.nilaiList = remoteNilai;
+        saveState("nilai", remoteNilai, true);
+      }
+      if (Array.isArray(data.tagihan)) {
+        const stale = data.tagihan.filter((t) => deletedIds.has(t.id)).map((t) => t.id);
+        if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteTagihan(id).catch(() => {}));
+        const remoteTagihan = data.tagihan.filter((t) => !deletedIds.has(t.id));
+        setSppList(remoteTagihan);
+        latestDataRef.current.sppList = remoteTagihan;
+        saveState("spp", remoteTagihan, true);
       }
       if (Array.isArray(data.jenisTagihan)) {
         const stale = data.jenisTagihan.filter((t) => deletedIds.has(t.id)).map((t) => t.id);
@@ -1930,10 +1874,152 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       updated = [newPresensi, ...presensiList];
     }
     setPresensiList(updated);
+    latestDataRef.current.presensiList = updated;
     saveState("presensi", updated);
     const targetRec = updated.find((p) => p.siswaId === siswaId && p.tanggal === targetDate);
     if (targetRec) {
       persistSupabase(() => SupabaseSchoolService.upsertPresensi(targetRec));
+    }
+  };
+
+  const deletePresensi = (id: string) => {
+    recordDeletedId(id);
+    const updated = presensiList.filter((p) => p.id !== id);
+    latestDataRef.current.presensiList = updated;
+    setPresensiList(updated);
+    saveState("presensi", updated);
+    persistSupabase(() => SupabaseSchoolService.deletePresensi(id));
+  };
+
+  const resetPresensiSiswa = (siswaId: string, tanggal?: string) => {
+    const targetDate = tanggal;
+    const targetRecs = presensiList.filter((p) =>
+      p.siswaId === siswaId && (targetDate ? p.tanggal === targetDate : true)
+    );
+
+    const idsToDelete = targetRecs.map((r) => r.id);
+    if (idsToDelete.length > 0) {
+      recordDeletedId(idsToDelete);
+    }
+    const updated = presensiList.filter(
+      (p) => !(p.siswaId === siswaId && (targetDate ? p.tanggal === targetDate : true))
+    );
+    latestDataRef.current.presensiList = updated;
+    setPresensiList(updated);
+    saveState("presensi", updated);
+
+    idsToDelete.forEach((id) => {
+      persistSupabase(() => SupabaseSchoolService.deletePresensi(id));
+    });
+
+    if (targetDate) {
+      persistSupabase(() =>
+        SupabaseSchoolService.deletePresensiBySiswaTanggal(siswaId, targetDate)
+      );
+    } else {
+      persistSupabase(() =>
+        SupabaseSchoolService.deletePresensiBySiswa(siswaId)
+      );
+    }
+  };
+
+  const clearAllPresensiSiswa = (siswaId: string) => {
+    resetPresensiSiswa(siswaId); // passing no date empties 100% of all dates for this student
+  };
+
+  const resetPresensiKelas = (kelas: string, tanggal?: string) => {
+    const targetDate = tanggal || new Date().toISOString().split("T")[0];
+    const targetRecs = presensiList.filter((p) => {
+      if (p.tanggal !== targetDate) return false;
+      if (kelas === "Semua") return true;
+      return p.kelas?.trim().toLowerCase() === kelas.trim().toLowerCase();
+    });
+    if (targetRecs.length === 0) return;
+
+    const idsToDelete = targetRecs.map((r) => r.id);
+    recordDeletedId(idsToDelete);
+    const idSet = new Set(idsToDelete);
+    const updated = presensiList.filter((p) => !idSet.has(p.id));
+    latestDataRef.current.presensiList = updated;
+    setPresensiList(updated);
+    saveState("presensi", updated);
+    idsToDelete.forEach((id) => {
+      persistSupabase(() => SupabaseSchoolService.deletePresensi(id));
+    });
+  };
+
+  const batchUpdatePresensi = (
+    items: Array<{
+      siswaId: string;
+      status: StatusKehadiran;
+      keterangan?: string;
+      tanggal?: string;
+      extra?: {
+        waktuMasuk?: string;
+        waktuPulang?: string;
+        metode?: MetodePresensi;
+        terlambat?: boolean;
+        fotoSnapshot?: string;
+        notifWaTerkirim?: boolean;
+      };
+    }>
+  ) => {
+    if (!items || items.length === 0) return;
+    const defaultDate = new Date().toISOString().split("T")[0];
+    let updated = [...(latestDataRef.current.presensiList || presensiList)];
+    const touchedRecords: PresensiRecord[] = [];
+    const allCurrentSiswa = latestDataRef.current.siswaList || siswaList;
+
+    items.forEach((item) => {
+      const targetDate = item.tanggal || defaultDate;
+      const siswa = allCurrentSiswa.find((s) => s.id === item.siswaId);
+      if (!siswa) return;
+
+      const existingIndex = updated.findIndex(
+        (p) => p.siswaId === item.siswaId && p.tanggal === targetDate
+      );
+
+      if (existingIndex >= 0) {
+        const prev = updated[existingIndex];
+        const rec: PresensiRecord = {
+          ...prev,
+          status: item.status,
+          keterangan: item.keterangan !== undefined ? item.keterangan : prev.keterangan,
+          waktuMasuk: item.extra?.waktuMasuk || prev.waktuMasuk,
+          waktuPulang: item.extra?.waktuPulang || prev.waktuPulang,
+          metode: item.extra?.metode || prev.metode,
+          terlambat: item.extra?.terlambat !== undefined ? item.extra.terlambat : prev.terlambat,
+          fotoSnapshot: item.extra?.fotoSnapshot || prev.fotoSnapshot,
+          notifWaTerkirim: item.extra?.notifWaTerkirim !== undefined ? item.extra.notifWaTerkirim : prev.notifWaTerkirim,
+        };
+        updated[existingIndex] = rec;
+        touchedRecords.push(rec);
+      } else {
+        const newPresensi: PresensiRecord = {
+          id: `prs-${Date.now()}-${item.siswaId}-${Math.random().toString(36).substring(2, 6)}`,
+          siswaId: item.siswaId,
+          siswaNama: siswa.nama,
+          kelas: siswa.kelas,
+          tanggal: targetDate,
+          status: item.status,
+          keterangan: item.keterangan,
+          waktuMasuk: item.extra?.waktuMasuk,
+          waktuPulang: item.extra?.waktuPulang,
+          metode: item.extra?.metode,
+          terlambat: item.extra?.terlambat,
+          fotoSnapshot: item.extra?.fotoSnapshot,
+          notifWaTerkirim: item.extra?.notifWaTerkirim,
+        };
+        updated.unshift(newPresensi);
+        touchedRecords.push(newPresensi);
+      }
+    });
+
+    setPresensiList(updated);
+    latestDataRef.current.presensiList = updated;
+    saveState("presensi", updated);
+    if (touchedRecords.length > 0) {
+      persistSupabase(() => SupabaseSchoolService.upsertPresensiBatch(touchedRecords));
     }
   };
 
@@ -3885,6 +3971,11 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         resetJadwalToDefault,
         presensiList,
         updatePresensi,
+        deletePresensi,
+        resetPresensiSiswa,
+        clearAllPresensiSiswa,
+        resetPresensiKelas,
+        batchUpdatePresensi,
         nilaiList,
         saveNilai,
         bulkSaveNilai,

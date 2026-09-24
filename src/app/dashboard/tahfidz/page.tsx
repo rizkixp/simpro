@@ -10,6 +10,7 @@ import {
   SurahJuz30Info,
 } from "@/types/school";
 import { SURAH_JUZ_30 } from "@/lib/mock-data";
+import * as XLSX from "xlsx";
 import {
   BookOpen,
   Award,
@@ -27,6 +28,7 @@ import {
   TrendingUp,
   Bookmark,
   Check,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function TahfidzPage() {
@@ -583,13 +585,85 @@ export default function TahfidzPage() {
               </select>
             </div>
 
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Cetak Lembar Rapor Tahfidz (Print / PDF)</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md shadow-emerald-700/20 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Cetak Lembar Rapor Tahfidz (Print / PDF)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    if (!studentTrackerData.student) return;
+                    const s = studentTrackerData.student;
+                    const rows: (string | number)[][] = [
+                      [profile.namaSekolah.toUpperCase()],
+                      [`NPSN: ${profile.npsn} • Akreditasi: ${profile.akreditasi}`],
+                      [`${profile.alamat} • Telp: ${profile.telepon}`],
+                      [""],
+                      ["LEMBAR MUTABA'AH & SYAHADAH HAFALAN AL-QUR'AN (RAPOR TAHFIDZ)"],
+                      [`Tahun Ajaran: ${profile.tahunAjaranAktif} • Semester: ${profile.semesterAktif}`],
+                      [""],
+                      ["Nama Santri", `: ${s.nama}`, "", "Kelas / Rombel", `: ${s.kelas}`],
+                      ["NISN", `: ${s.nisn || "-"}`, "", "Target Capaian", ": Juz 30 (Al-Qur'an Al-Karim)"],
+                      [""],
+                      ["No", "Tanggal", "Surah", "Ayat", "Kelancaran", "Nilai Tajwid", "Ustadz Pengampu"],
+                    ];
+
+                    if (studentTrackerData.studentRecords.length === 0) {
+                      rows.push(["-", "Belum ada catatan setoran untuk santri ini", "-", "-", "-", "-", "-"]);
+                    } else {
+                      studentTrackerData.studentRecords.forEach((rec, i) => {
+                        rows.push([
+                          i + 1,
+                          rec.tanggal,
+                          `Surah ${rec.surah}`,
+                          `${rec.ayatMulai} - ${rec.ayatSelesai}`,
+                          rec.kelancaran,
+                          rec.nilaiTajwid,
+                          rec.ustadzPengampu,
+                        ]);
+                      });
+                    }
+
+                    rows.push([""]);
+                    rows.push(["", "", "", "", "Mengetahui,"]);
+                    rows.push(["Koordinator Tahfidz Al-Qur'an", "", "", "", `Kepala Sekolah ${profile.namaSekolah}`]);
+                    rows.push([""]);
+                    rows.push([""]);
+                    rows.push(["Ustadz Ahmad Fauzi, Lc.", "", "", "", profile.kepalaSekolah]);
+                    rows.push(["NIP. 199004082015042008", "", "", "", `NPSN. ${profile.npsn}`]);
+
+                    const ws = XLSX.utils.aoa_to_sheet(rows);
+                    ws["!cols"] = [
+                      { wch: 6 },
+                      { wch: 14 },
+                      { wch: 24 },
+                      { wch: 14 },
+                      { wch: 16 },
+                      { wch: 14 },
+                      { wch: 28 },
+                    ];
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Rapor Tahfidz");
+                    const fileName = `Rapor_Tahfidz_${s.nama.replace(/[/\\?%*:|"<>]/g, "_")}_${s.kelas.replace(/[/\\?%*:|"<>]/g, "_")}.xlsx`;
+                    XLSX.writeFile(wb, fileName);
+                  } catch (err: any) {
+                    alert(`Gagal mengekspor Rapor Tahfidz: ${err?.message || err}`);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/20 transition-all flex items-center gap-2 cursor-pointer"
+                title="Ekspor lembar rapor tahfidz santri ini ke file Excel (.xlsx)"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Ekspor Excel (.xlsx)</span>
+              </button>
+            </div>
           </div>
 
           {/* Printable Sheet */}
