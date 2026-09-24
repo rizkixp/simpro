@@ -594,7 +594,11 @@ export default function DashboardOverviewPage() {
   return (
     <div className="space-y-6">
       {/* Primary KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 ${
+          user?.role === "guru" ? "lg:grid-cols-3" : "lg:grid-cols-4"
+        } gap-4 sm:gap-5`}
+      >
         {/* Stat 1: Siswa */}
         {user?.role === "admin" ? (
           <Link
@@ -637,26 +641,8 @@ export default function DashboardOverviewPage() {
           </div>
         )}
 
-        {/* Stat 2: Guru / Asatidz */}
-        {user?.role === "guru" ? (
-          <Link
-            href="/dashboard/nilai"
-            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-950 shadow-xs flex items-center justify-between hover:border-amber-400 dark:hover:border-amber-600 hover:shadow-md transition-all group cursor-pointer"
-          >
-            <div>
-              <p className="text-xs font-semibold text-amber-800/80 dark:text-amber-400">
-                Mapel Diampu: {teacherScope.assignedSubjects.join(", ") || "Tematik & Agama"}
-              </p>
-              <p className="mt-1 text-2xl font-extrabold text-slate-900 dark:text-white">E-Rapor Karakter</p>
-              <p className="mt-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400 group-hover:underline">
-                Kelola Nilai {teacherScope.assignedClass} &rarr;
-              </p>
-            </div>
-            <div className="h-12 w-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 border border-amber-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Award className="h-6 w-6" />
-            </div>
-          </Link>
-        ) : (
+        {/* Stat 2: Guru / Asatidz (Hanya tampil untuk Non-Guru / Admin) */}
+        {user?.role !== "guru" && (
           <Link
             href="/dashboard/guru"
             className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-teal-100/90 dark:border-teal-950 shadow-xs flex items-center justify-between hover:border-teal-400 hover:shadow-md transition-all group cursor-pointer"

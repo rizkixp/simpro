@@ -850,7 +850,7 @@ export default function NilaiManagementPage() {
   };
 
   const renderRaporSettingsPanel = () => {
-    if (!isRaporSettingsOpen) return null;
+    if (!isAdmin || !isRaporSettingsOpen) return null;
 
     return (
       <div className="mb-6 p-4 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-700/50 shadow-sm print:hidden animate-in fade-in duration-200">
@@ -1379,7 +1379,7 @@ export default function NilaiManagementPage() {
           <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
               <p className="text-slate-500">
-                Atur teks judul rapor, besar huruf (font size), format tebal (bold), dan garis bawah (underline).
+                Atur jenis huruf rapor (font family), teks judul rapor, besar huruf (font size), format tebal (bold), dan garis bawah (underline).
               </p>
               <button
                 type="button"
@@ -1393,14 +1393,132 @@ export default function NilaiManagementPage() {
                     underlineJudulRapor: true,
                     fontSizeSubjudulRapor: 12,
                     boldSubjudulRapor: false,
+                    fontFamilyRapor: "Times New Roman",
+                    customFontName: "",
                   })
                 }
                 className="px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer flex items-center gap-1"
-                title="Kembalikan format judul rapor ke standar sistem"
+                title="Kembalikan format judul & huruf rapor ke standar sistem"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 <span>Reset Judul Standar</span>
               </button>
+            </div>
+
+            {/* Pilihan Jenis Huruf (Font Family) Dokumen Rapor */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                    <Type className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-800 dark:text-slate-100 block text-sm">
+                      Pilih Jenis Huruf Dokumen Rapor (Font Family):
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Pilih jenis huruf resmi yang diterapkan pada seluruh lembar cetak rapor (kop, judul, identitas, tabel nilai, dan tanda tangan).
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    Aktif: {raporConfig.customFontName?.trim() || raporConfig.fontFamilyRapor || "Times New Roman"}
+                  </span>
+                  <select
+                    value={raporConfig.customFontName ? "custom" : (raporConfig.fontFamilyRapor || "Times New Roman")}
+                    onChange={(e) => {
+                      if (e.target.value !== "custom") {
+                        updateRaporConfig({ fontFamilyRapor: e.target.value, customFontName: "" });
+                      }
+                    }}
+                    className="text-xs font-bold py-1.5 px-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-800 dark:text-slate-100 cursor-pointer shadow-xs focus:ring-2 focus:ring-amber-500"
+                    title="Pilih Jenis Huruf Dokumen Rapor Cepat"
+                  >
+                    {RAPOR_FONT_OPTIONS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.label} ({f.category})
+                      </option>
+                    ))}
+                    {raporConfig.customFontName && (
+                      <option value="custom">Kustom: {raporConfig.customFontName}</option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Grid Kartu Font Interaktif */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                {RAPOR_FONT_OPTIONS.map((f) => {
+                  const isSelected =
+                    !raporConfig.customFontName?.trim() &&
+                    (raporConfig.fontFamilyRapor || "Times New Roman").toLowerCase() === f.id.toLowerCase();
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() =>
+                        updateRaporConfig({
+                          fontFamilyRapor: f.id,
+                          customFontName: "",
+                        })
+                      }
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                        isSelected
+                          ? "bg-amber-500/10 border-amber-500 dark:border-amber-500 ring-2 ring-amber-500 shadow-xs"
+                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-amber-300 hover:shadow-xs"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                          {f.label}
+                        </span>
+                        {isSelected ? (
+                          <span className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0">
+                            <Check className="h-2.5 w-2.5 stroke-[3]" />
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="text-[10px] text-slate-400 block mb-1.5 font-medium">
+                        {f.category}
+                      </span>
+                      <p
+                        style={{ fontFamily: f.css }}
+                        className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 italic"
+                      >
+                        {f.sample}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Input Font Kustom / Lokal */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Atau Ketik Font Kustom Komputer:
+                </span>
+                <div className="flex-1 flex gap-2 min-w-[200px]">
+                  <input
+                    type="text"
+                    value={raporConfig.customFontName || ""}
+                    onChange={(e) => updateRaporConfig({ customFontName: e.target.value })}
+                    placeholder="Contoh: Cambria, Palatino Linotype, Century Gothic, Segoe UI..."
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium"
+                  />
+                  {raporConfig.customFontName && (
+                    <button
+                      type="button"
+                      onClick={() => updateRaporConfig({ customFontName: "" })}
+                      className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-rose-100 hover:text-rose-600 transition-colors cursor-pointer"
+                      title="Hapus font kustom dan kembali ke pilihan standar"
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Styling Toolbar: Font Size, Bold, Underline */}
@@ -3799,16 +3917,18 @@ export default function NilaiManagementPage() {
           <span>Rekap Komponen Lengkap</span>
         </button>
 
-        {/* Tombol Khusus Format Rapor & Live Preview */}
-        <button
-          type="button"
-          onClick={() => setIsFormatRaporModalOpen(true)}
-          className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-md shadow-amber-500/20 active:scale-95 border border-amber-600 ml-auto sm:ml-0"
-          title="Pengaturan Format Cetak Rapor & Pratinjau Langsung (Live Preview)"
-        >
-          <Sliders className="h-4 w-4 text-white" />
-          <span>Format Rapor</span>
-        </button>
+        {/* Tombol Khusus Format Rapor & Live Preview (Hanya Admin) */}
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setIsFormatRaporModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-md shadow-amber-500/20 active:scale-95 border border-amber-600 ml-auto sm:ml-0"
+            title="Pengaturan Format Cetak Rapor & Pratinjau Langsung (Live Preview)"
+          >
+            <Sliders className="h-4 w-4 text-white" />
+            <span>Format Rapor</span>
+          </button>
+        )}
       </div>
 
       {/* KPI Stats Cards */}
@@ -6166,7 +6286,7 @@ export default function NilaiManagementPage() {
                 </div>
               </div>
 
-              {/* Action Buttons (Direct Print & PDF Export) - Hanya Admin */}
+              {/* Action Buttons (Direct Print, PDF Export & Admin Tools) */}
               <div className="flex items-center gap-2">
                 {isAdmin && (
                   <>
@@ -6213,59 +6333,61 @@ export default function NilaiManagementPage() {
                       <UserX className="h-4 w-4" />
                       <span>Hapus Siswa</span>
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handlePrintReport(
-                          `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
-                        )
-                      }
-                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                      title="Cetak langsung menggunakan dialog print peramban"
-                    >
-                      <Printer className="h-4 w-4" />
-                      <span>Cetak Langsung</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handlePrintReport(
-                          `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
-                        )
-                      }
-                      className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer"
-                      title="Simpan dokumen sebagai file PDF beresolusi tinggi"
-                    >
-                      <Download className="h-4 w-4" />
-                      <span>Simpan / Ekspor PDF</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenWhatsAppModal(raporSiswa)}
-                      className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-green-600/20 transition-all cursor-pointer"
-                      title="Kirim ringkasan laporan hasil belajar langsung ke WhatsApp orang tua"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      <span>Kirim WA Wali</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                        isRaporSettingsOpen
-                          ? "bg-amber-500 text-white shadow-amber-500/20"
-                          : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
-                      }`}
-                      title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
-                    >
-                      <Sliders className="h-4 w-4" />
-                      <span>Atur Kop & TTD</span>
-                    </button>
                   </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                  title="Cetak langsung menggunakan dialog print peramban"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Cetak Langsung</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handlePrintReport(
+                      `Rapor_${raporPrintType.toUpperCase()}_${raporSiswa.nama}_${raporSiswa.kelas}`
+                    )
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-700/20 transition-all cursor-pointer"
+                  title="Simpan dokumen sebagai file PDF beresolusi tinggi"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Simpan / Ekspor PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenWhatsAppModal(raporSiswa)}
+                  className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-green-600/20 transition-all cursor-pointer"
+                  title="Kirim ringkasan laporan hasil belajar langsung ke WhatsApp orang tua"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  <span>Kirim WA Wali</span>
+                </button>
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsRaporSettingsOpen(!isRaporSettingsOpen)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                      isRaporSettingsOpen
+                        ? "bg-amber-500 text-white shadow-amber-500/20"
+                        : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                    }`}
+                    title="Kustomisasi Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                  >
+                    <Sliders className="h-4 w-4" />
+                    <span>Atur Kop & TTD</span>
+                  </button>
                 )}
 
                 <button
@@ -6280,16 +6402,18 @@ export default function NilaiManagementPage() {
               </div>
             </div>
 
-            {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
-            {(isAdmin || isRaporSettingsOpen) && renderRaporSettingsPanel()}
+            {/* Kustomisasi Kop Surat & Titimangsa (No Print - Hanya Admin) */}
+            {isAdmin && isRaporSettingsOpen && renderRaporSettingsPanel()}
 
             {/* Official School Letterhead (Kop Surat) */}
             {renderOfficialLetterhead()}
 
             {/* Report Title & Type Info */}
             <div className="text-center mb-5">
-              {/* Quick Format & Edit Bar (No Print) */}
-              <div className="mb-2.5 print:hidden inline-flex flex-wrap items-center justify-center gap-1.5 p-1 px-3 rounded-full bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800 dark:hover:bg-slate-700/70 border border-slate-300 dark:border-slate-600 shadow-xs transition-all text-xs">
+              {/* Quick Format & Edit Bar (No Print - Khusus Admin) */}
+              {isAdmin && (
+                <>
+                  <div className="mb-2.5 print:hidden inline-flex flex-wrap items-center justify-center gap-1.5 p-1 px-3 rounded-full bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800 dark:hover:bg-slate-700/70 border border-slate-300 dark:border-slate-600 shadow-xs transition-all text-xs">
                 {/* Quick Font Selector */}
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
@@ -6571,6 +6695,8 @@ export default function NilaiManagementPage() {
                   </div>
                 </div>
               )}
+            </>
+          )}
 
               {/* Title Header with Dynamic Style */}
               <h3
@@ -7674,132 +7800,137 @@ export default function NilaiManagementPage() {
                       <span>Simpan / Ekspor PDF</span>
                     </button>
 
-                    {/* Quick Font Selector */}
-                    <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
-                        <Type className="h-3 w-3 text-indigo-500" />
-                        <span>Font:</span>
-                      </span>
-                      <select
-                        value={raporConfig.fontFamilyRapor || "Times New Roman"}
-                        onChange={(e) => updateRaporConfig({ fontFamilyRapor: e.target.value })}
-                        className="text-[11px] font-bold py-0.5 px-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-none"
-                        title="Pilih Jenis Font Tulisan Dokumen Rapor"
-                      >
-                        {RAPOR_FONT_OPTIONS.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Kontrol Format & Kustomisasi Rapor (Hanya Admin) */}
+                    {isAdmin && (
+                      <>
+                        {/* Quick Font Selector */}
+                        <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                            <Type className="h-3 w-3 text-indigo-500" />
+                            <span>Font:</span>
+                          </span>
+                          <select
+                            value={raporConfig.fontFamilyRapor || "Times New Roman"}
+                            onChange={(e) => updateRaporConfig({ fontFamilyRapor: e.target.value })}
+                            className="text-[11px] font-bold py-0.5 px-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-none"
+                            title="Pilih Jenis Font Tulisan Dokumen Rapor"
+                          >
+                            {RAPOR_FONT_OPTIONS.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
-                        <Type className="h-3 w-3" />
-                        <span>Judul:</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateRaporConfig({
-                            fontSizeJudulRapor: Math.max(10, (raporConfig.fontSizeJudulRapor || 16) - 1),
-                          })
-                        }
-                        className="w-5 h-5 rounded bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
-                        title="Perkecil Font Judul"
-                      >
-                        -
-                      </button>
-                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 min-w-[28px] text-center">
-                        {raporConfig.fontSizeJudulRapor || 16}px
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateRaporConfig({
-                            fontSizeJudulRapor: Math.min(32, (raporConfig.fontSizeJudulRapor || 16) + 1),
-                          })
-                        }
-                        className="w-5 h-5 rounded bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
-                        title="Perbesar Font Judul"
-                      >
-                        +
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateRaporConfig({
-                            boldJudulRapor: !(raporConfig.boldJudulRapor ?? true),
-                          })
-                        }
-                        className={`px-1.5 py-0.5 rounded font-bold text-xs cursor-pointer transition-all ${
-                          (raporConfig.boldJudulRapor ?? true)
-                            ? "bg-amber-500 text-white font-black"
-                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300"
-                        }`}
-                        title="Tebalkan Huruf Judul (Bold)"
-                      >
-                        <Bold className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateRaporConfig({
-                            underlineJudulRapor: !(raporConfig.underlineJudulRapor ?? true),
-                          })
-                        }
-                        className={`px-1.5 py-0.5 rounded font-bold text-xs cursor-pointer transition-all ${
-                          (raporConfig.underlineJudulRapor ?? true)
-                            ? "bg-amber-500 text-white font-black underline"
-                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300"
-                        }`}
-                        title="Garis Bawah Judul (Underline)"
-                      >
-                        <UnderlineIcon className="h-3 w-3" />
-                      </button>
-                    </div>
+                        <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 mr-0.5">
+                            <Type className="h-3 w-3" />
+                            <span>Judul:</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateRaporConfig({
+                                fontSizeJudulRapor: Math.max(10, (raporConfig.fontSizeJudulRapor || 16) - 1),
+                              })
+                            }
+                            className="w-5 h-5 rounded bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                            title="Perkecil Font Judul"
+                          >
+                            -
+                          </button>
+                          <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 min-w-[28px] text-center">
+                            {raporConfig.fontSizeJudulRapor || 16}px
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateRaporConfig({
+                                fontSizeJudulRapor: Math.min(32, (raporConfig.fontSizeJudulRapor || 16) + 1),
+                              })
+                            }
+                            className="w-5 h-5 rounded bg-white dark:bg-slate-900 hover:bg-amber-500 hover:text-white text-slate-700 dark:text-slate-200 font-black flex items-center justify-center text-xs shadow-xs cursor-pointer transition-colors"
+                            title="Perbesar Font Judul"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateRaporConfig({
+                                boldJudulRapor: !(raporConfig.boldJudulRapor ?? true),
+                              })
+                            }
+                            className={`px-1.5 py-0.5 rounded font-bold text-xs cursor-pointer transition-all ${
+                              (raporConfig.boldJudulRapor ?? true)
+                                ? "bg-amber-500 text-white font-black"
+                                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300"
+                            }`}
+                            title="Tebalkan Huruf Judul (Bold)"
+                          >
+                            <Bold className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateRaporConfig({
+                                underlineJudulRapor: !(raporConfig.underlineJudulRapor ?? true),
+                              })
+                            }
+                            className={`px-1.5 py-0.5 rounded font-bold text-xs cursor-pointer transition-all ${
+                              (raporConfig.underlineJudulRapor ?? true)
+                                ? "bg-amber-500 text-white font-black underline"
+                                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300"
+                            }`}
+                            title="Garis Bawah Judul (Underline)"
+                          >
+                            <UnderlineIcon className="h-3 w-3" />
+                          </button>
+                        </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveRaporConfigTab("judul");
-                        setIsRaporSettingsOpen(!isRaporSettingsOpen);
-                      }}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
-                        isRaporSettingsOpen
-                          ? "bg-amber-500 text-white shadow-amber-500/20"
-                          : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
-                      }`}
-                      title="Kustomisasi Judul, Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
-                    >
-                      <Sliders className="h-4 w-4" />
-                      <span>Atur Judul & Kop</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveRaporConfigTab("judul");
+                            setIsRaporSettingsOpen(!isRaporSettingsOpen);
+                          }}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+                            isRaporSettingsOpen
+                              ? "bg-amber-500 text-white shadow-amber-500/20"
+                              : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200"
+                          }`}
+                          title="Kustomisasi Judul, Logo Kop, Teks Kop Surat, dan Titimangsa Rapor"
+                        >
+                          <Sliders className="h-4 w-4" />
+                          <span>Atur Judul & Kop</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveRaporConfigTab("urutan");
-                        setIsRaporSettingsOpen(true);
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                      title="Atur urutan naik/turun mata pelajaran pada rapor"
-                    >
-                      <ArrowUpDown className="h-4 w-4 text-indigo-600" />
-                      <span>Urutan Mapel</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveRaporConfigTab("urutan");
+                            setIsRaporSettingsOpen(true);
+                          }}
+                          className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                          title="Atur urutan naik/turun mata pelajaran pada rapor"
+                        >
+                          <ArrowUpDown className="h-4 w-4 text-indigo-600" />
+                          <span>Urutan Mapel</span>
+                        </button>
 
-                    {/* Format Rapor (Full Modal) Button */}
-                    <button
-                      type="button"
-                      onClick={() => setIsFormatRaporModalOpen(true)}
-                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-amber-500/20 transition-all cursor-pointer"
-                      title="Buka Format Rapor Komprehensif (Kop, Judul, Font, Ukuran & Pratinjau)"
-                    >
-                      <Sliders className="h-4 w-4" />
-                      <span>Format Rapor</span>
-                    </button>
+                        {/* Format Rapor (Full Modal) Button */}
+                        <button
+                          type="button"
+                          onClick={() => setIsFormatRaporModalOpen(true)}
+                          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-amber-500/20 transition-all cursor-pointer"
+                          title="Buka Format Rapor Komprehensif (Kop, Judul, Font, Ukuran & Pratinjau)"
+                        >
+                          <Sliders className="h-4 w-4" />
+                          <span>Format Rapor</span>
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -7815,8 +7946,8 @@ export default function NilaiManagementPage() {
               </div>
             </div>
 
-            {/* Kustomisasi Kop Surat & Titimangsa (No Print) */}
-            {(isAdmin || isRaporSettingsOpen) && renderRaporSettingsPanel()}
+            {/* Kustomisasi Kop Surat & Titimangsa (No Print - Hanya Admin) */}
+            {isAdmin && isRaporSettingsOpen && renderRaporSettingsPanel()}
 
             {/* ========================================================= */}
             {/* KONTEN 1: MODE BUNDEL LEMBAR RAPOR PER SISWA (MULTI-PAGE) */}
@@ -9505,7 +9636,7 @@ export default function NilaiManagementPage() {
       {/* ========================================================================= */}
       {/* MODAL KHUSUS: FORMAT CETAK RAPOR & PRATINJAU LANGSUNG (LIVE PREVIEW)      */}
       {/* ========================================================================= */}
-      {isFormatRaporModalOpen && (() => {
+      {isAdmin && isFormatRaporModalOpen && (() => {
         // Data Siswa untuk Pratinjau
         const previewStudent: Siswa = (() => {
           if (formatPreviewSource === "siswa" && siswaList.length > 0) {
@@ -10087,10 +10218,42 @@ export default function NilaiManagementPage() {
 
                         {/* Format & Ukuran Judul */}
                         <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 space-y-3">
-                          <span className="font-bold text-slate-700 dark:text-slate-200 block">Format Gaya Huruf Judul:</span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-700 dark:text-slate-200 block">Format Gaya Huruf Judul:</span>
+                            <button
+                              type="button"
+                              onClick={() => setFormatRaporActiveTab("format")}
+                              className="text-[11px] text-amber-600 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>Atur Huruf Lengkap &rarr;</span>
+                            </button>
+                          </div>
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
-                              <span className="text-slate-500">Ukuran Font:</span>
+                              <span className="text-slate-500 font-medium">Font:</span>
+                              <select
+                                value={raporConfig.customFontName ? "custom" : (raporConfig.fontFamilyRapor || "Times New Roman")}
+                                onChange={(e) => {
+                                  if (e.target.value !== "custom") {
+                                    updateRaporConfig({ fontFamilyRapor: e.target.value, customFontName: "" });
+                                  }
+                                }}
+                                className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold cursor-pointer max-w-[130px] truncate"
+                                title="Pilih Jenis Huruf Dokumen Rapor"
+                              >
+                                {RAPOR_FONT_OPTIONS.map((f) => (
+                                  <option key={f.id} value={f.id}>
+                                    {f.label}
+                                  </option>
+                                ))}
+                                {raporConfig.customFontName && (
+                                  <option value="custom">Kustom: {raporConfig.customFontName}</option>
+                                )}
+                              </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-500">Ukuran:</span>
                               <button type="button" onClick={() => updateRaporConfig({ fontSizeJudulRapor: Math.max(12, (raporConfig.fontSizeJudulRapor || 16) - 1) })} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">-</button>
                               <span className="w-10 text-center font-mono font-bold text-amber-600 text-sm">{raporConfig.fontSizeJudulRapor || 16}px</span>
                               <button type="button" onClick={() => updateRaporConfig({ fontSizeJudulRapor: Math.min(26, (raporConfig.fontSizeJudulRapor || 16) + 1) })} className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-700 font-bold flex items-center justify-center cursor-pointer">+</button>
