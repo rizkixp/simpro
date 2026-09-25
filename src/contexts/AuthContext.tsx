@@ -5,7 +5,14 @@ import { User, UserRole } from "@/types/school";
 import { DEMO_USERS } from "@/lib/mock-data";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { SupabaseSchoolService } from "@/lib/supabase/services/schoolService";
-import { hashPassword, verifyPassword, generateSessionToken } from "@/lib/security";
+import {
+  hashPassword,
+  verifyPassword,
+  generateSessionToken,
+  checkLoginRateLimit,
+  recordFailedLoginAttempt,
+  clearLoginRateLimit,
+} from "@/lib/security";
 
 interface AuthContextType {
   user: User | null;
@@ -185,6 +192,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!cleanId || !cleanPass) {
       return { success: false, message: "Email / NISN dan kata sandi wajib diisi." };
+    }
+
+    // Proteksi Bank-Grade: Cek status pembatasan brute-force (PCI-DSS Rate Limiter)
+    const rateCheck = checkLoginRateLimit(cleanId);
+    if (rateCheck.isLocked) {
+      return {
+        success: false,
+        message: rateCheck.message,
+      };
     }
 
     if (isSupabaseConfigured()) {
@@ -372,11 +388,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (authError) {
+        // Catat percobaan login gagal untuk mendeteksi brute-force
+        const failedRate = recordFailedLoginAttempt(cleanId);
+        if (failedRate.isLocked) {
+          return {
+            success: false,
+            message: failedRate.message,
+          };
+        }
+
+        const remainingNote =
+          failedRate.attemptsLeft <= 2
+            ? ` (Peringatan: Sisa ${failedRate.attemptsLeft} kesempatan sebelum akun dikunci sementara)`
+            : "";
+
         return {
           success: false,
           message:
             authError.message === "Invalid login credentials"
-              ? "Kata sandi yang Anda masukkan salah. Coba lagi atau gunakan opsi Lupa Kata Sandi."
+              ? `Kata sandi yang Anda masukkan salah${remainingNote}. Coba lagi atau gunakan opsi Lupa Kata Sandi.`
               : authError.message,
         };
       }
@@ -397,6 +427,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             success: false,
             message: "Akun Anda berstatus Nonaktif. Hubungi Admin sekolah.",
           };
+        }
+
+        // Reset rate limiter setelah login berhasil
+        clearLoginRateLimit(cleanId);
+        if (targetEmail && targetEmail !== cleanId) {
+          clearLoginRateLimit(targetEmail);
         }
 
         setUser(loggedInUser);
@@ -427,9 +463,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (cleanPass && matchedUser.password) {
       const verification = await verifyPassword(cleanPass, matchedUser.password);
       if (!verification.valid) {
-        return { success: false, message: "Kata sandi yang Anda masukkan salah." };
+        const failedRate = recordFailedLoginAttempt(cleanId);
+        if (failedRate.isLocked) {
+          return { success: false, message: failedRate.message };
+        }
+        const remainingNote =
+          failedRate.attemptsLeft <= 2
+            ? ` (Sisa ${failedRate.attemptsLeft} kesempatan)`
+            : "";
+        return { success: false, message: `Kata sandi yang Anda masukkan salah${remainingNote}.` };
       }
     }
+
+    // Reset rate limiter setelah login offline berhasil
+    clearLoginRateLimit(cleanId);
 
     const sessionUser: User = {
       ...matchedUser,
