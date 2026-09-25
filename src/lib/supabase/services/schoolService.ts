@@ -204,6 +204,24 @@ export const SupabaseSchoolService = {
           : extData.landingFooterText !== undefined
           ? extData.landingFooterText
           : "",
+      // Multi-Unit / Yayasan & Gateways
+      namaYayasan: extData.namaYayasan || "",
+      jenjangSekolah: extData.jenjangSekolah || "",
+      nomorIzinOperasional: extData.nomorIzinOperasional || "",
+      waGatewayProvider: extData.waGatewayProvider || "fonnte",
+      waGatewayToken: extData.waGatewayToken || "",
+      waGatewayDomain: extData.waGatewayDomain || "",
+      waAutoSendPresensiMasuk: extData.waAutoSendPresensiMasuk !== undefined ? extData.waAutoSendPresensiMasuk : true,
+      waAutoSendPresensiPulang: extData.waAutoSendPresensiPulang !== undefined ? extData.waAutoSendPresensiPulang : true,
+      waAutoSendSPP: extData.waAutoSendSPP !== undefined ? extData.waAutoSendSPP : true,
+      waTemplatePresensi: extData.waTemplatePresensi || "",
+      waTemplateSPP: extData.waTemplateSPP || "",
+      paymentProvider: extData.paymentProvider || "midtrans",
+      midtransServerKey: extData.midtransServerKey || "",
+      midtransClientKey: extData.midtransClientKey || "",
+      midtransMerchantId: extData.midtransMerchantId || "",
+      midtransIsProduction: extData.midtransIsProduction !== undefined ? extData.midtransIsProduction : false,
+      qrisManualImageUrl: extData.qrisManualImageUrl || "",
     };
   },
 

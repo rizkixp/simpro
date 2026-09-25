@@ -238,7 +238,7 @@ export default function PenggunaPage() {
     setIsResetModalOpen(true);
   };
 
-  const handleExecuteResetPassword = (e: React.FormEvent) => {
+  const handleExecuteResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetUser) return;
     if (!newPassword.trim() || newPassword.trim().length < 4) {
@@ -246,7 +246,7 @@ export default function PenggunaPage() {
       return;
     }
 
-    const resPassword = resetPassword(targetUser.id, newPassword.trim());
+    const resPassword = await resetPassword(targetUser.id, newPassword.trim());
     if (resPassword) {
       if (copyAfterReset) {
         navigator.clipboard.writeText(resPassword);

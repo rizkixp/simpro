@@ -60,6 +60,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
+          "var(--font-plus-jakarta)",
           "'Plus Jakarta Sans'",
           "'Inter'",
           "-apple-system",
@@ -71,6 +72,7 @@ const config: Config = {
           "sans-serif",
         ],
         heading: [
+          "var(--font-plus-jakarta)",
           "'Plus Jakarta Sans'",
           "'Inter'",
           "sans-serif",

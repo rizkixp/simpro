@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope, isClassMatch } from "@/hooks/useTeacherScope";
 import { StatusKehadiran, PresensiRecord, MetodePresensi } from "@/types/school";
-import * as XLSX from "xlsx";
+import Pagination from "@/components/common/Pagination";
 import {
   CalendarCheck2,
   Check,
@@ -36,15 +37,31 @@ import {
   UploadCloud,
 } from "lucide-react";
 
-// Modal Components
-import DigitalAttendanceScanner from "@/components/presensi/DigitalAttendanceScanner";
+// Modal Components with dynamic lazy-loading for zero initial bundle bloat
+const DigitalAttendanceScanner = dynamic(
+  () => import("@/components/presensi/DigitalAttendanceScanner"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-4 text-center">
+          <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+          <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Menyiapkan Kamera & Scanner Digital...</p>
+        </div>
+      </div>
+    ),
+  }
+);
+const ImportPresensiExcelModal = dynamic(
+  () => import("@/components/presensi/ImportPresensiExcelModal"),
+  { ssr: false }
+);
 import KartuPelajarGeneratorModal from "@/components/presensi/KartuPelajarGeneratorModal";
 import FaceRegistrationModal from "@/components/presensi/FaceRegistrationModal";
 import AttendanceSettingsModal, {
   getAttendanceSettings,
   AttendanceSettings,
 } from "@/components/presensi/AttendanceSettingsModal";
-import ImportPresensiExcelModal from "@/components/presensi/ImportPresensiExcelModal";
 
 export default function PresensiPage() {
   const { user } = useAuth();
@@ -174,6 +191,20 @@ export default function PresensiPage() {
     });
   }, [classStudents, searchQuery, selectedStatusFilter, presensiList, selectedDate]);
 
+  // Paginasi Presensi Siswa
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedStatusFilter, selectedKelas, selectedDate]);
+
+  const paginatedStudents = useMemo(() => {
+    if (pageSize <= 0 || pageSize >= displayedStudents.length) return displayedStudents;
+    const start = (currentPage - 1) * pageSize;
+    return displayedStudents.slice(start, start + pageSize);
+  }, [displayedStudents, currentPage, pageSize]);
+
   const handleSetAllHadir = () => {
     if (!canEdit) return;
     classStudents.forEach((s) => {
@@ -219,7 +250,8 @@ export default function PresensiPage() {
   };
 
   // Export attendance to Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const XLSX = await import("xlsx");
     const dataToExport = classStudents.map((s, idx) => {
       const rec = getStudentRecord(s.id);
       return {
@@ -816,7 +848,7 @@ export default function PresensiPage() {
                   </td>
                 </tr>
               ) : (
-                displayedStudents.map((siswa, idx) => {
+                paginatedStudents.map((siswa, idx) => {
                   const currentStatus = getStudentStatus(siswa.id);
                   const studentRecord = getStudentRecord(siswa.id);
                   const waktuMasuk = studentRecord?.waktuMasuk;
@@ -832,7 +864,7 @@ export default function PresensiPage() {
 
                   return (
                     <tr key={siswa.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="px-5 py-3.5 text-slate-400 font-medium">{idx + 1}</td>
+                      <td className="px-5 py-3.5 text-slate-400 font-medium">{(currentPage - 1) * pageSize + idx + 1}</td>
                       <td className="px-5 py-3.5 flex items-center gap-3">
                         <img
                           src={siswa.avatar || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150"}
@@ -1019,6 +1051,14 @@ export default function PresensiPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={displayedStudents.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          itemLabel="siswa"
+        />
       </div>
 
       {/* 1. Modal Terminal Absensi Kiosk */}

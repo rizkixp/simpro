@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import { Siswa, NilaiSiswa, JenisRapor, MataPelajaran, SchoolProfile, Kelas, Guru } from "@/types/school";
 import { calculateMidGrade, calculateSemesterGrade, formatDateIndo } from "@/lib/utils";
 
@@ -474,8 +473,9 @@ export function buildSingleRaporRows(params: SingleRaporExcelDataParams): (strin
 // Convert 2D rows into configured XLSX worksheet with column widths
 export function createRaporWorksheet(
   rows: (string | number)[][],
-  type: JenisRapor
-): XLSX.WorkSheet {
+  type: JenisRapor,
+  XLSX: any
+): any {
   const worksheet = XLSX.utils.aoa_to_sheet(rows);
 
   if (type === "tengah") {
@@ -505,13 +505,14 @@ export function createRaporWorksheet(
 }
 
 // Export single student report card to Excel file (.xlsx / .xls)
-export function exportSingleRaporXls(
+export async function exportSingleRaporXls(
   params: SingleRaporExcelDataParams,
   format: "xlsx" | "xls" = "xlsx"
-): string {
+): Promise<string> {
+  const XLSX = await import("xlsx");
   const { siswa, type, semester } = params;
   const rows = buildSingleRaporRows(params);
-  const worksheet = createRaporWorksheet(rows, type);
+  const worksheet = createRaporWorksheet(rows, type, XLSX);
 
   const workbook = XLSX.utils.book_new();
   const sheetName = type === "tengah" ? `Rapor STS - ${siswa.nama.slice(0, 18)}` : `Rapor SAS - ${siswa.nama.slice(0, 18)}`;
@@ -549,10 +550,11 @@ export interface BatchRaporExcelDataParams {
 
 // Export entire class / batch report cards to Excel (.xlsx / .xls)
 // Includes a Master "Rekap Leger & Rapor" Sheet + Individual Sheets for every student
-export function exportBatchRaporXls(
+export async function exportBatchRaporXls(
   params: BatchRaporExcelDataParams,
   format: "xlsx" | "xls" = "xlsx"
-): string {
+): Promise<string> {
+  const XLSX = await import("xlsx");
   const {
     batchStudents,
     type,
@@ -698,7 +700,7 @@ export function exportBatchRaporXls(
       raporConfig,
     });
 
-    const studentSheet = createRaporWorksheet(rows, type);
+    const studentSheet = createRaporWorksheet(rows, type, XLSX);
 
     // Generate safe sheet name (<= 31 chars, unique, no invalid chars)
     let safeName = `${idx + 1}. ${siswa.nama}`.replace(/[/\\?%*:[\]]/g, " ").trim();

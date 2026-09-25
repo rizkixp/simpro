@@ -39,6 +39,12 @@ import {
   FileJson,
   AlertTriangle,
   X,
+  Send,
+  Smartphone,
+  CreditCard,
+  QrCode,
+  Building,
+  Copy,
 } from "lucide-react";
 
 export default function PengaturanPage() {
@@ -98,12 +104,33 @@ export default function PengaturanPage() {
     appTagline: profile?.appTagline ?? "Sistem Informasi Manajemen Sekolah Terpadu",
     appLogoUrl: profile?.appLogoUrl ?? "",
     appIconPreset: profile?.appIconPreset ?? "graduation",
+    // Multi-Unit / Yayasan
+    namaYayasan: profile?.namaYayasan ?? "Yayasan Pendidikan Islam Cendekia Nusantara",
+    jenjangSekolah: profile?.jenjangSekolah ?? "SDI & SMP Terpadu",
+    nomorIzinOperasional: profile?.nomorIzinOperasional ?? "",
+    // Landing Page
     landingHeroBadge: profile?.landingHeroBadge ?? "Platform Manajemen Sekolah Generasi Terbaru #1",
     landingHeroTitle: profile?.landingHeroTitle ?? "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
     landingHeroSubtitle: profile?.landingHeroSubtitle ?? "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
     landingCtaText: profile?.landingCtaText ?? "Buka Portal & Form Login",
     landingShowDemoButton: profile?.landingShowDemoButton !== undefined ? profile.landingShowDemoButton : true,
     landingFooterText: profile?.landingFooterText ?? "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
+    // WhatsApp Gateway
+    waGatewayProvider: profile?.waGatewayProvider ?? "fonnte",
+    waGatewayToken: profile?.waGatewayToken ?? "",
+    waGatewayDomain: profile?.waGatewayDomain ?? "",
+    waAutoSendPresensiMasuk: profile?.waAutoSendPresensiMasuk !== undefined ? profile.waAutoSendPresensiMasuk : true,
+    waAutoSendPresensiPulang: profile?.waAutoSendPresensiPulang !== undefined ? profile.waAutoSendPresensiPulang : true,
+    waAutoSendSPP: profile?.waAutoSendSPP !== undefined ? profile.waAutoSendSPP : true,
+    waTemplatePresensi: profile?.waTemplatePresensi ?? "",
+    waTemplateSPP: profile?.waTemplateSPP ?? "",
+    // Payment Gateway
+    paymentProvider: profile?.paymentProvider ?? "midtrans",
+    midtransServerKey: profile?.midtransServerKey ?? "",
+    midtransClientKey: profile?.midtransClientKey ?? "",
+    midtransMerchantId: profile?.midtransMerchantId ?? "",
+    midtransIsProduction: profile?.midtransIsProduction ?? false,
+    qrisManualImageUrl: profile?.qrisManualImageUrl ?? "",
   });
 
   // Sinkronisasi form otomatis ketika data profile berhasil dimuat dari LocalStorage atau Supabase (hanya jika pengguna belum mengubah form)
@@ -115,15 +142,68 @@ export default function PengaturanPage() {
         appTagline: profile.appTagline ?? "Sistem Informasi Manajemen Sekolah Terpadu",
         appLogoUrl: profile.appLogoUrl ?? "",
         appIconPreset: profile.appIconPreset ?? "graduation",
+        namaYayasan: profile.namaYayasan ?? "Yayasan Pendidikan Islam Cendekia Nusantara",
+        jenjangSekolah: profile.jenjangSekolah ?? "SDI & SMP Terpadu",
+        nomorIzinOperasional: profile.nomorIzinOperasional ?? "",
         landingHeroBadge: profile.landingHeroBadge ?? "Platform Manajemen Sekolah Generasi Terbaru #1",
         landingHeroTitle: profile.landingHeroTitle ?? "Transformasi Digital Pendidikan yang Cerdas, Efisien & Terpadu",
         landingHeroSubtitle: profile.landingHeroSubtitle ?? "Kelola seluruh ekosistem sekolah dari administrasi siswa, tenaga pendidik, absensi digital, e-rapor, hingga tagihan SPP dalam satu platform modern berkecepatan tinggi.",
         landingCtaText: profile.landingCtaText ?? "Buka Portal & Form Login",
         landingShowDemoButton: profile.landingShowDemoButton !== undefined ? profile.landingShowDemoButton : true,
         landingFooterText: profile.landingFooterText ?? "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
+        waGatewayProvider: profile.waGatewayProvider ?? "fonnte",
+        waGatewayToken: profile.waGatewayToken ?? "",
+        waGatewayDomain: profile.waGatewayDomain ?? "",
+        waAutoSendPresensiMasuk: profile.waAutoSendPresensiMasuk !== undefined ? profile.waAutoSendPresensiMasuk : true,
+        waAutoSendPresensiPulang: profile.waAutoSendPresensiPulang !== undefined ? profile.waAutoSendPresensiPulang : true,
+        waAutoSendSPP: profile.waAutoSendSPP !== undefined ? profile.waAutoSendSPP : true,
+        waTemplatePresensi: profile.waTemplatePresensi ?? "",
+        waTemplateSPP: profile.waTemplateSPP ?? "",
+        paymentProvider: profile.paymentProvider ?? "midtrans",
+        midtransServerKey: profile.midtransServerKey ?? "",
+        midtransClientKey: profile.midtransClientKey ?? "",
+        midtransMerchantId: profile.midtransMerchantId ?? "",
+        midtransIsProduction: profile.midtransIsProduction ?? false,
+        qrisManualImageUrl: profile.qrisManualImageUrl ?? "",
       });
     }
   }, [profile, isDirty]);
+
+  const [testingWa, setTestingWa] = useState(false);
+  const [testWaPhone, setTestWaPhone] = useState("");
+  const [testWaResult, setTestWaResult] = useState<{ success: boolean; msg: string } | null>(null);
+
+  const handleTestSendWa = async () => {
+    if (!testWaPhone.trim()) {
+      alert("Masukkan nomor WhatsApp tujuan uji coba terlebih dahulu.");
+      return;
+    }
+    setTestingWa(true);
+    setTestWaResult(null);
+    try {
+      const res = await fetch("/api/notifications/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: testWaPhone,
+          message: `*UJI COBA WHATSAPP GATEWAY*\n\nAssalamu'alaikum Wr. Wb.\nIni adalah pesan uji coba dari sistem *${formData.appName || "SIM Sekolah PRO"}* (${formData.namaSekolah}).\n\nIntegrasi WhatsApp Gateway berhasil aktif dan terhubung! ✅`,
+          provider: formData.waGatewayProvider || "fonnte",
+          token: formData.waGatewayToken,
+          domain: formData.waGatewayDomain,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTestWaResult({ success: true, msg: "Pesan uji coba berhasil terkirim ke WhatsApp Anda!" });
+      } else {
+        setTestWaResult({ success: false, msg: data.message || "Gagal mengirim pesan uji coba." });
+      }
+    } catch (err: any) {
+      setTestWaResult({ success: false, msg: err.message || "Gagal menghubungi server WhatsApp." });
+    } finally {
+      setTestingWa(false);
+    }
+  };
 
   const updateField = <K extends keyof SchoolProfile>(key: K, value: SchoolProfile[K]) => {
     setIsDirty(true);
@@ -1398,6 +1478,48 @@ export default function PengaturanPage() {
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Yayasan / Badan Pengelola
+                </label>
+                <input
+                  type="text"
+                  disabled={!canEdit}
+                  value={formData.namaYayasan || ""}
+                  onChange={(e) => updateField("namaYayasan", e.target.value)}
+                  placeholder="Contoh: Yayasan Pendidikan Islam Cendekia"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Jenjang Satuan Pendidikan
+                </label>
+                <input
+                  type="text"
+                  disabled={!canEdit}
+                  value={formData.jenjangSekolah || ""}
+                  onChange={(e) => updateField("jenjangSekolah", e.target.value)}
+                  placeholder="Contoh: SDI, SMP IT, SMA Plus, atau Terpadu"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nomor SK Izin Operasional Lembaga
+                </label>
+                <input
+                  type="text"
+                  disabled={!canEdit}
+                  value={formData.nomorIzinOperasional || ""}
+                  onChange={(e) => updateField("nomorIzinOperasional", e.target.value)}
+                  placeholder="Contoh: 421.2/1089-Disdik/2021"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -1501,6 +1623,323 @@ export default function PengaturanPage() {
                   <option value="Genap">Semester Genap</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Section 4: Integrasi WhatsApp Gateway */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-50/50 via-slate-50/40 to-white dark:from-slate-800/60 dark:via-slate-900 dark:to-slate-900 border border-emerald-200/70 dark:border-emerald-900/50 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-emerald-100 dark:border-emerald-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-sm">
+                  <Smartphone className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Integrasi WhatsApp Gateway & Notifikasi Otomatis
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Kirim notifikasi kehadiran santri dan tanda bukti kuitansi SPP otomatis ke WhatsApp orang tua di background.
+                  </p>
+                </div>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                Layanan Otomatisasi Terintegrasi
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Penyedia Layanan (Provider) Gateway
+                  </label>
+                  <select
+                    disabled={!canEdit}
+                    value={formData.waGatewayProvider || "fonnte"}
+                    onChange={(e) => updateField("waGatewayProvider", e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-semibold focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="fonnte">Fonnte (api.fonnte.com - Sangat Direkomendasikan)</option>
+                    <option value="wablas">Wablas (wablas.com)</option>
+                    <option value="generic">Generic Webhook / Custom REST API</option>
+                    <option value="manual">Manual Saja (Menggunakan tautan wa.me di browser)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    API Token / Kunci Akses Gateway
+                  </label>
+                  <input
+                    type="password"
+                    disabled={!canEdit}
+                    value={formData.waGatewayToken || ""}
+                    onChange={(e) => updateField("waGatewayToken", e.target.value)}
+                    placeholder="Masukkan Token API (misal dari Fonnte / Wablas)..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Dapatkan token dari dasbor penyedia WhatsApp Gateway sekolah Anda.
+                  </p>
+                </div>
+              </div>
+
+              {formData.waGatewayProvider === "wablas" || formData.waGatewayProvider === "generic" ? (
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Domain / URL Endpoint Server Gateway
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!canEdit}
+                    value={formData.waGatewayDomain || ""}
+                    onChange={(e) => updateField("waGatewayDomain", e.target.value)}
+                    placeholder="Contoh: https://pati.wablas.com atau https://api.domainsekolah.sch.id/send"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              ) : null}
+
+              {/* Toggles Auto-Send */}
+              <div className="pt-2 border-t border-emerald-100 dark:border-emerald-900/40">
+                <span className="block text-xs font-bold text-slate-800 dark:text-white mb-2">
+                  Pemicu Notifikasi Otomatis (Auto-Trigger):
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      disabled={!canEdit}
+                      checked={formData.waAutoSendPresensiMasuk ?? true}
+                      onChange={(e) => updateField("waAutoSendPresensiMasuk", e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-800 dark:text-slate-200 font-medium">
+                      Kirim Otomatis saat Siswa Absen Masuk
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      disabled={!canEdit}
+                      checked={formData.waAutoSendPresensiPulang ?? true}
+                      onChange={(e) => updateField("waAutoSendPresensiPulang", e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-800 dark:text-slate-200 font-medium">
+                      Kirim Otomatis saat Siswa Absen Pulang
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      disabled={!canEdit}
+                      checked={formData.waAutoSendSPP ?? true}
+                      onChange={(e) => updateField("waAutoSendSPP", e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-800 dark:text-slate-200 font-medium">
+                      Kirim Kuitansi Otomatis saat SPP Lunas
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Uji Coba Kirim WA Card */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-3">
+                <span className="text-xs font-bold text-slate-800 dark:text-white block">
+                  Uji Coba Pengiriman Pesan WhatsApp (Test Gateway):
+                </span>
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Masukkan Nomor HP Anda (misal: 081234567890)"
+                    value={testWaPhone}
+                    onChange={(e) => setTestWaPhone(e.target.value)}
+                    className="w-full sm:w-80 px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestSendWa}
+                    disabled={testingWa}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-60"
+                  >
+                    {testingWa ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    <span>{testingWa ? "Mengirim..." : "Kirim Pesan Uji Coba"}</span>
+                  </button>
+                </div>
+                {testWaResult && (
+                  <div
+                    className={`p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                      testWaResult.success
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                    }`}
+                  >
+                    {testWaResult.success ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                    <span>{testWaResult.msg}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Integrasi Payment Gateway (Midtrans & QRIS) */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-teal-50/50 via-slate-50/40 to-white dark:from-slate-800/60 dark:via-slate-900 dark:to-slate-900 border border-teal-200/70 dark:border-teal-900/50 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-teal-100 dark:border-teal-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-teal-600 text-white shadow-sm">
+                  <CreditCard className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Integrasi Payment Gateway & Pembayaran Online (Midtrans)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Terima pembayaran SPP secara otomatis via QRIS (GoPay, ShopeePay, OVO, Dana) dan Virtual Account Bank Syariah Indonesia (BSI), Mandiri, BRI.
+                  </p>
+                </div>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                QRIS & Virtual Account Otomatis
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Metode Pembayaran Online
+                  </label>
+                  <select
+                    disabled={!canEdit}
+                    value={formData.paymentProvider || "midtrans"}
+                    onChange={(e) => updateField("paymentProvider", e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-semibold focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="midtrans">Midtrans Snap (QRIS & Virtual Account Otomatis)</option>
+                    <option value="manual">Manual Transfer / QRIS Statis Saja</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Lingkungan Layanan (Environment)
+                  </label>
+                  <div className="flex items-center gap-3 pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="midtrans_env_radio"
+                        checked={!formData.midtransIsProduction}
+                        onChange={() => updateField("midtransIsProduction", false)}
+                        disabled={!canEdit}
+                        className="text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">
+                        Sandbox (Mode Testing & Uji Coba)
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="midtrans_env_radio"
+                        checked={Boolean(formData.midtransIsProduction)}
+                        onChange={() => updateField("midtransIsProduction", true)}
+                        disabled={!canEdit}
+                        className="text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">
+                        Production (Mode Resmi / Uang Asli)
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {formData.paymentProvider === "midtrans" ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Midtrans Server Key
+                      </label>
+                      <input
+                        type="password"
+                        disabled={!canEdit}
+                        value={formData.midtransServerKey || ""}
+                        onChange={(e) => updateField("midtransServerKey", e.target.value)}
+                        placeholder="SB-Mid-server-XXXXX atau Mid-server-XXXXX"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Midtrans Client Key
+                      </label>
+                      <input
+                        type="text"
+                        disabled={!canEdit}
+                        value={formData.midtransClientKey || ""}
+                        onChange={(e) => updateField("midtransClientKey", e.target.value)}
+                        placeholder="SB-Mid-client-XXXXX atau Mid-client-XXXXX"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Webhook Configuration Guide */}
+                  <div className="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 space-y-2">
+                    <span className="text-xs font-bold text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-teal-600" />
+                      <span>URL Callback Notifikasi Pembayaran (Webhook URL):</span>
+                    </span>
+                    <p className="text-[11px] text-teal-800 dark:text-teal-300 leading-relaxed">
+                      Salin alamat URL berikut ke pengaturan akun Midtrans Anda (menu: <strong>Settings &rarr; Configuration &rarr; Payment Notification URL</strong>) agar saat orang tua membayar, status tagihan otomatis menjadi <strong>Lunas</strong> seketika:
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="text"
+                        readOnly
+                        value={typeof window !== "undefined" ? `${window.location.origin}/api/payment/webhook` : "https://domain-sekolah.sch.id/api/payment/webhook"}
+                        className="w-full px-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-900 border border-teal-300 dark:border-teal-700 font-mono text-teal-800 dark:text-teal-300 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = typeof window !== "undefined" ? `${window.location.origin}/api/payment/webhook` : "https://domain-sekolah.sch.id/api/payment/webhook";
+                          navigator.clipboard.writeText(url);
+                          alert("URL Webhook berhasil disalin ke clipboard!");
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center gap-1 shrink-0 cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Salin</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    URL Gambar Barcode QRIS Resmi Sekolah
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!canEdit}
+                    value={formData.qrisManualImageUrl || ""}
+                    onChange={(e) => updateField("qrisManualImageUrl", e.target.value)}
+                    placeholder="https://domain.com/qris-sekolah.png"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Digunakan untuk menampilkan gambar barcode QRIS statis pada modal pembayaran jika tidak menggunakan Midtrans.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

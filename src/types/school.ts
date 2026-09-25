@@ -203,6 +203,10 @@ export interface SchoolProfile {
   appTagline?: string;
   appLogoUrl?: string;
   appIconPreset?: "graduation" | "school" | "book" | "shield" | "sparkles";
+  // Identitas Yayasan / Multi-Unit
+  namaYayasan?: string;
+  jenjangSekolah?: string;
+  nomorIzinOperasional?: string;
   // Pengaturan Tampilan Awal (Landing Page)
   landingHeroBadge?: string;
   landingHeroTitle?: string;
@@ -210,6 +214,22 @@ export interface SchoolProfile {
   landingCtaText?: string;
   landingShowDemoButton?: boolean;
   landingFooterText?: string;
+  // Pengaturan WhatsApp Gateway
+  waGatewayProvider?: "fonnte" | "wablas" | "generic" | "manual";
+  waGatewayToken?: string;
+  waGatewayDomain?: string;
+  waAutoSendPresensiMasuk?: boolean;
+  waAutoSendPresensiPulang?: boolean;
+  waAutoSendSPP?: boolean;
+  waTemplatePresensi?: string;
+  waTemplateSPP?: string;
+  // Pengaturan Payment Gateway
+  paymentProvider?: "midtrans" | "manual";
+  midtransServerKey?: string;
+  midtransClientKey?: string;
+  midtransMerchantId?: string;
+  midtransIsProduction?: boolean;
+  qrisManualImageUrl?: string;
 }
 
 export interface TabunganSiswa {

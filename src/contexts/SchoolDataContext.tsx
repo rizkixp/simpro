@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from "react";
 import {
   Siswa,
   Guru,
@@ -363,7 +363,7 @@ interface SchoolDataContextType {
   isSyncing: boolean;
   lastSyncTime: Date | null;
   supabaseError: string | null;
-  syncWithSupabase: () => Promise<void>;
+  syncWithSupabase: (options?: { force?: boolean }) => Promise<void>;
   seedDatabaseToCloud: (options?: { silent?: boolean }) => Promise<boolean>;
   testSupabaseHealth: () => Promise<SupabaseHealthStatus>;
 
@@ -489,6 +489,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   const [lastAutoPushTime, setLastAutoPushTime] = useState<Date | null>(null);
   const [autoPushStatus, setAutoPushStatus] = useState<"idle" | "pushing" | "success" | "error">("idle");
   const autoPushTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncTimestampRef = useRef<number>(0);
 
   // Reference holding the latest live in-memory state to avoid stale React closures in timers/intervals
   const latestDataRef = useRef({
@@ -979,8 +980,11 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!SupabaseSchoolService.isConfigured()) return;
     const handleSyncOnFocus = () => {
-      // Re-sync with Supabase to make sure data is identical across all devices/tabs
-      syncWithSupabase();
+      // Re-sync with Supabase only if at least 3 minutes have passed since last sync
+      const now = Date.now();
+      if (now - lastSyncTimestampRef.current >= 3 * 60 * 1000) {
+        syncWithSupabase();
+      }
     };
     window.addEventListener("focus", handleSyncOnFocus);
     window.addEventListener("online", handleSyncOnFocus);
@@ -1085,9 +1089,15 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   };
 
   // Full bi-directional sync with Supabase Cloud
-  const syncWithSupabase = async (): Promise<void> => {
+  const syncWithSupabase = async (options?: { force?: boolean }): Promise<void> => {
     if (!SupabaseSchoolService.isConfigured()) {
       setIsSupabaseConnected(false);
+      return;
+    }
+
+    const now = Date.now();
+    if (!options?.force && now - lastSyncTimestampRef.current < 3 * 60 * 1000) {
+      // Data sudah segar disinkronkan dalam 3 menit terakhir, lewati fetch paralel cloud
       return;
     }
 
@@ -1114,6 +1124,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         console.log("[Supabase] Database cloud masih kosong. Menjaga cloud tetap kosong (tidak auto-seeding data dummy).");
         setIsSupabaseConnected(true);
         setLastSyncTime(new Date());
+        lastSyncTimestampRef.current = Date.now();
         setIsSyncing(false);
         return;
       }
@@ -1338,6 +1349,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
       setIsSupabaseConnected(true);
       setLastSyncTime(new Date());
+      lastSyncTimestampRef.current = Date.now();
     } catch (err: any) {
       console.error("[Supabase] Gagal mengambil data sekolah dari Supabase:", err);
       setIsSupabaseConnected(false);
@@ -1347,13 +1359,13 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  // Sync to LocalStorage
-  const saveState = (key: string, value: unknown, skipAutoPush: boolean = false) => {
+  // Sync to LocalStorage dengan Quota Guard & Perlindungan Granular
+  const saveState = (key: string, value: unknown, skipAutoPush: boolean = true) => {
     try {
       localStorage.setItem(`sim_data_${key}`, JSON.stringify(value));
     } catch (e: any) {
-      console.warn(`Failed to persist ${key} to localStorage:`, e?.message || e);
-      // Quota exceeded fallback: if saving profile, strip massive appLogoUrl if it was causing the overflow
+      console.warn(`[SafeStorage] Kuota localStorage penuh saat menyimpan ${key}:`, e?.message || e);
+      // Fallback kuota: jika menyimpan profile, hapus logo base64 besar jika membebani storage
       if (key === "profile" && value && typeof value === "object") {
         try {
           const safeCopy = { ...(value as any), appLogoUrl: "" };
@@ -1361,6 +1373,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         } catch {}
       }
     }
+    // Full-database auto push hanya dipicu jika secara eksplisit diminta (misal sync/backup manual)
     if (!skipAutoPush && isAutoPushEnabled && key !== "auto_push_db_enabled") {
       triggerAutoPush(`saveState-${key}`);
     }
@@ -3939,152 +3952,189 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     };
   };
 
+  const contextValue = useMemo<SchoolDataContextType>(
+    () => ({
+      profile,
+      updateProfile,
+      siswaList,
+      addSiswa,
+      importSiswaList,
+      updateSiswa,
+      deleteSiswa,
+      bulkDeleteSiswa,
+      guruList,
+      addGuru,
+      updateGuru,
+      deleteGuru,
+      kelasList,
+      addKelas,
+      updateKelas,
+      deleteKelas,
+      mapelList,
+      addMapel,
+      updateMapel,
+      deleteMapel,
+      jadwalList,
+      addJadwal,
+      bulkAddJadwal,
+      updateJadwal,
+      deleteJadwal,
+      bulkDeleteJadwal,
+      resetJadwalToDefault,
+      presensiList,
+      updatePresensi,
+      deletePresensi,
+      resetPresensiSiswa,
+      clearAllPresensiSiswa,
+      resetPresensiKelas,
+      batchUpdatePresensi,
+      nilaiList,
+      saveNilai,
+      bulkSaveNilai,
+      deleteNilai,
+      deleteNilaiBySiswa,
+      sppList,
+      jenisTagihanList,
+      addJenisTagihan,
+      updateJenisTagihan,
+      deleteJenisTagihan,
+      addTagihan,
+      bulkAddTagihan,
+      bayarSPP,
+      bayarTagihanDariTabungan,
+      bulkBayarTagihanDariTabungan,
+      pengumumanList,
+      addPengumuman,
+      deletePengumuman,
+      tabunganList,
+      transaksiTabunganList,
+      setorTabungan,
+      tarikTabungan,
+      bulkSetorTabungan,
+      clearAllTabungan,
+      pesertaTransportList,
+      sppTransportRecords,
+      transaksiSPPTransportList,
+      updatePesertaTransport,
+      bayarSPPTransport,
+      bulkBayarSPPTransportDariTabungan,
+      getStudentSPPTransportRecord,
+
+      // LMS States & Actions
+      lmsMateriList,
+      addMateri,
+      updateMateri,
+      deleteMateri,
+      toggleBacaMateri,
+      lmsTugasList,
+      addTugas,
+      updateTugas,
+      deleteTugas,
+      lmsSubmissionList,
+      submitTugas,
+      nilaiSubmission,
+      lmsKuisList,
+      addKuis,
+      deleteKuis,
+      lmsKuisAttemptList,
+      submitKuisAttempt,
+      lmsForumList,
+      addForumTopik,
+      addKomentarForum,
+      lmsMeetingList,
+      addMeeting,
+      deleteMeeting,
+      lmsBankSoalList,
+      addBankSoal,
+      updateBankSoal,
+      deleteBankSoal,
+      addSoalToBank,
+      updateSoalInBank,
+      deleteSoalFromBank,
+      generateKuisFromBankSoal,
+      lmsJadwalMateriList,
+      addJadwalMateri,
+      updateJadwalMateri,
+      deleteJadwalMateri,
+      toggleRealisasiJadwal,
+
+      // Islamic School Flagship Features
+      tahfidzList,
+      addTahfidzRecord,
+      updateTahfidzRecord,
+      deleteTahfidzRecord,
+      mutabaahList,
+      addOrUpdateMutabaahRecord,
+      batchAddOrUpdateMutabaahRecords,
+      verifyMutabaahRecord,
+      deleteMutabaahRecord,
+
+      resetToDefault,
+
+      // Supabase Cloud State & Sync
+      isSupabaseConnected,
+      isSyncing,
+      lastSyncTime,
+      supabaseError,
+      syncWithSupabase,
+      seedDatabaseToCloud,
+      testSupabaseHealth,
+
+      // Automatic Push Database Engine
+      isAutoPushEnabled,
+      toggleAutoPush,
+      isAutoPushing,
+      lastAutoPushTime,
+      autoPushStatus,
+      forceAutoPushNow,
+
+      // Backup & Restore Database
+      exportDatabaseBackup,
+      importDatabaseBackup,
+      clearAllDatabase,
+      clearNilaiDanSpp,
+    }),
+    [
+      profile,
+      siswaList,
+      guruList,
+      kelasList,
+      mapelList,
+      jadwalList,
+      presensiList,
+      nilaiList,
+      sppList,
+      jenisTagihanList,
+      pengumumanList,
+      tabunganList,
+      transaksiTabunganList,
+      pesertaTransportList,
+      sppTransportRecords,
+      transaksiSPPTransportList,
+      lmsMateriList,
+      lmsTugasList,
+      lmsSubmissionList,
+      lmsKuisList,
+      lmsKuisAttemptList,
+      lmsForumList,
+      lmsMeetingList,
+      lmsBankSoalList,
+      lmsJadwalMateriList,
+      tahfidzList,
+      mutabaahList,
+      isSupabaseConnected,
+      isSyncing,
+      lastSyncTime,
+      supabaseError,
+      isAutoPushEnabled,
+      isAutoPushing,
+      lastAutoPushTime,
+      autoPushStatus,
+    ]
+  );
+
   return (
-    <SchoolDataContext.Provider
-      value={{
-        profile,
-        updateProfile,
-        siswaList,
-        addSiswa,
-        importSiswaList,
-        updateSiswa,
-        deleteSiswa,
-        bulkDeleteSiswa,
-        guruList,
-        addGuru,
-        updateGuru,
-        deleteGuru,
-        kelasList,
-        addKelas,
-        updateKelas,
-        deleteKelas,
-        mapelList,
-        addMapel,
-        updateMapel,
-        deleteMapel,
-        jadwalList,
-        addJadwal,
-        bulkAddJadwal,
-        updateJadwal,
-        deleteJadwal,
-        bulkDeleteJadwal,
-        resetJadwalToDefault,
-        presensiList,
-        updatePresensi,
-        deletePresensi,
-        resetPresensiSiswa,
-        clearAllPresensiSiswa,
-        resetPresensiKelas,
-        batchUpdatePresensi,
-        nilaiList,
-        saveNilai,
-        bulkSaveNilai,
-        deleteNilai,
-        deleteNilaiBySiswa,
-        sppList,
-        jenisTagihanList,
-        addJenisTagihan,
-        updateJenisTagihan,
-        deleteJenisTagihan,
-        addTagihan,
-        bulkAddTagihan,
-        bayarSPP,
-        bayarTagihanDariTabungan,
-        bulkBayarTagihanDariTabungan,
-        pengumumanList,
-        addPengumuman,
-        deletePengumuman,
-        tabunganList,
-        transaksiTabunganList,
-        setorTabungan,
-        tarikTabungan,
-        bulkSetorTabungan,
-        clearAllTabungan,
-        pesertaTransportList,
-        sppTransportRecords,
-        transaksiSPPTransportList,
-        updatePesertaTransport,
-        bayarSPPTransport,
-        bulkBayarSPPTransportDariTabungan,
-        getStudentSPPTransportRecord,
-
-        // LMS States & Actions
-        lmsMateriList,
-        addMateri,
-        updateMateri,
-        deleteMateri,
-        toggleBacaMateri,
-        lmsTugasList,
-        addTugas,
-        updateTugas,
-        deleteTugas,
-        lmsSubmissionList,
-        submitTugas,
-        nilaiSubmission,
-        lmsKuisList,
-        addKuis,
-        deleteKuis,
-        lmsKuisAttemptList,
-        submitKuisAttempt,
-        lmsForumList,
-        addForumTopik,
-        addKomentarForum,
-        lmsMeetingList,
-        addMeeting,
-        deleteMeeting,
-        lmsBankSoalList,
-        addBankSoal,
-        updateBankSoal,
-        deleteBankSoal,
-        addSoalToBank,
-        updateSoalInBank,
-        deleteSoalFromBank,
-        generateKuisFromBankSoal,
-        lmsJadwalMateriList,
-        addJadwalMateri,
-        updateJadwalMateri,
-        deleteJadwalMateri,
-        toggleRealisasiJadwal,
-
-        // Islamic School Flagship Features
-        tahfidzList,
-        addTahfidzRecord,
-        updateTahfidzRecord,
-        deleteTahfidzRecord,
-        mutabaahList,
-        addOrUpdateMutabaahRecord,
-        batchAddOrUpdateMutabaahRecords,
-        verifyMutabaahRecord,
-        deleteMutabaahRecord,
-
-        resetToDefault,
-
-        // Supabase Cloud State & Sync
-        isSupabaseConnected,
-        isSyncing,
-        lastSyncTime,
-        supabaseError,
-        syncWithSupabase,
-        seedDatabaseToCloud,
-        testSupabaseHealth,
-
-        // Automatic Push Database Engine
-        isAutoPushEnabled,
-        toggleAutoPush,
-        isAutoPushing,
-        lastAutoPushTime,
-        autoPushStatus,
-        forceAutoPushNow,
-
-        // Backup & Restore Database
-        exportDatabaseBackup,
-        importDatabaseBackup,
-        clearAllDatabase,
-        clearNilaiDanSpp,
-      }}
-
-
-    >
+    <SchoolDataContext.Provider value={contextValue}>
       {children}
     </SchoolDataContext.Provider>
   );

@@ -1,8 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SchoolDataProvider } from "@/contexts/SchoolDataContext";
 import { PwaManager } from "@/components/common/PwaManager";
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-plus-jakarta",
+  display: "swap",
+});
 
 export const viewport: Viewport = {
   themeColor: "#064e3b",
@@ -36,18 +44,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className="h-full">
+    <html lang="id" className={`h-full ${plusJakartaSans.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="h-full antialiased font-sans bg-slate-50 text-slate-900 selection:bg-emerald-700 selection:text-white">
+      <body className={`h-full antialiased font-sans bg-slate-50 text-slate-900 selection:bg-emerald-700 selection:text-white ${plusJakartaSans.className}`}>
         <AuthProvider>
           <SchoolDataProvider>
             {children}

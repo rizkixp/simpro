@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope } from "@/hooks/useTeacherScope";
 import { Siswa } from "@/types/school";
 import { getStatusBadgeClass } from "@/lib/utils";
-import * as XLSX from "xlsx";
+import Pagination from "@/components/common/Pagination";
 import {
   Users,
   Search,
@@ -115,6 +115,20 @@ export default function SiswaManagementPage() {
     const matchKelas = teacherScope.isTeacher || selectedKelas === "Semua" || s.kelas === selectedKelas;
     return matchSearch && matchKelas;
   });
+
+  // Paginasi Siswa
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedKelas]);
+
+  const paginatedSiswa = useMemo(() => {
+    if (pageSize <= 0 || pageSize >= filteredSiswa.length) return filteredSiswa;
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredSiswa.slice(startIndex, startIndex + pageSize);
+  }, [filteredSiswa, currentPage, pageSize]);
 
   // Multi-select & Bulk Action Helpers
   const isAllSelected = filteredSiswa.length > 0 && filteredSiswa.every((s) => selectedIds.includes(s.id));
@@ -337,7 +351,8 @@ export default function SiswaManagementPage() {
   };
 
   // Download Templates
-  const handleDownloadExcelTemplate = () => {
+  const handleDownloadExcelTemplate = async () => {
+    const XLSX = await import("xlsx");
     const defaultKelas = teacherScope.isTeacher && teacherScope.assignedClass
       ? teacherScope.assignedClass
       : kelasList[0]?.nama || "X MIPA 1";
@@ -399,6 +414,7 @@ export default function SiswaManagementPage() {
     setIsParsing(true);
 
     try {
+      const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const firstSheetName = workbook.SheetNames[0];
@@ -847,7 +863,7 @@ export default function SiswaManagementPage() {
                   </td>
                 </tr>
               ) : (
-                filteredSiswa.map((siswa) => {
+                paginatedSiswa.map((siswa) => {
                   const isSelected = selectedIds.includes(siswa.id);
                   return (
                   <tr
@@ -933,6 +949,14 @@ export default function SiswaManagementPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredSiswa.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          itemLabel="siswa"
+        />
       </div>
 
       {/* Modal Detail Siswa */}

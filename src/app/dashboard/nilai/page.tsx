@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import * as XLSX from "xlsx";
+import Pagination from "@/components/common/Pagination";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTeacherScope, isClassMatch } from "@/hooks/useTeacherScope";
@@ -318,6 +318,15 @@ export default function NilaiManagementPage() {
   const [mainTableViewMode, setMainTableViewMode] = useState<"leger" | "ringkasan">("leger");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const mainLegerFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Pagination State for Leger Matriks & Ringkasan Siswa
+  const [nilaiPage, setNilaiPage] = useState<number>(1);
+  const [nilaiPageSize, setNilaiPageSize] = useState<number>(25);
+
+  // Reset page to 1 whenever any filter changes
+  useEffect(() => {
+    setNilaiPage(1);
+  }, [selectedKelas, selectedMapel, searchTerm, activeSemester, activeAssessmentType, isTengah, activeRaporTab]);
 
   // Daftar mata pelajaran aktif untuk tabel leger pada halaman utama
   const activeLegerMapels = useMemo(() => {
@@ -2229,7 +2238,6 @@ export default function NilaiManagementPage() {
     return matchSearch && matchKelas && matchMapel && matchSemester && matchType;
   });
 
-  // Daftar Siswa Terfilter untuk Tabel Utama (menampilkan seluruh siswa dengan kondisi default jika belum ada nilai)
   const filteredSiswa = baseSiswaList.filter((s) => {
     const matchSearch =
       s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -2241,6 +2249,13 @@ export default function NilaiManagementPage() {
         : selectedKelas === "Semua" || isClassMatch(s.kelas, selectedKelas);
     return matchSearch && matchKelas;
   });
+
+  // Paginated students for the main tables to ensure blazing 60 FPS rendering
+  const paginatedFilteredSiswa = useMemo(() => {
+    if (nilaiPageSize <= 0 || nilaiPageSize >= filteredSiswa.length) return filteredSiswa;
+    const start = (nilaiPage - 1) * nilaiPageSize;
+    return filteredSiswa.slice(start, start + nilaiPageSize);
+  }, [filteredSiswa, nilaiPage, nilaiPageSize]);
 
   const siswaWithGrades = filteredSiswa.filter((s) => {
     const records = nilaiList.filter(
@@ -2993,8 +3008,9 @@ export default function NilaiManagementPage() {
   };
 
   // Unduh Format / Template Excel Leger Rombel (dilengkapi daftar siswa dan mapel kelas aktif)
-  const handleDownloadLegerExcelTemplate = () => {
+  const handleDownloadLegerExcelTemplate = async () => {
     try {
+      const XLSX = await import("xlsx");
       const targetStudents = isBatchRaporOpen ? batchStudents : activeTargetStudents;
       const targetMapels = isBatchRaporOpen ? currentLegerMapelList : activeLegerMapels;
       const targetKelas = isBatchRaporOpen ? batchSelectedKelas : selectedKelas;
@@ -3065,6 +3081,7 @@ export default function NilaiManagementPage() {
 
     setIsLegerImporting(true);
     try {
+      const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const firstSheetName = workbook.SheetNames[0];
@@ -3504,7 +3521,7 @@ export default function NilaiManagementPage() {
   };
 
   // Export Single Student Rapor to Excel (.xlsx / .xls)
-  const handleExportSingleRapor = (
+  const handleExportSingleRapor = async (
     siswa: Siswa,
     type?: JenisRapor,
     sem?: "Ganjil" | "Genap",
@@ -3520,7 +3537,7 @@ export default function NilaiManagementPage() {
           (activeType === "tengah" ? isRecordStsFilled(n) : isRecordSasFilled(n))
       );
       const att = getStudentAttendance(siswa.id, siswa.nama);
-      const fileName = exportSingleRaporXls(
+      const fileName = await exportSingleRaporXls(
         {
           siswa,
           type: activeType,
@@ -3548,7 +3565,7 @@ export default function NilaiManagementPage() {
   };
 
   // Export Batch Student Rapor to Excel (.xlsx / .xls)
-  const handleExportBatchRapor = (format: "xlsx" | "xls" = "xlsx") => {
+  const handleExportBatchRapor = async (format: "xlsx" | "xls" = "xlsx") => {
     try {
       if (batchStudents.length === 0) {
         setNotification({
@@ -3557,7 +3574,7 @@ export default function NilaiManagementPage() {
         });
         return;
       }
-      const fileName = exportBatchRaporXls(
+      const fileName = await exportBatchRaporXls(
         {
           batchStudents,
           type: batchRaporType,
@@ -4460,7 +4477,7 @@ export default function NilaiManagementPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredSiswa.map((s, index) => {
+                      paginatedFilteredSiswa.map((s, index) => {
                         const studentScores = activeLegerMapels.map((m) => {
                           const key = `${s.id}_${m.nama}`;
                           const raw = legerInputScores[key];
@@ -4491,7 +4508,7 @@ export default function NilaiManagementPage() {
                             className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                           >
                             <td className="px-2 py-2 text-center font-mono text-slate-400 text-xs">
-                              {index + 1}
+                              {((nilaiPage - 1) * nilaiPageSize) + index + 1}
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-2">
@@ -4770,7 +4787,7 @@ export default function NilaiManagementPage() {
                   </td>
                 </tr>
               ) : (
-                filteredSiswa.map((s, index) => {
+                paginatedFilteredSiswa.map((s, index) => {
                   const studentRecords = nilaiList.filter(
                     (n) =>
                       n.siswaId === s.id &&
@@ -4817,7 +4834,7 @@ export default function NilaiManagementPage() {
                         className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
                       >
                         <td className="px-3 py-3.5 text-center font-mono text-slate-400 text-xs">
-                          {index + 1}
+                          {((nilaiPage - 1) * nilaiPageSize) + index + 1}
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2.5">
@@ -5116,7 +5133,7 @@ export default function NilaiManagementPage() {
                       className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
                     >
                       <td className="px-3 py-3.5 text-center font-mono text-slate-400 text-xs">
-                        {index + 1}
+                        {((nilaiPage - 1) * nilaiPageSize) + index + 1}
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
@@ -5399,6 +5416,17 @@ export default function NilaiManagementPage() {
             </table>
           </div>
         )}
+
+        {/* Pagination Controls for Grade Tables */}
+        <Pagination
+          currentPage={nilaiPage}
+          totalItems={filteredSiswa.length}
+          pageSize={nilaiPageSize}
+          onPageChange={setNilaiPage}
+          onPageSizeChange={setNilaiPageSize}
+          itemLabel="siswa"
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
       </div>
     );
   })()}

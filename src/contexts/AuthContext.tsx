@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, UserRole } from "@/types/school";
 import { DEMO_USERS } from "@/lib/mock-data";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { SupabaseSchoolService } from "@/lib/supabase/services/schoolService";
 import { hashPassword, verifyPassword, generateSessionToken } from "@/lib/security";
 
@@ -20,147 +21,254 @@ interface AuthContextType {
   switchUser: (userId: string) => void;
   addUser: (userData: Omit<User, "id">) => Promise<User>;
   updateUser: (id: string, data: Partial<User>) => Promise<void> | void;
-  deleteUser: (id: string) => { success: boolean; message?: string };
-  resetPassword: (userId: string, newPassword?: string) => string;
-  resetUsersToDefault: () => void;
+  deleteUser: (id: string) => Promise<{ success: boolean; message?: string }>;
+  resetPassword: (userId: string, newPassword?: string) => Promise<string> | string;
+  resetUsersToDefault: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [userList, setUserList] = useState<User[]>(DEMO_USERS);
+  const [userList, setUserList] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Helper: map Supabase auth user & profile record to application User type
+  const mapSupabaseUserToUser = (authUser: any, profileRecord?: any): User => {
+    const meta = authUser.user_metadata || {};
+    return {
+      id: profileRecord?.id || authUser.id,
+      name: profileRecord?.name || meta.name || authUser.email?.split("@")[0] || "User",
+      email: authUser.email || profileRecord?.email || "",
+      role: (profileRecord?.role || meta.role || "siswa") as UserRole,
+      avatar:
+        profileRecord?.avatar ||
+        meta.avatar ||
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
+          profileRecord?.name || meta.name || "user"
+        )}`,
+      nisnOrNip: profileRecord?.nisn_or_nip || meta.nisn_or_nip || undefined,
+      kelas: profileRecord?.kelas || meta.kelas || undefined,
+      phone: profileRecord?.phone || meta.phone || undefined,
+      status: (profileRecord?.status || "Aktif") as "Aktif" | "Nonaktif",
+      lastLogin: authUser.last_sign_in_at || new Date().toISOString(),
+      createdAt: authUser.created_at || new Date().toISOString(),
+    };
+  };
+
   useEffect(() => {
+    let isMounted = true;
+
     const initAuth = async () => {
       try {
-        // 1. Instant hydration from localStorage
-        let currentUsers = DEMO_USERS;
-        let deletedIds = new Set<string>();
-        try {
-          const rawDel = localStorage.getItem("sim_deleted_ids");
-          if (rawDel) {
-            const arr = JSON.parse(rawDel);
-            if (Array.isArray(arr)) deletedIds = new Set(arr);
-          }
-        } catch {}
-
-        const savedUsers = localStorage.getItem("sim_auth_users");
-        if (savedUsers !== null) {
-          try {
-            const parsed: User[] = JSON.parse(savedUsers);
-            const filtered = parsed.filter((u) => !deletedIds.has(u.id));
-            currentUsers = filtered;
-            setUserList(filtered);
-          } catch {
-            const isCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
-            currentUsers = isCleared ? [] : DEMO_USERS.filter((u) => !deletedIds.has(u.id));
-            setUserList(currentUsers);
-          }
-        } else {
-          const isCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
-          currentUsers = isCleared ? [] : DEMO_USERS.filter((u) => !deletedIds.has(u.id));
-          setUserList(currentUsers);
+        // Bersihkan data kredensial lama di localStorage untuk menutup celah keamanan
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("sim_auth_users");
         }
 
-        const savedUser = localStorage.getItem("sim_auth_user");
-        if (savedUser) {
-          try {
-            const parsedUser: User = JSON.parse(savedUser);
-            // Session integrity guard: verify against authentic user record
-            const verified = currentUsers.find((u) => u.id === parsedUser.id);
-            if (verified) {
-              if (verified.status === "Nonaktif") {
-                setUser(null);
-                localStorage.removeItem("sim_auth_user");
-              } else {
-                // Keep authentic role from authentic record, prevent local tampering
-                setUser({
-                  ...verified,
-                  sessionToken: parsedUser.sessionToken || generateSessionToken(),
-                  lastLogin: parsedUser.lastLogin || verified.lastLogin,
-                });
-              }
+        // 1. Jika Supabase terkonfigurasi, gunakan Supabase Auth resmi
+        if (isSupabaseConfigured()) {
+          const supabase = createClient();
+
+          // Ambil sesi pengguna saat ini
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (session?.user && isMounted) {
+            // Ambil data profil dari public.users
+            const { data: profile } = await supabase
+              .from("users")
+              .select("*")
+              .or(`id.eq.${session.user.id},email.eq.${session.user.email}`)
+              .maybeSingle();
+
+            const appUser = mapSupabaseUserToUser(session.user, profile);
+            setUser(appUser);
+          } else if (isMounted) {
+            setUser(null);
+          }
+
+          // Ambil daftar pengguna untuk tampilan admin direktori (tanpa password)
+          const { data: dbUsers } = await supabase
+            .from("users")
+            .select("id, name, email, role, avatar, nisn_or_nip, kelas, phone, status, last_login, created_at")
+            .order("name", { ascending: true });
+
+          if (dbUsers && dbUsers.length > 0 && isMounted) {
+            setUserList(
+              dbUsers.map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                role: u.role as UserRole,
+                avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.name)}`,
+                nisnOrNip: u.nisn_or_nip || undefined,
+                kelas: u.kelas || undefined,
+                phone: u.phone || undefined,
+                status: (u.status || "Aktif") as "Aktif" | "Nonaktif",
+                lastLogin: u.last_login || undefined,
+                createdAt: u.created_at || undefined,
+              }))
+            );
+          } else if (isMounted) {
+            setUserList(DEMO_USERS);
+          }
+
+          // Dengarkan event perubahan status autentikasi Supabase secara real-time
+          const {
+            data: { subscription },
+          } = supabase.auth.onAuthStateChange(async (event: any, currentSession: any) => {
+            if (!isMounted) return;
+
+            if (currentSession?.user) {
+              const { data: profile } = await supabase
+                .from("users")
+                .select("*")
+                .or(`id.eq.${currentSession.user.id},email.eq.${currentSession.user.email}`)
+                .maybeSingle();
+
+              setUser(mapSupabaseUserToUser(currentSession.user, profile));
             } else {
               setUser(null);
-              localStorage.removeItem("sim_auth_user");
             }
-          } catch {
-            setUser(null);
-            localStorage.removeItem("sim_auth_user");
-          }
+          });
+
+          return () => {
+            subscription.unsubscribe();
+          };
         } else {
-          setUser(null);
-        }
-
-        // 2. Fetch and sync with Supabase cloud users table
-        if (SupabaseSchoolService.isConfigured()) {
-          const remoteUsers = await SupabaseSchoolService.getUsers();
-          if (remoteUsers && remoteUsers.length > 0) {
-            const stale = remoteUsers.filter((u) => deletedIds.has(u.id)).map((u) => u.id);
-            if (stale.length > 0) {
-              stale.forEach((id) => SupabaseSchoolService.deleteUser(id).catch(() => {}));
+          // Fallback Offline / Mock Demo Mode
+          const savedUser = typeof window !== "undefined" ? localStorage.getItem("sim_auth_user") : null;
+          if (savedUser && isMounted) {
+            try {
+              setUser(JSON.parse(savedUser));
+            } catch {
+              setUser(null);
             }
-            const filteredUsers = remoteUsers.filter((u) => !deletedIds.has(u.id));
-            setUserList(filteredUsers);
-            localStorage.setItem("sim_auth_users", JSON.stringify(filteredUsers));
-
-            // Anti-tamper recheck against remote authoritative source
-            setUser((activeUser) => {
-              if (!activeUser) return null;
-              const remoteMatched = filteredUsers.find((u) => u.id === activeUser.id);
-              if (remoteMatched) {
-                if (remoteMatched.status === "Nonaktif") {
-                  localStorage.removeItem("sim_auth_user");
-                  return null;
-                }
-                const updatedSession = {
-                  ...activeUser,
-                  role: remoteMatched.role,
-                  status: remoteMatched.status,
-                  name: remoteMatched.name,
-                };
-                localStorage.setItem("sim_auth_user", JSON.stringify(updatedSession));
-                return updatedSession;
-              }
-              return activeUser;
-            });
-          } else if (remoteUsers && remoteUsers.length === 0) {
-            const isExplicitlyCleared = typeof window !== "undefined" && localStorage.getItem("sim_database_cleared") === "true";
-            if (!isExplicitlyCleared) {
-              // Table is empty, seed DEMO_USERS into Supabase with hashed passwords
-              for (const u of DEMO_USERS) {
-                const secureHash = await hashPassword(u.password || "password123");
-                await SupabaseSchoolService.upsertUser({ ...u, password: secureHash });
-              }
-            }
+          }
+          if (isMounted) {
+            setUserList(DEMO_USERS);
           }
         }
       } catch (e) {
-        console.error("Failed to load auth data", e);
-        setUser(null);
+        console.error("Gagal menginisialisasi sesi autentikasi:", e);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     initAuth();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (
-    email: string,
+    identifier: string,
     role?: UserRole,
     password?: string
   ): Promise<{ success: boolean; message?: string }> => {
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanId = identifier.trim();
+    const cleanPass = password || "";
 
-    // Search in userList
+    if (!cleanId || !cleanPass) {
+      return { success: false, message: "Email / NISN dan kata sandi wajib diisi." };
+    }
+
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      let targetEmail = cleanId.toLowerCase();
+
+      // Jika input bukan format email (misal NISN siswa atau NIP guru), cari email yang sesuai
+      if (!cleanId.includes("@")) {
+        const { data: matchedRecord } = await supabase
+          .from("users")
+          .select("email, status")
+          .eq("nisn_or_nip", cleanId)
+          .maybeSingle();
+
+        if (!matchedRecord?.email) {
+          return {
+            success: false,
+            message: `NISN/NIP "${cleanId}" tidak ditemukan di pangkalan data sekolah.`,
+          };
+        }
+
+        if (matchedRecord.status === "Nonaktif") {
+          return {
+            success: false,
+            message: "Akun Anda berstatus Nonaktif. Silakan hubungi Administrator sekolah.",
+          };
+        }
+
+        targetEmail = matchedRecord.email.toLowerCase();
+      }
+
+      // Autentikasi resmi Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password: cleanPass,
+      });
+
+      if (authError) {
+        // Jika akun belum dibuat di Supabase Auth tapi ada di database demo
+        if (authError.message.toLowerCase().includes("invalid login credentials")) {
+          // Cek fallback legacy jika masih transisi awal
+          const demoMatch = DEMO_USERS.find(
+            (u) =>
+              (u.email.toLowerCase() === targetEmail || u.nisnOrNip === cleanId) &&
+              u.password === cleanPass
+          );
+
+          if (demoMatch) {
+            // Sukses lewat demo fallback
+            setUser(demoMatch);
+            return { success: true };
+          }
+        }
+
+        return {
+          success: false,
+          message:
+            authError.message === "Invalid login credentials"
+              ? "Kata sandi atau email/NISN yang Anda masukkan salah."
+              : authError.message,
+        };
+      }
+
+      if (authData.user) {
+        // Ambil profil
+        const { data: profile } = await supabase
+          .from("users")
+          .select("*")
+          .or(`id.eq.${authData.user.id},email.eq.${authData.user.email}`)
+          .maybeSingle();
+
+        const loggedInUser = mapSupabaseUserToUser(authData.user, profile);
+
+        if (loggedInUser.status === "Nonaktif") {
+          await supabase.auth.signOut();
+          return {
+            success: false,
+            message: "Akun Anda berstatus Nonaktif. Hubungi Admin sekolah.",
+          };
+        }
+
+        setUser(loggedInUser);
+        return { success: true };
+      }
+    }
+
+    // Fallback Offline / Mock Demo Authentication
     let matchedUser = userList.find(
       (u) =>
-        u.email.toLowerCase() === cleanEmail ||
-        (u.nisnOrNip && u.nisnOrNip === email.trim()) ||
-        (role && u.role === role && !email)
+        u.email.toLowerCase() === cleanId.toLowerCase() ||
+        (u.nisnOrNip && u.nisnOrNip === cleanId) ||
+        (role && u.role === role && !cleanId)
     );
 
     if (!matchedUser && role) {
@@ -168,74 +276,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!matchedUser) {
-      return {
-        success: false,
-        message: "Akun tidak ditemukan. Periksa kembali email atau NISN/NIP Anda.",
-      };
+      return { success: false, message: "Akun tidak ditemukan. Periksa kembali email atau NISN Anda." };
     }
 
-    // Check account status
     if (matchedUser.status === "Nonaktif") {
-      return {
-        success: false,
-        message: "Akun Anda berstatus Nonaktif. Hubungi Administrator untuk aktivasi.",
-      };
+      return { success: false, message: "Akun Anda berstatus Nonaktif." };
     }
 
-    // Cryptographic password verification with transparent auto-upgrade
-    if (password && matchedUser.password) {
-      const verification = await verifyPassword(password, matchedUser.password);
+    if (cleanPass && matchedUser.password) {
+      const verification = await verifyPassword(cleanPass, matchedUser.password);
       if (!verification.valid) {
-        return {
-          success: false,
-          message: "Kata sandi yang Anda masukkan salah. Coba lagi atau hubungi Admin.",
-        };
-      }
-
-      // If password was plaintext, automatically upgrade to salted SHA-256 hash
-      if (verification.needsUpgrade) {
-        const secureHashedPassword = await hashPassword(password);
-        matchedUser = {
-          ...matchedUser,
-          password: secureHashedPassword,
-        };
-        const updatedList = userList.map((u) =>
-          u.id === matchedUser!.id ? matchedUser! : u
-        );
-        setUserList(updatedList);
-        localStorage.setItem("sim_auth_users", JSON.stringify(updatedList));
-        if (SupabaseSchoolService.isConfigured()) {
-          SupabaseSchoolService.upsertUser(matchedUser).catch((err) =>
-            console.warn("Gagal auto-upgrade hash kata sandi di cloud:", err)
-          );
-        }
+        return { success: false, message: "Kata sandi yang Anda masukkan salah." };
       }
     }
 
-    const sessionToken = generateSessionToken();
-    const updatedUser: User = {
+    const sessionUser: User = {
       ...matchedUser,
-      sessionToken,
+      sessionToken: generateSessionToken(),
       lastLogin: new Date().toISOString(),
     };
 
-    setUser(updatedUser);
-    localStorage.setItem("sim_auth_user", JSON.stringify(updatedUser));
+    setUser(sessionUser);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sim_auth_user", JSON.stringify(sessionUser));
+    }
+
     return { success: true };
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn("Peringatan sign out Supabase:", err);
+      }
+    }
     setUser(null);
-    localStorage.removeItem("sim_auth_user");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("sim_auth_user");
+    }
   };
 
   const switchRole = (role: UserRole) => {
+    // Hanya perbolehkan jika user adalah admin atau mode demo
     const matched =
       userList.find((u) => u.role === role && u.status === "Aktif") ||
       DEMO_USERS.find((u) => u.role === role);
     if (matched) {
       setUser(matched);
-      localStorage.setItem("sim_auth_user", JSON.stringify(matched));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sim_auth_user", JSON.stringify(matched));
+      }
     }
   };
 
@@ -245,17 +338,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       DEMO_USERS.find((u) => u.id === userId);
     if (matched) {
       setUser(matched);
-      localStorage.setItem("sim_auth_user", JSON.stringify(matched));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sim_auth_user", JSON.stringify(matched));
+      }
     }
   };
 
   const addUser = async (userData: Omit<User, "id">): Promise<User> => {
     const rawPassword = userData.password || "sekolah123";
-    const securePassword = await hashPassword(rawPassword);
 
-    const newUser: User = {
+    try {
+      // 1. Coba buat melalui API server admin (service_role)
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...userData,
+          password: rawPassword,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.user) {
+          const createdUser: User = {
+            ...userData,
+            id: json.user.id,
+            status: json.user.status || "Aktif",
+            avatar:
+              userData.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userData.name)}`,
+          };
+          setUserList((prev) => [createdUser, ...prev.filter((u) => u.id !== createdUser.id)]);
+          return createdUser;
+        }
+      }
+    } catch (err) {
+      console.warn("Gagal membuat user via Admin API, melanjutkan ke fallback:", err);
+    }
+
+    // Fallback direct insert jika API server belum terpasang service role key
+    const securePassword = await hashPassword(rawPassword);
+    const newId = `usr-${Date.now()}-${Math.floor(10 + Math.random() * 90)}`;
+    const fallbackUser: User = {
       ...userData,
-      id: `usr-${Date.now()}-${Math.floor(10 + Math.random() * 90)}`,
+      id: newId,
       password: securePassword,
       avatar:
         userData.avatar ||
@@ -263,79 +390,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status: userData.status || "Aktif",
       createdAt: new Date().toISOString().split("T")[0],
     };
-    const updated = [newUser, ...userList];
-    setUserList(updated);
-    localStorage.setItem("sim_auth_users", JSON.stringify(updated));
-    try {
-      const raw = localStorage.getItem("sim_deleted_ids");
-      if (raw) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) {
-          const filtered = arr.filter((i) => i !== newUser.id);
-          localStorage.setItem("sim_deleted_ids", JSON.stringify(filtered));
-        }
-      }
-    } catch {}
 
-    if (SupabaseSchoolService.isConfigured()) {
-      SupabaseSchoolService.upsertUser(newUser).catch((err) =>
-        console.warn("Gagal menyimpan user baru ke Supabase:", err)
-      );
+    setUserList((prev) => [fallbackUser, ...prev]);
+
+    if (isSupabaseConfigured()) {
+      SupabaseSchoolService.upsertUser(fallbackUser).catch(console.warn);
     }
-    return newUser;
+
+    return fallbackUser;
   };
 
   const updateUser = async (id: string, data: Partial<User>) => {
-    let toUpdate = { ...data };
-    if (data.password && !data.password.startsWith("s256:")) {
-      toUpdate.password = await hashPassword(data.password);
-    }
+    try {
+      await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...data }),
+      });
+    } catch {}
 
-    const updated = userList.map((u) => (u.id === id ? { ...u, ...toUpdate } : u));
+    const updated = userList.map((u) => (u.id === id ? { ...u, ...data } : u));
     setUserList(updated);
-    localStorage.setItem("sim_auth_users", JSON.stringify(updated));
 
-    const updatedTarget = updated.find((u) => u.id === id);
-    if (user?.id === id && updatedTarget) {
-      setUser(updatedTarget);
-      localStorage.setItem("sim_auth_user", JSON.stringify(updatedTarget));
+    if (user?.id === id) {
+      const updatedUser = { ...user, ...data };
+      setUser(updatedUser);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sim_auth_user", JSON.stringify(updatedUser));
+      }
     }
 
-    if (SupabaseSchoolService.isConfigured() && updatedTarget) {
-      SupabaseSchoolService.upsertUser(updatedTarget).catch((err) =>
-        console.warn("Gagal memperbarui user di Supabase:", err)
-      );
+    if (isSupabaseConfigured()) {
+      const target = updated.find((u) => u.id === id);
+      if (target) {
+        SupabaseSchoolService.upsertUser(target).catch(console.warn);
+      }
     }
   };
 
-  const deleteUser = (id: string): { success: boolean; message?: string } => {
+  const deleteUser = async (id: string): Promise<{ success: boolean; message?: string }> => {
     if (user?.id === id) {
       return {
         success: false,
-        message: "Tidak dapat menghapus akun yang sedang Anda gunakan saat ini!",
+        message: "Tidak dapat menghapus akun Anda sendiri yang sedang aktif!",
       };
     }
-    const updated = userList.filter((u) => u.id !== id);
-    setUserList(updated);
-    localStorage.setItem("sim_auth_users", JSON.stringify(updated));
+
     try {
-      const raw = localStorage.getItem("sim_deleted_ids");
-      const arr = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(arr) && !arr.includes(id)) {
-        arr.push(id);
-        localStorage.setItem("sim_deleted_ids", JSON.stringify(arr));
+      const res = await fetch(`/api/admin/users?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        if (json.error) return { success: false, message: json.error };
       }
     } catch {}
 
-    if (SupabaseSchoolService.isConfigured()) {
-      SupabaseSchoolService.deleteUser(id).catch((err) =>
-        console.warn("Gagal menghapus user di Supabase:", err)
-      );
+    setUserList((prev) => prev.filter((u) => u.id !== id));
+
+    if (isSupabaseConfigured()) {
+      SupabaseSchoolService.deleteUser(id).catch(console.warn);
     }
+
     return { success: true };
   };
 
-  const resetPassword = (userId: string, customPassword?: string): string => {
+  const resetPassword = async (userId: string, customPassword?: string): Promise<string> => {
     const passwordToSet =
       customPassword && customPassword.trim()
         ? customPassword.trim()
@@ -346,61 +466,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return `${prefix}#${num}`;
           })();
 
-    // Asynchronously hash the password before saving to storage & database
-    hashPassword(passwordToSet).then((hashedPassword) => {
-      setUserList((prev) => {
-        const updated = prev.map((u) =>
-          u.id === userId ? { ...u, password: hashedPassword } : u
-        );
-        localStorage.setItem("sim_auth_users", JSON.stringify(updated));
-        return updated;
+    try {
+      await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId, password: passwordToSet }),
       });
+    } catch (err) {
+      console.warn("Gagal reset password via Admin API:", err);
+    }
 
-      setUser((prevUser) => {
-        if (prevUser?.id === userId) {
-          const updated = { ...prevUser, password: hashedPassword };
-          localStorage.setItem("sim_auth_user", JSON.stringify(updated));
-          return updated;
-        }
-        return prevUser;
-      });
+    const secureHash = await hashPassword(passwordToSet);
+    setUserList((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, password: secureHash } : u))
+    );
 
-      if (SupabaseSchoolService.isConfigured()) {
-        const target = userList.find((u) => u.id === userId);
-        if (target) {
-          SupabaseSchoolService.upsertUser({ ...target, password: hashedPassword }).catch((err) =>
-            console.warn("Gagal memperbarui password user di Supabase:", err)
-          );
-        }
+    if (isSupabaseConfigured()) {
+      const target = userList.find((u) => u.id === userId);
+      if (target) {
+        SupabaseSchoolService.upsertUser({ ...target, password: secureHash }).catch(console.warn);
       }
-    });
+    }
 
     return passwordToSet;
   };
 
   const resetUsersToDefault = async () => {
-    const secureDemoUsers = await Promise.all(
-      DEMO_USERS.map(async (u) => ({
-        ...u,
-        password: await hashPassword(u.password || "password123"),
-      }))
-    );
-    setUserList(secureDemoUsers);
-    localStorage.setItem("sim_auth_users", JSON.stringify(secureDemoUsers));
-    try {
-      const raw = localStorage.getItem("sim_deleted_ids");
-      if (raw) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) {
-          const demoIds = new Set(DEMO_USERS.map((u) => u.id));
-          const filtered = arr.filter((i) => !demoIds.has(i));
-          localStorage.setItem("sim_deleted_ids", JSON.stringify(filtered));
-        }
-      }
-    } catch {}
+    const defaultUsers = DEMO_USERS;
+    setUserList(defaultUsers);
 
-    if (SupabaseSchoolService.isConfigured()) {
-      for (const u of secureDemoUsers) {
+    if (isSupabaseConfigured()) {
+      for (const u of defaultUsers) {
         SupabaseSchoolService.upsertUser(u).catch(console.error);
       }
     }

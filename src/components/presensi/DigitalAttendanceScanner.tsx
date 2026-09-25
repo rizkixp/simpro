@@ -337,6 +337,55 @@ export default function DigitalAttendanceScanner({
         metode: detectedMethod,
       };
 
+      // Auto-send WhatsApp notification if enabled
+      const shouldAutoSend =
+        (sesiPresensi === "masuk" && schoolProfile?.waAutoSendPresensiMasuk) ||
+        (sesiPresensi === "pulang" && schoolProfile?.waAutoSendPresensiPulang);
+
+      if (shouldAutoSend && siswa.noHpWali && schoolProfile?.waGatewayToken) {
+        const schoolTitle = schoolProfile?.namaSekolah || "Sekolah";
+        const statusNote = isLate ? "Terlambat" : "Tepat Waktu";
+        const sesiNote = sesiPresensi === "masuk" ? "Tiba di Sekolah" : "Pulang Sekolah";
+
+        const defaultMsg =
+          `*PEMBERITAHUAN ABSENSI DIGITAL SISWA*\n` +
+          `*${schoolTitle}*\n\n` +
+          `Assalamu'alaikum Wr. Wb.\n` +
+          `Diberitahukan kepada Bapak/Ibu Wali Murid, bahwa:\n\n` +
+          `👤 *Nama:* ${siswa.nama}\n` +
+          `🔢 *NISN:* ${siswa.nisn}\n` +
+          `🏫 *Kelas:* ${siswa.kelas}\n` +
+          `📅 *Tanggal:* ${todayStr}\n` +
+          `⏰ *Waktu:* ${timeOnlyStr} WIB\n` +
+          `📋 *Sesi:* ${sesiNote} (${statusNote})\n` +
+          `📲 *Metode:* Absensi ${detectedMethod.toUpperCase()}\n\n` +
+          `Terima kasih atas kerja samanya.\n_Sistem Informasi Manajemen Sekolah_`;
+
+        const finalMsg = schoolProfile.waTemplatePresensi
+          ? schoolProfile.waTemplatePresensi
+              .replace(/\{nama\}/g, siswa.nama)
+              .replace(/\{kelas\}/g, siswa.kelas)
+              .replace(/\{status\}/g, `${sesiNote} (${statusNote})`)
+              .replace(/\{waktu\}/g, timeOnlyStr)
+              .replace(/\{tanggal\}/g, todayStr)
+              .replace(/\{sekolah\}/g, schoolTitle)
+          : defaultMsg;
+
+        fetch("/api/notifications/whatsapp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: siswa.noHpWali,
+            message: finalMsg,
+            provider: schoolProfile.waGatewayProvider || "fonnte",
+            token: schoolProfile.waGatewayToken,
+            domain: schoolProfile.waGatewayDomain,
+          }),
+        }).catch((err) => {
+          console.warn("[Scanner] Background WA dispatch warning:", err);
+        });
+      }
+
       setLastScanResult(scanResult);
       setRecentScans((prev) => [scanResult, ...prev.slice(0, 19)]); // Keep last 20
       setWarningMessage(null);
@@ -352,6 +401,7 @@ export default function DigitalAttendanceScanner({
       todayPresensiMap,
       settings,
       onRecordAttendance,
+      schoolProfile,
     ]
   );
 
@@ -542,8 +592,10 @@ export default function DigitalAttendanceScanner({
     setFilteredManualSiswa(matches.slice(0, 5));
   }, [manualQuery, siswaList]);
 
+  const [waSendingStatus, setWaSendingStatus] = useState<string | null>(null);
+
   // WhatsApp Notification Helper
-  const handleSendWhatsAppNotification = (scan: ScanResultEvent) => {
+  const handleSendWhatsAppNotification = async (scan: ScanResultEvent) => {
     const parentPhone = scan.siswa.noHpWali?.replace(/[^0-9]/g, "");
     const formattedPhone = parentPhone
       ? parentPhone.startsWith("0")
@@ -569,11 +621,37 @@ export default function DigitalAttendanceScanner({
       `📲 *Metode:* Absensi ${scan.metode.toUpperCase()}\n\n` +
       `Terima kasih atas kerja samanya.\n_Sistem Informasi Manajemen Sekolah_`;
 
+    if (schoolProfile?.waGatewayToken && formattedPhone) {
+      setWaSendingStatus("Mengirim via Gateway...");
+      try {
+        const res = await fetch("/api/notifications/whatsapp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: formattedPhone,
+            message: msg,
+            provider: schoolProfile.waGatewayProvider || "fonnte",
+            token: schoolProfile.waGatewayToken,
+            domain: schoolProfile.waGatewayDomain,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setWaSendingStatus("✅ Berhasil Terkirim via WA Gateway!");
+          setTimeout(() => setWaSendingStatus(null), 3000);
+          return;
+        }
+      } catch (err) {
+        // Fallback ke window.open
+      }
+    }
+
     const waUrl = formattedPhone
       ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
 
     window.open(waUrl, "_blank");
+    setWaSendingStatus(null);
   };
 
   if (!isOpen) return null;
@@ -918,13 +996,24 @@ export default function DigitalAttendanceScanner({
                     : "Presensi pulang berhasil! Hati-hati di jalan."}
                 </div>
 
-                {/* WhatsApp Notification Button */}
+                {/* WhatsApp Notification Button & Feedback */}
+                {waSendingStatus && (
+                  <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold text-center">
+                    {waSendingStatus}
+                  </div>
+                )}
+
                 <button
+                  type="button"
                   onClick={() => handleSendWhatsAppNotification(lastScanResult)}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  <span>Kirim Notifikasi WA Orang Tua</span>
+                  <span>
+                    {schoolProfile?.waGatewayToken
+                      ? "Kirim Ulang / Buka WA Manual"
+                      : "Kirim Notifikasi WA Orang Tua"}
+                  </span>
                 </button>
               </div>
             </div>

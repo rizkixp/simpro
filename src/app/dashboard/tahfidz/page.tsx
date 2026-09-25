@@ -10,7 +10,6 @@ import {
   SurahJuz30Info,
 } from "@/types/school";
 import { SURAH_JUZ_30 } from "@/lib/mock-data";
-import * as XLSX from "xlsx";
 import {
   BookOpen,
   Award,
@@ -597,8 +596,9 @@ export default function TahfidzPage() {
 
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   try {
+                    const XLSX = await import("xlsx");
                     if (!studentTrackerData.student) return;
                     const s = studentTrackerData.student;
                     const rows: (string | number)[][] = [

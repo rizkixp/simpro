@@ -2,8 +2,6 @@
 
 import React, { useState, useRef, useMemo } from "react";
 import { Siswa, StatusKehadiran } from "@/types/school";
-import * as XLSX from "xlsx";
-import confetti from "canvas-confetti";
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -183,7 +181,8 @@ export default function ImportPresensiExcelModal({
   };
 
   // 1. DOWNLOAD TEMPLATE HARIAN (.XLSX)
-  const handleDownloadHarianTemplate = () => {
+  const handleDownloadHarianTemplate = async () => {
+    const XLSX = await import("xlsx");
     const listToExport = classStudents.length > 0 ? classStudents : siswaList;
     const cleanClassName = modalKelas === "Semua" ? "Semua_Kelas" : modalKelas.replace(/[^a-zA-Z0-9]/g, "_");
 
@@ -216,7 +215,8 @@ export default function ImportPresensiExcelModal({
   };
 
   // 2. DOWNLOAD TEMPLATE MINGGUAN (5 HARI KERJA) (.XLSX)
-  const handleDownloadMingguanTemplate = () => {
+  const handleDownloadMingguanTemplate = async () => {
+    const XLSX = await import("xlsx");
     const listToExport = classStudents.length > 0 ? classStudents : siswaList;
     const cleanClassName = modalKelas === "Semua" ? "Semua_Kelas" : modalKelas.replace(/[^a-zA-Z0-9]/g, "_");
 
@@ -296,6 +296,7 @@ export default function ImportPresensiExcelModal({
     setIsParsing(true);
 
     try {
+      const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const firstSheetName = workbook.SheetNames[0];
@@ -542,6 +543,7 @@ export default function ImportPresensiExcelModal({
 
       // Fire celebratory confetti
       try {
+        const { default: confetti } = await import("canvas-confetti");
         confetti({
           particleCount: 80,
           spread: 70,

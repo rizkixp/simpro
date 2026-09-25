@@ -21,6 +21,20 @@ export const INITIAL_SCHOOL_PROFILE: SchoolProfile = {
   landingCtaText: "Buka Portal & Form Login",
   landingShowDemoButton: true,
   landingFooterText: "SIM Sekolah PRO - Sistem Informasi Manajemen Sekolah Terpadu. All rights reserved.",
+  // Multi-Unit / Yayasan
+  namaYayasan: "Yayasan Pendidikan Islam Cendekia Nusantara",
+  jenjangSekolah: "SDI & SMP Terpadu",
+  nomorIzinOperasional: "421.2/1089-Disdik/2021",
+  // WhatsApp Gateway Defaults
+  waGatewayProvider: "fonnte",
+  waAutoSendPresensiMasuk: true,
+  waAutoSendPresensiPulang: true,
+  waAutoSendSPP: true,
+  waTemplatePresensi: "Assalamu'alaikum Wr. Wb. Diberitahukan bahwa ananda *{nama}* (Kelas {kelas}) telah tercatat *{status}* pada jam {waktu} WIB ({tanggal}). Terima kasih.",
+  waTemplateSPP: "Assalamu'alaikum Wr. Wb. Terima kasih, pembayaran *{judul}* ananda *{nama}* (Kelas {kelas}) sebesar *Rp {nominal}* telah kami terima dengan No. Kuitansi: *{kuitansi}*. Status: *LUNAS*.",
+  // Payment Gateway Defaults
+  paymentProvider: "midtrans",
+  midtransIsProduction: false,
 };
 
 export const DEMO_USERS: User[] = [

@@ -29,3 +29,14 @@ export function getSupabaseBrowserClient() {
   return supabaseClientInstance;
 }
 
+/**
+ * Standard alias for getSupabaseBrowserClient with guaranteed non-null fallback client
+ */
+export function createClient() {
+  const existing = getSupabaseBrowserClient();
+  if (existing) return existing;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
+  return createBrowserClient(url, anonKey);
+}

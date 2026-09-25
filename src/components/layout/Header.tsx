@@ -148,35 +148,37 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           </div>
         )}
 
-        {/* Role Quick Selector / Simulator for testing different views */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-          <span className="text-[11px] font-semibold text-slate-400 pl-2 pr-1 hidden md:inline">
-            Peran:
-          </span>
-          {roleConfigs.map((r) => {
-            const isSelected = user?.role === r.role;
-            return (
-              <button
-                key={r.role}
-                onClick={() => {
-                  switchRole(r.role);
-                  if (r.role === "bendahara") {
-                    router.push("/dashboard/spp-transportasi");
-                  }
-                }}
-                title={`Beralih ke mode ${r.label}`}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
-                  isSelected
-                    ? `${r.color} shadow-sm font-semibold`
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                }`}
-              >
-                {r.icon}
-                <span className="hidden sm:inline">{r.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Role Quick Selector / Simulator for testing different views (Khusus Admin / Mode Demo) */}
+        {(user?.role === "admin" || !isSupabaseConnected) && (
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" title="Simulator Pratinjau Peran (Khusus Administrator / Demo)">
+            <span className="text-[11px] font-semibold text-slate-400 pl-2 pr-1 hidden md:inline">
+              Peran:
+            </span>
+            {roleConfigs.map((r) => {
+              const isSelected = user?.role === r.role;
+              return (
+                <button
+                  key={r.role}
+                  onClick={() => {
+                    switchRole(r.role);
+                    if (r.role === "bendahara") {
+                      router.push("/dashboard/spp-transportasi");
+                    }
+                  }}
+                  title={`Beralih ke mode ${r.label}`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                    isSelected
+                      ? `${r.color} shadow-sm font-semibold`
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {r.icon}
+                  <span className="hidden sm:inline">{r.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* PWA Direct Install Button */}
         <InstallPwaButton />
