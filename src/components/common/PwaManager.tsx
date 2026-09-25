@@ -55,16 +55,31 @@ export function PwaManager() {
         });
       }
     } else {
-      // 2. In Production: Register Service Worker
+      // 2. In Production: Register Service Worker & handle updates
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker
             .register("/sw.js")
             .then((registration) => {
-              console.log("SDI Smart PWA: Service Worker aktif:", registration.scope);
+              console.log("SIM Sekolah PRO: Service Worker aktif:", registration.scope);
+
+              // Pantau jika ada rilis/versi cache baru
+              registration.addEventListener("updatefound", () => {
+                const newWorker = registration.installing;
+                if (newWorker) {
+                  newWorker.addEventListener("statechange", () => {
+                    if (
+                      newWorker.state === "installed" &&
+                      navigator.serviceWorker.controller
+                    ) {
+                      console.log("SIM PRO: Versi baru aplikasi siap digunakan.");
+                    }
+                  });
+                }
+              });
             })
             .catch((error) => {
-              console.warn("SDI Smart PWA: Pendaftaran Service Worker gagal:", error);
+              console.warn("SIM PRO: Pendaftaran Service Worker gagal:", error);
             });
         });
       }

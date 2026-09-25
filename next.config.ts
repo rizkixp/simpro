@@ -70,6 +70,30 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Service Worker: Wajib no-cache agar pembaruan kode aplikasi langsung aktif
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          {
+            key: "Service-Worker-Allowed",
+            value: "/",
+          },
+        ],
+      },
+      {
+        // Halaman darurat offline
+        source: "/offline.html",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
     ];
   },
 };
