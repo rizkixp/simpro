@@ -64,13 +64,19 @@ export async function middleware(request: NextRequest) {
 
     const role = (user.user_metadata?.role || "siswa").toLowerCase();
 
-    // 2. Proteksi Halaman Khusus Administrator
+    // 2. Proteksi Halaman Khusus Administrator (Master Data, Pengguna & Konfigurasi)
     const adminOnlyPrefixes = [
       "/dashboard/pengguna",
       "/dashboard/pengaturan",
+      "/dashboard/siswa",
+      "/dashboard/kelas",
+      "/dashboard/jadwal",
     ];
 
-    if (adminOnlyPrefixes.some((prefix) => pathname.startsWith(prefix)) && role !== "admin") {
+    if (
+      adminOnlyPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/")) &&
+      role !== "admin"
+    ) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
@@ -81,8 +87,22 @@ export async function middleware(request: NextRequest) {
         "/dashboard/keuangan",
         "/dashboard/tabungan",
       ];
-      const isAllowed = allowedFinancePrefixes.some((p) => pathname.startsWith(p));
+      const isAllowed = allowedFinancePrefixes.some(
+        (p) => pathname === p || pathname.startsWith(p + "/")
+      );
       if (!isAllowed) {
+        return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
+      }
+    }
+
+    // 4. Batasi Siswa & Orang Tua dari Pembukuan Kas Internal Sekolah
+    if (role === "siswa" || role === "ortu") {
+      const internalFinancePrefixes = ["/dashboard/keuangan"];
+      if (
+        internalFinancePrefixes.some(
+          (p) => pathname === p || pathname.startsWith(p + "/")
+        )
+      ) {
         return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
       }
     }

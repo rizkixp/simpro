@@ -22,7 +22,23 @@ export default function DashboardLayout({
         router.push("/login");
         return;
       }
-      // Bendahara is strictly restricted to financial management pages
+      // 1. Proteksi Halaman Khusus Administrator
+      const adminOnlyPaths = [
+        "/dashboard/pengguna",
+        "/dashboard/pengaturan",
+        "/dashboard/siswa",
+        "/dashboard/kelas",
+        "/dashboard/jadwal",
+      ];
+      if (
+        adminOnlyPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) &&
+        user.role !== "admin"
+      ) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      // 2. Bendahara dibatasi hanya ke modul keuangan
       if (user.role === "bendahara") {
         const allowedFinancePaths = [
           "/dashboard/spp-transportasi",
@@ -34,7 +50,17 @@ export default function DashboardLayout({
         );
         if (!isAllowed) {
           router.replace("/dashboard/spp-transportasi");
+          return;
         }
+      }
+
+      // 3. Batasi Siswa & Orang Tua dari Pembukuan Kas Internal Sekolah
+      if (
+        (user.role === "siswa" || user.role === "ortu") &&
+        (pathname === "/dashboard/keuangan" || pathname.startsWith("/dashboard/keuangan/"))
+      ) {
+        router.replace("/dashboard/spp-transportasi");
+        return;
       }
     }
   }, [user, isLoading, pathname, router]);

@@ -4,6 +4,27 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Verifikasi Autentikasi Pengguna untuk mencegah eksploitasi spam & kehabisan kuota
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user: caller },
+    } = await supabase.auth.getUser();
+
+    if (!caller) {
+      return NextResponse.json(
+        { success: false, message: "Akses ditolak. Pengiriman WhatsApp memerlukan sesi login terverifikasi." },
+        { status: 401 }
+      );
+    }
+
+    const callerRole = (caller.user_metadata?.role || "").toLowerCase();
+    if (callerRole === "siswa" || callerRole === "ortu") {
+      return NextResponse.json(
+        { success: false, message: "Akses ditolak. Pengiriman pesan WhatsApp hanya diperbolehkan untuk staf sekolah (Admin/Guru/Bendahara)." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { phone, message, provider, token, domain } = body;
 

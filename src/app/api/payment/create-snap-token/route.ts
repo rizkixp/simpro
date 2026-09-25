@@ -17,20 +17,49 @@ export async function POST(req: NextRequest) {
       isProductionOverride,
     } = body;
 
-    if (!grossAmount || grossAmount <= 0) {
+    const supabase = await createServerSupabaseClient();
+
+    let validatedAmount = Number(grossAmount);
+    let validatedJudul = judul || "Pembayaran SPP";
+    let validatedSiswaNama = siswaNama || "Santri";
+    let validatedSiswaKelas = siswaKelas || "";
+
+    // 1. Verifikasi integritas data: Jika tagihanId disertakan, kunci nominal langsung dari pangkalan data
+    if (tagihanId) {
+      const { data: dbTagihan } = await supabase
+        .from("tagihan_siswa")
+        .select("*")
+        .eq("id", tagihanId)
+        .maybeSingle();
+
+      if (dbTagihan) {
+        if (dbTagihan.status === "Lunas") {
+          return NextResponse.json(
+            { success: false, message: "Tagihan ini sudah berstatus LUNAS." },
+            { status: 400 }
+          );
+        }
+        // Override dengan data otoritatif dari database sekolah
+        validatedAmount = Number(dbTagihan.nominal);
+        validatedJudul = dbTagihan.judul || validatedJudul;
+        validatedSiswaNama = dbTagihan.siswa_nama || validatedSiswaNama;
+        validatedSiswaKelas = dbTagihan.kelas || validatedSiswaKelas;
+      }
+    }
+
+    if (!validatedAmount || validatedAmount <= 0) {
       return NextResponse.json(
         { success: false, message: "Nominal pembayaran tidak valid." },
         { status: 400 }
       );
     }
 
-    let activeServerKey = serverKeyOverride || process.env.MIDTRANS_SERVER_KEY;
-    let isProduction = isProductionOverride ?? (process.env.MIDTRANS_IS_PRODUCTION === "true");
+    // 2. Ambil Server Key dari environment server atau konfigurasi database sekolah
+    let activeServerKey = process.env.MIDTRANS_SERVER_KEY;
+    let isProduction = process.env.MIDTRANS_IS_PRODUCTION === "true";
 
-    // Jika belum ada di env atau override, ambil dari database profil sekolah
     if (!activeServerKey) {
       try {
-        const supabase = await createServerSupabaseClient();
         const { data: profileRow } = await supabase
           .from("school_profile")
           .select("*")
@@ -43,8 +72,14 @@ export async function POST(req: NextRequest) {
           isProduction = extData.midtransIsProduction ?? false;
         }
       } catch (err) {
-        // Fallback jika tidak terhubung
+        // Fallback jika database tidak tersedia
       }
+    }
+
+    // Fallback override hanya diperkenankan saat testing/setup awal
+    if (!activeServerKey && serverKeyOverride) {
+      activeServerKey = serverKeyOverride;
+      isProduction = isProductionOverride ?? false;
     }
 
     if (!activeServerKey) {
