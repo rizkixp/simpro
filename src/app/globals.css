@@ -65,6 +65,61 @@
   background: #059669;
 }
 
+/* Native Android / iOS Touch & Animation Optimizations */
+button, a, [role="button"], input[type="button"], input[type="submit"] {
+  touch-action: manipulation;
+}
+
+button:active:not(:disabled), a:active:not([aria-disabled="true"]) {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Responsive Bottom Sheet: Slides up from bottom on mobile, centered modal on desktop */
+@media (max-width: 640px) {
+  .modal-bottom-sheet {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .modal-bottom-sheet > div {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 1.5rem !important;
+    border-top-right-radius: 1.5rem !important;
+    max-height: 92vh !important;
+    width: 100% !important;
+    animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  }
+}
+
 @media print {
   @page {
     margin: 10mm 15mm;

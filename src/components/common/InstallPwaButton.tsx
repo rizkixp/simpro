@@ -35,8 +35,13 @@ export default function InstallPwaButton() {
 
       {/* Manual Installation Guide Modal (for iOS or browsers waiting for prompt) */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200 modal-bottom-sheet">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-emerald-100 dark:border-emerald-900/50 overflow-hidden text-slate-800 dark:text-slate-100">
+            {/* Mobile Drag Handle */}
+            <div className="sm:hidden pt-2.5 pb-1 flex justify-center bg-gradient-to-r from-[#064e3b] to-emerald-800">
+              <div className="w-10 h-1 rounded-full bg-white/40" />
+            </div>
+
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-[#064e3b] to-emerald-800 p-5 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">

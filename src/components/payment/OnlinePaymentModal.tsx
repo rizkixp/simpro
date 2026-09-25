@@ -141,8 +141,13 @@ export function OnlinePaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 modal-bottom-sheet">
       <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden pt-2 pb-1 flex justify-center bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600">
+          <div className="w-10 h-1 rounded-full bg-white/40" />
+        </div>
+
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
