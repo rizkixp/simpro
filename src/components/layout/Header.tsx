@@ -30,22 +30,31 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 px-4 sm:px-8 flex items-center justify-between shadow-xs no-print">
       {/* Left section: Hamburger, Title & Hijri Date */}
-      <div className="flex items-center gap-3 sm:gap-5">
+      <div className="flex items-center gap-2.5 sm:gap-5 min-w-0">
         <button
           onClick={onToggleSidebar}
           aria-label="Toggle navigation menu"
-          className="lg:hidden p-2 rounded-xl text-emerald-900 dark:text-emerald-100 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors"
+          className="lg:hidden p-2 rounded-xl text-emerald-900 dark:text-emerald-100 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors shrink-0"
         >
           <Menu className="h-5 w-5" />
         </button>
 
-        <div className="hidden sm:block">
-          <h1 className="text-sm font-bold text-slate-800 dark:text-white leading-tight flex items-center gap-2">
-            {profile?.appName || "SIM SD Islam Smart School"}
-          </h1>
-          <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
-            {profile?.appTagline || profile?.namaSekolah || "Kurikulum Merdeka & Pendidikan Karakter Qur'ani"}
-          </p>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-xs shrink-0 sm:hidden overflow-hidden">
+            {profile?.appLogoUrl ? (
+              <img src={profile.appLogoUrl} alt="Logo" className="h-full w-full object-cover" />
+            ) : (
+              <span className="font-bold text-[10px] tracking-tight">SDI</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white leading-tight truncate">
+              {profile?.appName || "SIM SD Islam Smart School"}
+            </h1>
+            <p className="text-[10px] sm:text-[11px] text-emerald-700 dark:text-emerald-400 font-medium truncate">
+              {profile?.appTagline || profile?.namaSekolah || "Kurikulum Merdeka"}
+            </p>
+          </div>
         </div>
 
         {/* Islamic Hijri Chip */}

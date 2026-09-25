@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import IdleSessionTimeout from "@/components/common/IdleSessionTimeout";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
 
 export default function DashboardLayout({
   children,
@@ -90,13 +91,16 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0 lg:pl-72 transition-all duration-300">
         <Header onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>
 
       {/* Proteksi Keamanan: Inactivity Auto-Logout Timer (Bank-Grade PCI-DSS) */}
       <IdleSessionTimeout />
+
+      {/* Navigasi Mobile Native ala Google Play Store (Bottom App Bar) */}
+      <MobileBottomNav />
     </div>
   );
 }
