@@ -41,6 +41,18 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // 0. Akses ke Root URL `/`: langsung arahkan ke /dashboard (jika sudah login) atau /login (jika belum login)
+  if (pathname === "/") {
+    if (user) {
+      const role = (user.user_metadata?.role || "siswa").toLowerCase();
+      if (role === "bendahara") {
+        return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
+      }
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   // 1. Proteksi Halaman Dashboard
   if (pathname.startsWith("/dashboard")) {
     // Jika belum login, redirect ke halaman login
@@ -98,6 +110,7 @@ export const config = {
      * - static public files (svg, png, jpg, etc.)
      * - api routes that might be public
      */
+    "/",
     "/dashboard/:path*",
     "/login",
   ],
