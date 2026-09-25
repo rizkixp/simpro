@@ -50,6 +50,17 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState<number>(0);
+  const [timeoutNotice, setTimeoutNotice] = useState<boolean>(false);
+
+  // Cek apakah user diarahkan karena sesi inaktif (Bank-Grade Idle Timeout)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("reason") === "timeout") {
+        setTimeoutNotice(true);
+      }
+    }
+  }, []);
 
   // Monitor Rate Limit & Lockout countdown timer
   useEffect(() => {
@@ -227,6 +238,15 @@ export default function LoginPage() {
           </div>
 
           {/* Status Notifications */}
+          {timeoutNotice && (
+            <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200 text-xs flex items-center gap-2.5 shadow-sm animate-fadeIn">
+              <Clock className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>
+                <strong>Sesi Berakhir Otomatis:</strong> Anda telah keluar secara otomatis demi keamanan data sekolah karena tidak ada aktivitas selama 15 menit. Silakan masuk kembali.
+              </span>
+            </div>
+          )}
+
           {lockoutRemaining > 0 ? (
             <div className="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200 text-xs flex items-start gap-3 shadow-sm animate-pulse">
               <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />

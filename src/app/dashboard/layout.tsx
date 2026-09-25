@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import IdleSessionTimeout from "@/components/common/IdleSessionTimeout";
 
 export default function DashboardLayout({
   children,
@@ -93,6 +94,9 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* Proteksi Keamanan: Inactivity Auto-Logout Timer (Bank-Grade PCI-DSS) */}
+      <IdleSessionTimeout />
     </div>
   );
 }
