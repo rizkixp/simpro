@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SchoolDataProvider } from "@/contexts/SchoolDataContext";
 import { PwaManager } from "@/components/common/PwaManager";
+import SplashScreen from "@/components/common/SplashScreen";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -54,6 +55,7 @@ export default function RootLayout({
           <SchoolDataProvider>
             {children}
             <PwaManager />
+            <SplashScreen />
           </SchoolDataProvider>
         </AuthProvider>
       </body>
