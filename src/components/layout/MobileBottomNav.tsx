@@ -28,6 +28,7 @@ import {
   Sparkles,
   ChevronRight,
   Shield,
+  Search,
   UserCheck,
 } from "lucide-react";
 
@@ -238,6 +239,30 @@ export default function MobileBottomNav() {
 
             {/* Sheet Body: All App Modules Grid */}
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Quick Search Spotlight Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic();
+                  setIsDrawerOpen(false);
+                  window.dispatchEvent(new CustomEvent("open-command-palette"));
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/60 dark:to-teal-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-950 dark:text-emerald-100 font-semibold text-xs shadow-xs active:scale-98 transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-xl bg-emerald-600 text-white shadow-xs">
+                    <Search className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="text-left">
+                    <span className="block font-bold">Pencarian Universal</span>
+                    <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400 font-normal">Cari siswa, guru, modul & aksi cepat</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 text-[10px] font-bold shadow-2xs">
+                  Buka
+                </span>
+              </button>
+
               <div>
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                   Semua Fitur & Modul Aplikasi

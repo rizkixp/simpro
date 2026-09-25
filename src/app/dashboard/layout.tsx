@@ -7,6 +7,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import IdleSessionTimeout from "@/components/common/IdleSessionTimeout";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import CommandPalette from "@/components/common/CommandPalette";
 
 export default function DashboardLayout({
   children,
@@ -101,6 +102,9 @@ export default function DashboardLayout({
 
       {/* Navigasi Mobile Native ala Google Play Store (Bottom App Bar) */}
       <MobileBottomNav />
+
+      {/* Universal Command Center (Ctrl+K / Spotlight Search Cerdas) */}
+      <CommandPalette />
     </div>
   );
 }

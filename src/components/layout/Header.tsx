@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { UserRole } from "@/types/school";
-import { Menu, Bell, Shield, UserCheck, BookOpen, HeartHandshake, Wallet, Sparkles, Cloud, RefreshCw, Zap } from "lucide-react";
+import { Menu, Bell, Shield, UserCheck, BookOpen, HeartHandshake, Wallet, Sparkles, Cloud, RefreshCw, Zap, Search } from "lucide-react";
 import InstallPwaButton from "@/components/common/InstallPwaButton";
 
 interface HeaderProps {
@@ -127,10 +127,32 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             </span>
           </button>
         )}
+
+        {/* Universal Command Center Quick Trigger (Desktop) */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+          title="Buka Universal Command Center (Ctrl+K)"
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-500 dark:text-slate-400 text-xs font-medium transition-all group shadow-2xs cursor-pointer ml-1"
+        >
+          <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
+          <span className="hidden lg:inline text-slate-600 dark:text-slate-300">Cari siswa, guru, modul...</span>
+          <span className="inline lg:hidden text-slate-600 dark:text-slate-300">Cari...</span>
+          <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-500 dark:text-slate-400 shadow-2xs">
+            Ctrl K
+          </kbd>
+        </button>
       </div>
 
       {/* Right section: Instant Role Simulator & Profile */}
       <div className="flex items-center gap-2 sm:gap-4">
+        {/* Mobile Command Palette Trigger */}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+          title="Buka Pencarian Cepat"
+          className="sm:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors"
+        >
+          <Search className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+        </button>
         {/* Guru Homeroom Class Quick Switcher */}
         {user?.role === "guru" && teacherUsers.length > 0 && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs">
