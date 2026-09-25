@@ -1,0 +1,57 @@
+{
+  "packageId": "id.sekolah.simpro",
+  "host": "simpro.sekolah.id",
+  "name": "SIM Sekolah PRO",
+  "launcherName": "SDI Smart",
+  "themeColor": "#064e3b",
+  "navigationColor": "#04241b",
+  "navigationColorDark": "#022c22",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#064e3b",
+  "enableNotifications": true,
+  "startUrl": "/dashboard",
+  "iconUrl": "/icons/icon.svg",
+  "maskableIconUrl": "/icons/icon.svg",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "simpro"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Dashboard Utama",
+      "shortName": "Dashboard",
+      "url": "/dashboard",
+      "chosenIconUrl": "/icons/icon.svg"
+    },
+    {
+      "name": "Presensi Siswa",
+      "shortName": "Presensi",
+      "url": "/dashboard/presensi",
+      "chosenIconUrl": "/icons/icon.svg"
+    },
+    {
+      "name": "Pembayaran SPP",
+      "shortName": "SPP",
+      "url": "/dashboard/spp-transportasi",
+      "chosenIconUrl": "/icons/icon.svg"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false
+}

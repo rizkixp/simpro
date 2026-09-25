@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.sekolah.simpro",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7F:0F:5C:CD:71:02:E4:EB:16:8B:90:E5:5D:86:F1:69:B3:36:0B:03:77:E5:7A:B4:49:12:03:82:70",
+        "XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX"
+      ]
+    }
+  }
+]
