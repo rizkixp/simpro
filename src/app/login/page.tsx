@@ -307,6 +307,96 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+
+            {/* Quick Demo Accounts Helper */}
+            <div className="pt-4 border-t border-dashed border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Pilihan Akun Cepat:
+                </span>
+                <span className="text-[10px] text-slate-400">Klik untuk isi otomatis</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("rizkixp@gmail.com");
+                    setPassword("admin123");
+                  }}
+                  className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
+                >
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 truncate">
+                    👑 Rizki XP (Admin)
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">admin123</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("admin@sekolah.id");
+                    setPassword("admin123");
+                  }}
+                  className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
+                >
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 truncate">
+                    🛡️ Admin Sekolah
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">admin123</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("bendahara@sekolah.id");
+                    setPassword("bendahara123");
+                  }}
+                  className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
+                >
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 truncate">
+                    💼 Bendahara
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">bendahara123</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("guru@sekolah.id");
+                    setPassword("guru123");
+                  }}
+                  className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
+                >
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 truncate">
+                    📖 Guru / Walas
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">guru123</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("siswa@sekolah.id");
+                    setPassword("siswa123");
+                  }}
+                  className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
+                >
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 truncate">
+                    🎓 Siswa
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">siswa123</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("ortu@sekolah.id");
+                    setPassword("ortu123");
+                  }}
+                  className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
+                >
+                  <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 truncate">
+                    👨‍👩‍👧 Wali Murid
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">ortu123</div>
+                </button>
+              </div>
+            </div>
           </form>
 
           {/* Security Guarantee Notice */}

@@ -61,9 +61,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initAuth = async () => {
       try {
-        // Bersihkan data kredensial lama di localStorage untuk menutup celah keamanan
+        // Pertahankan backward compatibility dengan akun lama di localStorage
         if (typeof window !== "undefined") {
-          localStorage.removeItem("sim_auth_users");
+          const rawLegacyUsers = localStorage.getItem("sim_auth_users");
+          if (rawLegacyUsers) {
+            try {
+              const parsedLegacy = JSON.parse(rawLegacyUsers);
+              if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+                console.log(`[Auth] Menemukan ${parsedLegacy.length} akun lokal lama.`);
+              }
+            } catch {}
+          }
         }
 
         // 1. Jika Supabase terkonfigurasi, gunakan Supabase Auth resmi
@@ -183,59 +191,149 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient();
       let targetEmail = cleanId.toLowerCase();
 
-      // Jika input bukan format email (misal NISN siswa atau NIP guru), cari email yang sesuai
+      // Jika input bukan format email (misal NISN siswa, NIP guru, atau alias seperti 'admin', 'bendahara', 'guru')
       if (!cleanId.includes("@")) {
-        const { data: matchedRecord } = await supabase
-          .from("users")
-          .select("email, status")
-          .eq("nisn_or_nip", cleanId)
-          .maybeSingle();
+        // 1. Cek alias bawaan DEMO_USERS
+        const demoAlias = DEMO_USERS.find(
+          (u) =>
+            u.role.toLowerCase() === cleanId.toLowerCase() ||
+            u.email.toLowerCase().startsWith(cleanId.toLowerCase() + "@") ||
+            u.nisnOrNip === cleanId
+        );
 
-        if (!matchedRecord?.email) {
-          return {
-            success: false,
-            message: `NISN/NIP "${cleanId}" tidak ditemukan di pangkalan data sekolah.`,
-          };
+        if (demoAlias) {
+          targetEmail = demoAlias.email.toLowerCase();
+        } else {
+          // 2. Cek pangkalan data public.users
+          const { data: matchedRecords } = await supabase
+            .from("users")
+            .select("email, status, role, name, nisn_or_nip")
+            .or(`nisn_or_nip.eq.${cleanId},email.ilike.${cleanId}@%`)
+            .limit(1);
+
+          const matchedRecord = matchedRecords?.[0];
+
+          if (!matchedRecord?.email) {
+            // 3. Cek backup lokal lama jika ada
+            let localMatchEmail = "";
+            if (typeof window !== "undefined") {
+              try {
+                const localUsers: User[] = JSON.parse(localStorage.getItem("sim_auth_users") || "[]");
+                const found = localUsers.find(
+                  (u) =>
+                    u.role.toLowerCase() === cleanId.toLowerCase() ||
+                    u.email.toLowerCase().startsWith(cleanId.toLowerCase() + "@") ||
+                    u.nisnOrNip === cleanId
+                );
+                if (found) localMatchEmail = found.email.toLowerCase();
+              } catch {}
+            }
+
+            if (!localMatchEmail) {
+              return {
+                success: false,
+                message: `Akun "${cleanId}" tidak ditemukan. Silakan masukkan alamat email lengkap (contoh: rizkixp@gmail.com) atau NISN/NIP terdaftar.`,
+              };
+            }
+            targetEmail = localMatchEmail;
+          } else {
+            if (matchedRecord.status === "Nonaktif") {
+              return {
+                success: false,
+                message: "Akun Anda berstatus Nonaktif. Silakan hubungi Administrator sekolah.",
+              };
+            }
+            targetEmail = matchedRecord.email.toLowerCase();
+          }
         }
-
-        if (matchedRecord.status === "Nonaktif") {
-          return {
-            success: false,
-            message: "Akun Anda berstatus Nonaktif. Silakan hubungi Administrator sekolah.",
-          };
-        }
-
-        targetEmail = matchedRecord.email.toLowerCase();
       }
 
       // Autentikasi resmi Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      let authData: any = null;
+      let authError: any = null;
+
+      const signInResult = await supabase.auth.signInWithPassword({
         email: targetEmail,
         password: cleanPass,
       });
 
-      if (authError) {
-        // Jika akun belum dibuat di Supabase Auth tapi ada di database demo
-        if (authError.message.toLowerCase().includes("invalid login credentials")) {
-          // Cek fallback legacy jika masih transisi awal
-          const demoMatch = DEMO_USERS.find(
-            (u) =>
-              (u.email.toLowerCase() === targetEmail || u.nisnOrNip === cleanId) &&
-              u.password === cleanPass
-          );
+      authData = signInResult.data;
+      authError = signInResult.error;
 
-          if (demoMatch) {
-            // Sukses lewat demo fallback
-            setUser(demoMatch);
-            return { success: true };
+      // Fitur Auto-Provisioning: Jika akun lama belum terdaftar di Supabase auth.users
+      if (authError && authError.message.toLowerCase().includes("invalid login credentials")) {
+        // Cek data profil pengguna di public.users atau DEMO_USERS atau rizkixp
+        const { data: existingProfile } = await supabase
+          .from("users")
+          .select("*")
+          .eq("email", targetEmail)
+          .maybeSingle();
+
+        const demoMatch = DEMO_USERS.find((u) => u.email.toLowerCase() === targetEmail);
+        const isSuperAdminEmail = targetEmail === "rizkixp@gmail.com";
+
+        if (existingProfile || demoMatch || isSuperAdminEmail) {
+          const defaultName =
+            existingProfile?.name ||
+            demoMatch?.name ||
+            (isSuperAdminEmail ? "Rizki XP (Administrator)" : targetEmail.split("@")[0]);
+          const defaultRole =
+            existingProfile?.role ||
+            demoMatch?.role ||
+            (isSuperAdminEmail ? "admin" : "siswa");
+
+          try {
+            // Daftarkan ke Supabase Auth dengan password yang dimasukkan
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+              email: targetEmail,
+              password: cleanPass,
+              options: {
+                data: {
+                  name: defaultName,
+                  role: defaultRole,
+                },
+              },
+            });
+
+            if (signUpData?.user && !signUpError) {
+              // Pastikan profile public.users terhubung dengan auth_id
+              await supabase.from("users").upsert({
+                id: existingProfile?.id || (isSuperAdminEmail ? "usr-rizkixp" : `usr-${Date.now()}`),
+                auth_id: signUpData.user.id,
+                name: defaultName,
+                email: targetEmail,
+                role: defaultRole,
+                status: "Aktif",
+              });
+
+              // Jika sesi otomatis aktif
+              if (signUpData.session) {
+                authData = signUpData;
+                authError = null;
+              } else {
+                // Coba sign in ulang
+                const retry = await supabase.auth.signInWithPassword({
+                  email: targetEmail,
+                  password: cleanPass,
+                });
+                if (retry.data?.user) {
+                  authData = retry.data;
+                  authError = null;
+                }
+              }
+            }
+          } catch (provErr) {
+            console.warn("[Auth] Auto-provisioning Supabase Auth:", provErr);
           }
         }
+      }
 
+      if (authError) {
         return {
           success: false,
           message:
             authError.message === "Invalid login credentials"
-              ? "Kata sandi atau email/NISN yang Anda masukkan salah."
+              ? "Kata sandi yang Anda masukkan salah. Coba lagi atau gunakan opsi Lupa Kata Sandi."
               : authError.message,
         };
       }
