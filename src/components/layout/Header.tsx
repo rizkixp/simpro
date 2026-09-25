@@ -208,6 +208,8 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           <img
             src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
             alt={user?.name || "Avatar"}
+            loading="lazy"
+            decoding="async"
             className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
           />
           <div className="hidden xl:block text-left">

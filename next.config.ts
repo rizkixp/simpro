@@ -40,12 +40,35 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   async headers() {
     return [
       {
         // Terapkan header keamanan ini ke semua rute di seluruh aplikasi
         source: "/:path*",
         headers: securityHeaders,
+      },
+      {
+        // Cache abadi (1 tahun) untuk bundle JS/CSS hasil build Next.js
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // Cache aset ikon dan splash screen statis
+        source: "/icons/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
       },
     ];
   },

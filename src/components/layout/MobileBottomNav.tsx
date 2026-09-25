@@ -207,6 +207,8 @@ export default function MobileBottomNav() {
                 <img
                   src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`}
                   alt={user.name}
+                  loading="lazy"
+                  decoding="async"
                   className="h-10 w-10 rounded-2xl object-cover ring-2 ring-emerald-500/30"
                 />
                 <div className="min-w-0">

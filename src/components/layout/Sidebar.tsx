@@ -208,6 +208,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <img
               src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
               alt={user?.name || "User"}
+              loading="lazy"
+              decoding="async"
               className="w-10 h-10 rounded-full object-cover ring-2 ring-amber-400/60 shadow-sm"
             />
             <div className="min-w-0 flex-1">
