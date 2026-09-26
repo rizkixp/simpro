@@ -12,8 +12,13 @@ export default function SplashScreen() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Periksa apakah pengguna baru pertama kali membuka aplikasi pada sesi ini
-    const hasShown = sessionStorage.getItem("sim_splash_shown");
+    let hasShown = false;
+    try {
+      hasShown = Boolean(sessionStorage.getItem("sim_splash_shown"));
+    } catch {
+      hasShown = false;
+    }
+
     if (!hasShown) {
       setIsVisible(true);
 
@@ -23,13 +28,24 @@ export default function SplashScreen() {
         // Hapus elemen setelah animasi fade-out selesai
         const removeTimer = setTimeout(() => {
           setIsVisible(false);
-          sessionStorage.setItem("sim_splash_shown", "true");
+          try {
+            sessionStorage.setItem("sim_splash_shown", "true");
+          } catch {}
         }, 600);
 
         return () => clearTimeout(removeTimer);
       }, 1400);
 
-      return () => clearTimeout(timer);
+      // Hard timeout pengaman absolut (maksimum 2.2 detik)
+      const hardSafetyTimer = setTimeout(() => {
+        setIsFading(true);
+        setIsVisible(false);
+      }, 2200);
+
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(hardSafetyTimer);
+      };
     }
   }, []);
 

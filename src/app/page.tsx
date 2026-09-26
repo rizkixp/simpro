@@ -29,6 +29,16 @@ export default function HomePage() {
   const { profile } = useSchoolData();
   const [isDemoLoading, setIsDemoLoading] = useState(false);
 
+  React.useEffect(() => {
+    if (user) {
+      if (user.role === "bendahara") {
+        router.replace("/dashboard/spp-transportasi");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [user, router]);
+
   const appName = profile?.appName || "SIM SD Islam Smart School";
   const appTagline = profile?.appTagline || profile?.namaSekolah || "Sistem Informasi Manajemen Sekolah Islam Terpadu";
   const appLogoUrl = profile?.appLogoUrl;

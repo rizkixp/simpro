@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import IdleSessionTimeout from "@/components/common/IdleSessionTimeout";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import CommandPalette from "@/components/common/CommandPalette";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
 
 export default function DashboardLayout({
   children,
@@ -22,7 +23,14 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!isLoading) {
       if (!user) {
-        router.push("/login");
+        // Hapus cookie sesi aplikasi di client seketika untuk mencegah redirect loop dengan middleware
+        if (typeof document !== "undefined") {
+          document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+        }
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("sim_auth_user");
+          window.location.replace("/login?redirectTo=" + encodeURIComponent(pathname));
+        }
         return;
       }
       // 1. Proteksi Halaman Khusus Administrator
@@ -68,43 +76,43 @@ export default function DashboardLayout({
     }
   }, [user, isLoading, pathname, router]);
 
-  if (isLoading) {
+  if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-[#f8faf9] dark:bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Memuat SIM SD Islam Smart School...</p>
+          <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+            {isLoading ? "Memuat SIM SD Islam Smart School..." : "Mengalihkan ke halaman login..."}
+          </p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-[#f8faf9] dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
-      {/* Sidebar */}
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+    <ErrorBoundary fallbackTitle="Kendala Memuat Modul Dashboard" fallbackMessage="Terjadi kendala saat merender komponen dashboard. Muat ulang halaman untuk menyegarkan tampilan.">
+      <div className="min-h-screen bg-[#f8faf9] dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
+        {/* Sidebar */}
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-72 transition-all duration-300">
-        <Header onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 lg:pl-72 transition-all duration-300">
+          <Header onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 max-w-7xl w-full mx-auto">
-          {children}
-        </main>
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 max-w-7xl w-full mx-auto">
+            {children}
+          </main>
+        </div>
+
+        {/* Proteksi Keamanan: Inactivity Auto-Logout Timer (Bank-Grade PCI-DSS) */}
+        <IdleSessionTimeout />
+
+        {/* Navigasi Mobile Native ala Google Play Store (Bottom App Bar) */}
+        <MobileBottomNav />
+
+        {/* Universal Command Center (Ctrl+K / Spotlight Search Cerdas) */}
+        <CommandPalette />
       </div>
-
-      {/* Proteksi Keamanan: Inactivity Auto-Logout Timer (Bank-Grade PCI-DSS) */}
-      <IdleSessionTimeout />
-
-      {/* Navigasi Mobile Native ala Google Play Store (Bottom App Bar) */}
-      <MobileBottomNav />
-
-      {/* Universal Command Center (Ctrl+K / Spotlight Search Cerdas) */}
-      <CommandPalette />
-    </div>
+    </ErrorBoundary>
   );
 }

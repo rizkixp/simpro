@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SchoolDataProvider } from "@/contexts/SchoolDataContext";
 import { PwaManager } from "@/components/common/PwaManager";
 import SplashScreen from "@/components/common/SplashScreen";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -51,13 +52,15 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={`h-full antialiased font-sans bg-slate-50 text-slate-900 selection:bg-emerald-700 selection:text-white ${plusJakartaSans.className}`}>
-        <AuthProvider>
-          <SchoolDataProvider>
-            {children}
-            <PwaManager />
-            <SplashScreen />
-          </SchoolDataProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <SchoolDataProvider>
+              {children}
+              <PwaManager />
+              <SplashScreen />
+            </SchoolDataProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

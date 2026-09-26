@@ -77,13 +77,29 @@ export default function DashboardOverviewPage() {
   const sppLunas = sppList.filter((s) => s.status === "Lunas");
   const totalSppTerkumpul = sppLunas.reduce((acc, curr) => acc + curr.nominal, 0);
 
-  // Student specific data (if role is siswa or ortu)
+  // Student specific data (if role is siswa or ortu) with guaranteed fallback
+  const fallbackStudent = {
+    id: "sis-default",
+    nisn: user?.nisnOrNip || "0012345678",
+    nama: user?.name || "Ahmad Rizky Pratama",
+    kelas: user?.kelas || "6",
+    jenisKelamin: "L" as const,
+    status: "Aktif" as const,
+    avatar:
+      user?.avatar ||
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
+    namaWali: "Wali Santri",
+    noHpWali: "0812-3456-7890",
+  };
+
   const currentSiswa =
-    siswaList.find(
+    (siswaList || []).find(
       (s) =>
         (user?.nisnOrNip && s.nisn === user.nisnOrNip) ||
         s.nama.toLowerCase().includes("ahmad rizky")
-    ) || siswaList[0];
+    ) ||
+    (siswaList && siswaList[0]) ||
+    fallbackStudent;
 
   // Interactive Buku Penghubung State (Parent Portal)
   const [bukuPenghubungList, setBukuPenghubungList] = useState<
@@ -170,10 +186,10 @@ export default function DashboardOverviewPage() {
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span>Portal Khusus Wali Santri (Parent Portal)</span>
                 <span className="text-emerald-400/40">•</span>
-                <span className="text-amber-300 font-medium">TA {profile.tahunAjaranAktif} Ganjil</span>
+                <span className="text-amber-300 font-medium">TA {profile?.tahunAjaranAktif || "2024/2025"} Ganjil</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                Ahlan wa Sahlan, {user?.name}
+                Ahlan wa Sahlan, {user?.name || "Wali Santri"}
                 <span className="text-amber-300">🌿</span>
               </h1>
               <p className="mt-2 text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
@@ -184,17 +200,17 @@ export default function DashboardOverviewPage() {
             {/* Quick Summary Pill Card Ananda */}
             <div className="bg-emerald-950/60 backdrop-blur-md border border-emerald-400/30 p-4 rounded-2xl flex items-center gap-3.5 shadow-lg shrink-0">
               <img
-                src={currentSiswa.avatar}
-                alt={currentSiswa.nama}
+                src={currentSiswa?.avatar || fallbackStudent.avatar}
+                alt={currentSiswa?.nama || fallbackStudent.nama}
                 className="w-14 h-14 rounded-xl object-cover ring-2 ring-amber-400 shadow-md bg-white/10"
               />
               <div>
                 <span className="text-[10px] uppercase font-bold text-amber-300 block tracking-wider">
                   Ananda Tercinta
                 </span>
-                <p className="font-bold text-base text-white">{currentSiswa.nama}</p>
+                <p className="font-bold text-base text-white">{currentSiswa?.nama || fallbackStudent.nama}</p>
                 <p className="text-xs text-emerald-200 font-medium">
-                  Kelas <strong>{currentSiswa.kelas}</strong> &bull; NISN: <span className="font-mono">{currentSiswa.nisn}</span>
+                  Kelas <strong>{currentSiswa?.kelas || fallbackStudent.kelas}</strong> &bull; NISN: <span className="font-mono">{currentSiswa?.nisn || fallbackStudent.nisn}</span>
                 </p>
               </div>
             </div>
@@ -573,7 +589,7 @@ export default function DashboardOverviewPage() {
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-slate-900 dark:text-white">Ustadzah Siti Nurhaliza, M.Si.</h4>
-                  <p className="text-xs text-emerald-800/80 font-medium">Wali Kelas {currentSiswa.kelas}</p>
+                  <p className="text-xs text-emerald-800/80 font-medium">Wali Kelas {currentSiswa?.kelas || fallbackStudent.kelas}</p>
                 </div>
               </div>
 
@@ -948,13 +964,13 @@ export default function DashboardOverviewPage() {
               </p>
               <div className="flex items-center gap-3 mb-4">
                 <img
-                  src={currentSiswa.avatar}
-                  alt={currentSiswa.nama}
+                  src={currentSiswa?.avatar || fallbackStudent.avatar}
+                  alt={currentSiswa?.nama || fallbackStudent.nama}
                   className="w-12 h-12 rounded-2xl object-cover ring-2 ring-emerald-500/40 shadow-sm"
                 />
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{currentSiswa.nama}</h4>
-                  <p className="text-xs text-emerald-800/80 font-medium">NISN: {currentSiswa.nisn} • {currentSiswa.kelas}</p>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{currentSiswa?.nama || fallbackStudent.nama}</h4>
+                  <p className="text-xs text-emerald-800/80 font-medium">NISN: {currentSiswa?.nisn || fallbackStudent.nisn} • {currentSiswa?.kelas || fallbackStudent.kelas}</p>
                 </div>
               </div>
 

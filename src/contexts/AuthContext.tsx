@@ -113,7 +113,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(appUser);
           } else if (isMounted) {
             // Cek apakah ada sesi aplikasi tersimpan (akun database dengan password hash)
-            const savedUser = typeof window !== "undefined" ? localStorage.getItem("sim_auth_user") : null;
+            let savedUser = typeof window !== "undefined" ? localStorage.getItem("sim_auth_user") : null;
+            // Jika tidak ada di localStorage, cek apakah ada cookie sim_session tersimpan
+            if (!savedUser && typeof document !== "undefined") {
+              const match = document.cookie.match(/(?:^|; )sim_session=([^;]*)/);
+              if (match && match[1]) {
+                try {
+                  savedUser = decodeURIComponent(match[1]);
+                } catch {
+                  savedUser = match[1];
+                }
+              }
+            }
+
             if (savedUser) {
               try {
                 const parsed = JSON.parse(savedUser);
@@ -136,9 +148,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                       status: (dbUser.status || "Aktif") as "Aktif" | "Nonaktif",
                     };
                     setUser(restoredUser);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("sim_auth_user", JSON.stringify(restoredUser));
+                    }
                   } else if (dbUser && dbUser.status === "Nonaktif") {
                     setUser(null);
-                    localStorage.removeItem("sim_auth_user");
+                    if (typeof window !== "undefined") {
+                      localStorage.removeItem("sim_auth_user");
+                    }
+                    if (typeof document !== "undefined") {
+                      document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+                    }
                   } else {
                     // Jika belum terdaftar di DB cloud, cek apakah akun DEMO_USERS atau sesi lokal aktif
                     const demoMatch = DEMO_USERS.find(
@@ -147,22 +167,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         (parsed.email && u.email.toLowerCase() === parsed.email.toLowerCase())
                     );
                     if (demoMatch && demoMatch.status !== "Nonaktif") {
-                      setUser({ ...demoMatch, ...parsed });
+                      const restoredUser = { ...demoMatch, ...parsed };
+                      setUser(restoredUser);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("sim_auth_user", JSON.stringify(restoredUser));
+                      }
                     } else if (parsed.status !== "Nonaktif") {
                       setUser(parsed);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("sim_auth_user", JSON.stringify(parsed));
+                      }
                     } else {
                       setUser(null);
-                      localStorage.removeItem("sim_auth_user");
+                      if (typeof window !== "undefined") {
+                        localStorage.removeItem("sim_auth_user");
+                      }
+                      if (typeof document !== "undefined") {
+                        document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+                      }
                     }
                   }
                 } else {
                   setUser(null);
+                  if (typeof document !== "undefined") {
+                    document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+                  }
                 }
               } catch {
                 setUser(null);
+                if (typeof document !== "undefined") {
+                  document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+                }
               }
             } else {
               setUser(null);
+              if (typeof document !== "undefined") {
+                document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+              }
             }
           }
 
@@ -223,12 +264,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         } else {
           // Fallback Offline / Mock Demo Mode
-          const savedUser = typeof window !== "undefined" ? localStorage.getItem("sim_auth_user") : null;
+          let savedUser = typeof window !== "undefined" ? localStorage.getItem("sim_auth_user") : null;
+          if (!savedUser && typeof document !== "undefined") {
+            const match = document.cookie.match(/(?:^|; )sim_session=([^;]*)/);
+            if (match && match[1]) {
+              try {
+                savedUser = decodeURIComponent(match[1]);
+              } catch {
+                savedUser = match[1];
+              }
+            }
+          }
           if (savedUser && isMounted) {
             try {
-              setUser(JSON.parse(savedUser));
+              const parsed = JSON.parse(savedUser);
+              setUser(parsed);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("sim_auth_user", JSON.stringify(parsed));
+              }
             } catch {
               setUser(null);
+              if (typeof document !== "undefined") {
+                document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+              }
+            }
+          } else if (isMounted) {
+            setUser(null);
+            if (typeof document !== "undefined") {
+              document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
             }
           }
           if (isMounted) {

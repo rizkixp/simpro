@@ -154,10 +154,24 @@ export default function TabunganSiswaPage() {
   });
 
   // Student Specific View (for student / ortu login)
+  const fallbackStudent = {
+    id: "sis-default",
+    nisn: user?.nisnOrNip || "0012345678",
+    nama: user?.name || "Ahmad Rizky Pratama",
+    kelas: user?.kelas || "6",
+    jenisKelamin: "L" as const,
+    status: "Aktif" as const,
+    avatar:
+      user?.avatar ||
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
+    namaWali: "Wali Santri",
+    noHpWali: "0812-3456-7890",
+  };
+
   const currentSiswa =
-    siswaList.find(
-      (s) => s.nisn === user?.nisnOrNip || s.nama.toLowerCase().includes("ahmad rizky")
-    ) || siswaList[0];
+    (siswaList || []).find(
+      (s) => (user?.nisnOrNip && s.nisn === user.nisnOrNip) || s.nama.toLowerCase().includes("ahmad rizky")
+    ) || (siswaList && siswaList[0]) || fallbackStudent;
   const currentStudentTabungan =
     tabunganList.find((t) => t.siswaId === currentSiswa.id) || {
       id: "tab-temp",
