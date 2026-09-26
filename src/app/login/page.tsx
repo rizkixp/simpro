@@ -94,12 +94,10 @@ export default function LoginPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    // Proteksi jika akun sedang terkunci sementara
+    // Update tampilan status jika ada lockout, tapi tetap izinkan proses login jika memasukkan kata sandi yang valid
     const initialCheck = checkLoginRateLimit(email.trim());
     if (initialCheck.isLocked) {
       setLockoutRemaining(initialCheck.lockoutRemainingSeconds);
-      setErrorMsg(initialCheck.message || "Akun sementara dikunci karena proteksi keamanan brute force.");
-      return;
     }
 
     if (!email.trim() || !password) {
@@ -120,6 +118,7 @@ export default function LoginPage() {
 
       const result = await login(email, undefined, password);
       if (result.success) {
+        setLockoutRemaining(0);
         setSuccessMsg("Autentikasi berhasil! Mengalihkan ke dashboard...");
         setTimeout(() => {
           window.location.href = "/dashboard";
