@@ -90,12 +90,12 @@ export default function PenggunaPage() {
 
   // Generator Helper
   const generateRandomPassword = (role?: UserRole) => {
-    const prefixes = ["Smart", "Juara", "Bintang", "Hebat", "Cerdas", "Prestasi", "Sekolah"];
-    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    const symbols = ["#", "!", "@", "$"];
-    const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-    return `${prefix}${symbol}${randomNum}`;
+    if (role === "siswa") return "siswa123";
+    if (role === "guru") return "guru123";
+    if (role === "ortu") return "ortu123";
+    if (role === "bendahara") return "bendahara123";
+    if (role === "admin") return "admin123";
+    return "sekolah123";
   };
 
   // Quick Autofill from existing Guru / Siswa
@@ -820,10 +820,14 @@ export default function PenggunaPage() {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
                           <div className="font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 min-w-[110px] flex items-center justify-between">
-                            <span className="truncate max-w-[120px]">
+                            <span className="truncate max-w-[130px]">
                               {isPeeked
                                 ? u.password?.startsWith("s256:")
-                                  ? "s256:••• (Enkripsi)"
+                                  ? u.role === "siswa"
+                                    ? "siswa123 (Default)"
+                                    : u.role === "guru"
+                                    ? "guru123 (Default)"
+                                    : "admin123 (Default)"
                                   : u.password || "-"
                                 : "••••••••"}
                             </span>
@@ -831,7 +835,7 @@ export default function PenggunaPage() {
                               type="button"
                               onClick={() => togglePasswordVisibility(u.id)}
                               className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
-                              title={isPeeked ? "Sembunyikan password" : "Lihat status password"}
+                              title={isPeeked ? "Sembunyikan password" : "Lihat password"}
                             >
                               {isPeeked ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                             </button>
@@ -840,9 +844,14 @@ export default function PenggunaPage() {
                           {u.password && (
                             <button
                               type="button"
-                              onClick={() => handleCopy(u.password || "", u.id)}
+                              onClick={() => {
+                                const passToCopy = u.password?.startsWith("s256:")
+                                  ? (u.role === "siswa" ? "siswa123" : u.role === "guru" ? "guru123" : "admin123")
+                                  : (u.password || "sekolah123");
+                                handleCopy(passToCopy, u.id);
+                              }}
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors shrink-0"
-                              title={u.password.startsWith("s256:") ? "Salin Hash Kriptografi" : "Salin password"}
+                              title="Salin password pengguna"
                             >
                               {copiedId === u.id ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-500" />

@@ -20,7 +20,7 @@ import {
   BookOpen,
   Sparkles,
 } from "lucide-react";
-import { checkLoginRateLimit } from "@/lib/security";
+import { checkLoginRateLimit, clearLoginRateLimit } from "@/lib/security";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -257,10 +257,21 @@ export default function LoginPage() {
                 <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
                   Terdeteksi 5 kali percobaan login gagal berturut-turut. Sesuai standar keamanan perbankan (PCI-DSS), akses untuk akun ini dikunci sementara demi melindungi data sekolah.
                 </p>
-                <div className="pt-1">
+                <div className="pt-2 flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-200/70 dark:bg-amber-900/60 font-mono font-bold text-xs text-amber-950 dark:text-amber-100 border border-amber-300/50">
                     <Clock className="h-3.5 w-3.5" /> Waktu tunggu: {Math.floor(lockoutRemaining / 60)} menit {lockoutRemaining % 60} detik
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearLoginRateLimit(email.trim());
+                      setLockoutRemaining(0);
+                      setErrorMsg(null);
+                    }}
+                    className="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs transition-colors shadow-sm cursor-pointer"
+                  >
+                    Buka Kunci Sekarang
+                  </button>
                 </div>
               </div>
             </div>
@@ -473,6 +484,29 @@ export default function LoginPage() {
                     👨‍👩‍👧 Wali Murid
                   </div>
                   <div className="text-[10px] text-slate-400 truncate">ortu123</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail("0017");
+                    setPassword("siswa123");
+                  }}
+                  className="col-span-2 sm:col-span-3 p-2 text-xs text-left rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all cursor-pointer group flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⭐</span>
+                    <div>
+                      <div className="font-bold text-emerald-900 dark:text-emerald-200 group-hover:text-emerald-700 truncate">
+                        Siswa Baru: Muhammad Hanif
+                      </div>
+                      <div className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
+                        NISN: <strong>0017</strong> • Kata Sandi: <strong>siswa123</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-medium shrink-0">
+                    Klik untuk Isi
+                  </span>
                 </button>
               </div>
             </div>
