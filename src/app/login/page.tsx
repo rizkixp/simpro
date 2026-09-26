@@ -122,8 +122,8 @@ export default function LoginPage() {
       if (result.success) {
         setSuccessMsg("Autentikasi berhasil! Mengalihkan ke dashboard...");
         setTimeout(() => {
-          router.push("/dashboard");
-        }, 400);
+          window.location.href = "/dashboard";
+        }, 300);
       } else {
         setErrorMsg(result.message || "Gagal masuk. Periksa kembali email atau kata sandi Anda.");
         const status = checkLoginRateLimit(email.trim());
