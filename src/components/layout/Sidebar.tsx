@@ -269,11 +269,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
 
           <button
-            onClick={() => {
-              logout();
-              window.location.href = "/login";
+            type="button"
+            onClick={async () => {
+              await logout();
+              window.location.href = "/login?logout=true";
             }}
-            className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-950/50 border border-rose-900/30 transition-all"
+            className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-950/50 border border-rose-900/30 transition-all cursor-pointer"
           >
             <LogOut className="h-4 w-4" />
             <span>Keluar Sesi (Logout)</span>

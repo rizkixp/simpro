@@ -48,9 +48,9 @@ export default function IdleSessionTimeout() {
     } catch (err) {
       console.warn("Gagal logout otomatis:", err);
     } finally {
-      router.push("/login?reason=timeout");
+      window.location.href = "/login?reason=timeout&logout=true";
     }
-  }, [logout, router]);
+  }, [logout]);
 
   // Reset Sesi Manual (Tombol "Lanjutkan Sesi")
   const handleExtendSession = () => {
@@ -71,7 +71,7 @@ export default function IdleSessionTimeout() {
       localStorage.removeItem(STORAGE_KEY);
       await logout();
     } finally {
-      router.push("/login");
+      window.location.href = "/login?logout=true";
     }
   };
 

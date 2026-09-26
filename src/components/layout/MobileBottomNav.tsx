@@ -343,9 +343,10 @@ export default function MobileBottomNav() {
 
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setIsDrawerOpen(false);
-                    logout();
+                    await logout();
+                    window.location.href = "/login?logout=true";
                   }}
                   className="flex items-center gap-2 text-xs font-semibold text-rose-600 hover:text-rose-700 p-2 cursor-pointer"
                 >

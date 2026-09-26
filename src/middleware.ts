@@ -121,12 +121,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 5. Jika sudah login tetapi membuka /login, redirect ke dashboard
-  if (pathname === "/login" && effectiveUser) {
-    if (role === "bendahara") {
-      return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
+  // 5. Jika membuka /login
+  if (pathname === "/login") {
+    // Jika ada parameter logout, hapus cookie sesi seketika dan izinkan akses ke form login
+    if (request.nextUrl.searchParams.get("logout") === "true") {
+      response.cookies.set("sim_session", "", { path: "/", maxAge: 0 });
+      return response;
     }
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+
+    // Jika sudah login dan tidak dalam proses logout, redirect ke dashboard
+    if (effectiveUser) {
+      if (role === "bendahara") {
+        return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
+      }
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
   }
 
   return response;

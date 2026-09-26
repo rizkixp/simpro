@@ -613,11 +613,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    // 1. Hapus cookie sesi aplikasi di client seketika (0 ms)
+    if (typeof document !== "undefined") {
+      document.cookie = "sim_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0;";
+    }
+
+    // 2. Hapus data pengguna lokal
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("sim_auth_user");
+    }
+
+    // 3. Reset state React
+    setUser(null);
+
+    // 4. Hapus cookie sesi di server HTTP
     try {
       await fetch("/api/auth/session", { method: "DELETE" });
     } catch (err) {
       console.warn("Peringatan hapus session cookie:", err);
     }
+
+    // 5. Sign out dari Supabase Auth
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
@@ -625,10 +641,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.warn("Peringatan sign out Supabase:", err);
       }
-    }
-    setUser(null);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("sim_auth_user");
     }
   };
 

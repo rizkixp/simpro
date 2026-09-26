@@ -24,7 +24,7 @@ import { checkLoginRateLimit, clearLoginRateLimit } from "@/lib/security";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, login } = useAuth();
+  const { user, login, logout } = useAuth();
   const { profile } = useSchoolData();
 
   const appName = profile?.appName || "SIM SDI Islamic";
@@ -33,6 +33,12 @@ export default function LoginPage() {
   const appIconPreset = profile?.appIconPreset || "graduation";
 
   useEffect(() => {
+    // Jika URL membawa ?logout=true, bersihkan sesi lama dan jangan redirect ke dashboard
+    if (typeof window !== "undefined" && window.location.search.includes("logout")) {
+      logout();
+      return;
+    }
+
     if (user) {
       if (user.role === "bendahara") {
         router.push("/dashboard/spp-transportasi");
@@ -40,7 +46,7 @@ export default function LoginPage() {
         router.push("/dashboard");
       }
     }
-  }, [user, router]);
+  }, [user, router, logout]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

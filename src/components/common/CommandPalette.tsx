@@ -319,9 +319,10 @@ export default function CommandPalette() {
         icon: LogOut,
         badge: "Keamanan",
         color: "text-rose-600 bg-rose-50 dark:bg-rose-950/60 border-rose-200",
-        action: () => {
+        action: async () => {
           setIsOpen(false);
-          logout();
+          await logout();
+          window.location.href = "/login?logout=true";
         },
         category: "aksi",
       },
