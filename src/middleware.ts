@@ -34,17 +34,32 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  // Ambil user dari Supabase Auth
+  // 1. Ambil user dari Supabase Auth
   const {
-    data: { user },
+    data: { user: supabaseUser },
   } = await supabase.auth.getUser();
+
+  // 2. Ambil sesi aplikasi terverifikasi dari cookie (sim_session)
+  const sessionCookie = request.cookies.get("sim_session")?.value;
+  let appUser: { id: string; role: string; email: string; name?: string } | null = null;
+  if (sessionCookie) {
+    try {
+      appUser = JSON.parse(decodeURIComponent(sessionCookie));
+    } catch {}
+  }
+
+  const effectiveUser = supabaseUser || appUser;
+  const role = (
+    supabaseUser?.user_metadata?.role ||
+    appUser?.role ||
+    "siswa"
+  ).toLowerCase();
 
   const pathname = request.nextUrl.pathname;
 
   // 0. Akses ke Root URL `/`: langsung arahkan ke /dashboard (jika sudah login) atau /login (jika belum login)
   if (pathname === "/") {
-    if (user) {
-      const role = (user.user_metadata?.role || "siswa").toLowerCase();
+    if (effectiveUser) {
       if (role === "bendahara") {
         return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
       }
@@ -56,13 +71,11 @@ export async function middleware(request: NextRequest) {
   // 1. Proteksi Halaman Dashboard
   if (pathname.startsWith("/dashboard")) {
     // Jika belum login, redirect ke halaman login
-    if (!user) {
+    if (!effectiveUser) {
       const redirectUrl = new URL("/login", request.url);
       redirectUrl.searchParams.set("redirectTo", pathname);
       return NextResponse.redirect(redirectUrl);
     }
-
-    const role = (user.user_metadata?.role || "siswa").toLowerCase();
 
     // 2. Proteksi Halaman Khusus Administrator (Master Data, Pengguna & Konfigurasi)
     const adminOnlyPrefixes = [
@@ -108,9 +121,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 4. Jika sudah login tetapi membuka /login, redirect ke dashboard
-  if (pathname === "/login" && user) {
-    const role = (user.user_metadata?.role || "siswa").toLowerCase();
+  // 5. Jika sudah login tetapi membuka /login, redirect ke dashboard
+  if (pathname === "/login" && effectiveUser) {
     if (role === "bendahara") {
       return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
     }

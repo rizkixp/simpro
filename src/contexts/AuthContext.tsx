@@ -101,7 +101,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const appUser = mapSupabaseUserToUser(session.user, profile);
             setUser(appUser);
           } else if (isMounted) {
-            setUser(null);
+            // Cek apakah ada sesi aplikasi tersimpan (akun database dengan password hash)
+            const savedUser = typeof window !== "undefined" ? localStorage.getItem("sim_auth_user") : null;
+            if (savedUser) {
+              try {
+                const parsed = JSON.parse(savedUser);
+                if (parsed && parsed.id) {
+                  const { data: dbUser } = await supabase
+                    .from("users")
+                    .select("*")
+                    .eq("id", parsed.id)
+                    .maybeSingle();
+
+                  if (dbUser && dbUser.status !== "Nonaktif") {
+                    const restoredUser: User = {
+                      ...parsed,
+                      name: dbUser.name || parsed.name,
+                      role: (dbUser.role || parsed.role) as UserRole,
+                      status: (dbUser.status || "Aktif") as "Aktif" | "Nonaktif",
+                    };
+                    setUser(restoredUser);
+                  } else {
+                    setUser(null);
+                    localStorage.removeItem("sim_auth_user");
+                  }
+                } else {
+                  setUser(null);
+                }
+              } catch {
+                setUser(null);
+              }
+            } else {
+              setUser(null);
+            }
           }
 
           // Ambil daftar pengguna untuk tampilan admin direktori (tanpa password)
@@ -144,8 +176,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .maybeSingle();
 
               setUser(mapSupabaseUserToUser(currentSession.user, profile));
-            } else {
+            } else if (event === "SIGNED_OUT") {
               setUser(null);
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("sim_auth_user");
+              }
             }
           });
 
@@ -205,11 +240,97 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (isSupabaseConfigured()) {
       const supabase = createClient();
+
+      // 1. Cek pangkalan data public.users (mendukung login instan via Email, NISN, atau NIP)
+      const { data: matchedRecords } = await supabase
+        .from("users")
+        .select("*")
+        .or(`email.ilike.${cleanId},nisn_or_nip.eq.${cleanId},email.ilike.${cleanId}@%`)
+        .limit(1);
+
+      const dbProfile = matchedRecords?.[0];
+
+      // Jika user ditemukan di database dan memiliki hash kata sandi (s256:...)
+      if (dbProfile && dbProfile.password) {
+        if (dbProfile.status === "Nonaktif") {
+          return {
+            success: false,
+            message: "Akun Anda berstatus Nonaktif. Silakan hubungi Administrator sekolah.",
+          };
+        }
+
+        const verification = await verifyPassword(cleanPass, dbProfile.password);
+        if (verification.valid) {
+          clearLoginRateLimit(cleanId);
+          if (dbProfile.email) clearLoginRateLimit(dbProfile.email);
+
+          const loggedInUser: User = {
+            id: dbProfile.id,
+            name: dbProfile.name,
+            email: dbProfile.email,
+            role: dbProfile.role as UserRole,
+            avatar:
+              dbProfile.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(dbProfile.name)}`,
+            nisnOrNip: dbProfile.nisn_or_nip || undefined,
+            kelas: dbProfile.kelas || undefined,
+            phone: dbProfile.phone || undefined,
+            status: (dbProfile.status || "Aktif") as "Aktif" | "Nonaktif",
+            lastLogin: new Date().toISOString(),
+            createdAt: dbProfile.created_at || undefined,
+            sessionToken: generateSessionToken(),
+          };
+
+          // Update last_login di database
+          supabase.from("users").update({ last_login: new Date().toISOString() }).eq("id", dbProfile.id).catch(() => {});
+
+          // Pasang session cookie via server API route
+          try {
+            await fetch("/api/auth/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user: loggedInUser }),
+            });
+          } catch (cookieErr) {
+            console.warn("Gagal menetapkan session cookie:", cookieErr);
+          }
+
+          // Coba login Supabase Auth di latar belakang jika ada
+          supabase.auth
+            .signInWithPassword({
+              email: dbProfile.email,
+              password: cleanPass,
+            })
+            .catch(() => {});
+
+          setUser(loggedInUser);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("sim_auth_user", JSON.stringify(loggedInUser));
+          }
+
+          return { success: true };
+        } else {
+          // Kata sandi salah untuk akun database yang ditemukan
+          const failedRate = recordFailedLoginAttempt(cleanId);
+          if (failedRate.isLocked) {
+            return { success: false, message: failedRate.message };
+          }
+          const remainingNote =
+            failedRate.attemptsLeft <= 2
+              ? ` (Peringatan: Sisa ${failedRate.attemptsLeft} kesempatan sebelum akun dikunci sementara)`
+              : "";
+          return {
+            success: false,
+            message: `Kata sandi yang Anda masukkan salah${remainingNote}. Periksa kembali atau hubungi Administrator.`,
+          };
+        }
+      }
+
       let targetEmail = cleanId.toLowerCase();
 
-      // Jika input bukan format email (misal NISN siswa, NIP guru, atau alias seperti 'admin', 'bendahara', 'guru')
+      // Jika input bukan format email (misal alias seperti 'admin', 'bendahara', 'guru' atau NISN tanpa record password)
       if (!cleanId.includes("@")) {
-        // 1. Cek alias bawaan DEMO_USERS
+        // Cek alias bawaan DEMO_USERS
         const demoAlias = DEMO_USERS.find(
           (u) =>
             u.role.toLowerCase() === cleanId.toLowerCase() ||
@@ -219,52 +340,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (demoAlias) {
           targetEmail = demoAlias.email.toLowerCase();
+        } else if (dbProfile?.email) {
+          targetEmail = dbProfile.email.toLowerCase();
         } else {
-          // 2. Cek pangkalan data public.users
-          const { data: matchedRecords } = await supabase
-            .from("users")
-            .select("email, status, role, name, nisn_or_nip")
-            .or(`nisn_or_nip.eq.${cleanId},email.ilike.${cleanId}@%`)
-            .limit(1);
-
-          const matchedRecord = matchedRecords?.[0];
-
-          if (!matchedRecord?.email) {
-            // 3. Cek backup lokal lama jika ada
-            let localMatchEmail = "";
-            if (typeof window !== "undefined") {
-              try {
-                const localUsers: User[] = JSON.parse(localStorage.getItem("sim_auth_users") || "[]");
-                const found = localUsers.find(
-                  (u) =>
-                    u.role.toLowerCase() === cleanId.toLowerCase() ||
-                    u.email.toLowerCase().startsWith(cleanId.toLowerCase() + "@") ||
-                    u.nisnOrNip === cleanId
-                );
-                if (found) localMatchEmail = found.email.toLowerCase();
-              } catch {}
-            }
-
-            if (!localMatchEmail) {
-              return {
-                success: false,
-                message: `Akun "${cleanId}" tidak ditemukan. Silakan masukkan alamat email lengkap (contoh: rizkixp@gmail.com) atau NISN/NIP terdaftar.`,
-              };
-            }
-            targetEmail = localMatchEmail;
-          } else {
-            if (matchedRecord.status === "Nonaktif") {
-              return {
-                success: false,
-                message: "Akun Anda berstatus Nonaktif. Silakan hubungi Administrator sekolah.",
-              };
-            }
-            targetEmail = matchedRecord.email.toLowerCase();
-          }
+          return {
+            success: false,
+            message: `Akun "${cleanId}" tidak ditemukan. Silakan masukkan alamat email lengkap atau NISN/NIP terdaftar.`,
+          };
         }
       }
 
-      // Autentikasi resmi Supabase Auth
+      // Autentikasi via Supabase Auth
       let authData: any = null;
       let authError: any = null;
 
@@ -278,7 +364,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Fitur Auto-Provisioning: Jika akun lama belum terdaftar di Supabase auth.users
       if (authError && authError.message.toLowerCase().includes("invalid login credentials")) {
-        // Cek data profil pengguna di public.users atau DEMO_USERS atau rizkixp
         const { data: existingProfile } = await supabase
           .from("users")
           .select("*")
@@ -299,7 +384,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             (isSuperAdminEmail ? "admin" : "siswa");
 
           try {
-            // Daftarkan ke Supabase Auth dengan password yang dimasukkan
             const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
               email: targetEmail,
               password: cleanPass,
@@ -312,7 +396,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (signUpData?.user && !signUpError) {
-              // Pastikan profile public.users terhubung dengan auth_id
               await supabase.from("users").upsert({
                 id: existingProfile?.id || (isSuperAdminEmail ? "usr-rizkixp" : `usr-${Date.now()}`),
                 auth_id: signUpData.user.id,
@@ -322,12 +405,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 status: "Aktif",
               });
 
-              // Jika sesi otomatis aktif
               if (signUpData.session) {
                 authData = signUpData;
                 authError = null;
               } else {
-                // Coba sign in ulang
                 const retry = await supabase.auth.signInWithPassword({
                   email: targetEmail,
                   password: cleanPass,
@@ -347,13 +428,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Penanganan khusus jika email belum dikonfirmasi di Supabase Auth (misal akun Super Admin rizkixp@gmail.com)
       if (authError && authError.message.toLowerCase().includes("email not confirmed")) {
         if (targetEmail === "rizkixp@gmail.com") {
-          // Masuk menggunakan sesi admin resmi terkonfirmasi
           let adminAuth = await supabase.auth.signInWithPassword({
             email: "admin@sekolah.id",
             password: cleanPass,
           });
 
-          // Coba fallback dengan default admin password jika berbeda
           if (adminAuth.error) {
             adminAuth = await supabase.auth.signInWithPassword({
               email: "admin@sekolah.id",
@@ -376,6 +455,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               createdAt: new Date().toISOString(),
             };
             setUser(superAdminUser);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("sim_auth_user", JSON.stringify(superAdminUser));
+            }
+            fetch("/api/auth/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user: superAdminUser }),
+            }).catch(() => {});
             return { success: true };
           }
         }
@@ -383,12 +470,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return {
           success: false,
           message:
-            "Email akun Anda belum dikonfirmasi. Silakan periksa inbox/spam di email Anda untuk mengklik link konfirmasi dari Supabase.",
+            "Email akun Anda belum dikonfirmasi di Supabase Auth. Silakan hubungi Administrator sekolah.",
         };
       }
 
       if (authError) {
-        // Catat percobaan login gagal untuk mendeteksi brute-force
         const failedRate = recordFailedLoginAttempt(cleanId);
         if (failedRate.isLocked) {
           return {
@@ -412,7 +498,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (authData.user) {
-        // Ambil profil
         const { data: profile } = await supabase
           .from("users")
           .select("*")
@@ -429,13 +514,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        // Reset rate limiter setelah login berhasil
         clearLoginRateLimit(cleanId);
         if (targetEmail && targetEmail !== cleanId) {
           clearLoginRateLimit(targetEmail);
         }
 
+        try {
+          await fetch("/api/auth/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: loggedInUser }),
+          });
+        } catch (cookieErr) {
+          console.warn("Gagal menetapkan session cookie:", cookieErr);
+        }
+
         setUser(loggedInUser);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("sim_auth_user", JSON.stringify(loggedInUser));
+        }
         return { success: true };
       }
     }
@@ -484,6 +581,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastLogin: new Date().toISOString(),
     };
 
+    try {
+      await fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: sessionUser }),
+      });
+    } catch {}
+
     setUser(sessionUser);
     if (typeof window !== "undefined") {
       localStorage.setItem("sim_auth_user", JSON.stringify(sessionUser));
@@ -493,6 +598,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    try {
+      await fetch("/api/auth/session", { method: "DELETE" });
+    } catch (err) {
+      console.warn("Peringatan hapus session cookie:", err);
+    }
     if (isSupabaseConfigured()) {
       try {
         const supabase = createClient();
@@ -517,6 +627,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         localStorage.setItem("sim_auth_user", JSON.stringify(matched));
       }
+      fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: matched }),
+      }).catch(() => {});
     }
   };
 
@@ -529,6 +644,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         localStorage.setItem("sim_auth_user", JSON.stringify(matched));
       }
+      fetch("/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: matched }),
+      }).catch(() => {});
     }
   };
 
