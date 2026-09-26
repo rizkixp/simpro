@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useTeacherScope } from "@/hooks/useTeacherScope";
 import { formatRupiah } from "@/lib/utils";
+import MobileSuperAppDashboard from "@/components/dashboard/MobileSuperAppDashboard";
 import {
   Users,
   GraduationCap,
@@ -155,8 +156,13 @@ export default function DashboardOverviewPage() {
   // =========================================================================
   if (user?.role === "ortu" && currentSiswa) {
     return (
-      <div className="space-y-6">
-        {/* Banner Khusus Wali Santri */}
+      <>
+        {/* Tampilan Mobile Super-App Bergaya BRImo Emerald (< 1024px) */}
+        <MobileSuperAppDashboard />
+
+        {/* Tampilan Desktop Luas Portal Wali Santri (>= 1024px) */}
+        <div className="hidden lg:block space-y-6">
+          {/* Banner Khusus Wali Santri */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#022c22] text-white p-6 sm:p-8 shadow-xl shadow-emerald-950/20 border border-emerald-600/30">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
@@ -585,6 +591,7 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -592,8 +599,13 @@ export default function DashboardOverviewPage() {
   // RENDER STANDAR: DASHBOARD OVERVIEW UNTUK ADMIN, GURU, DAN SISWA
   // =========================================================================
   return (
-    <div className="space-y-6">
-      {/* Primary KPI Stats Grid */}
+    <>
+      {/* Tampilan Mobile Super-App Bergaya BRImo Emerald (< 1024px) */}
+      <MobileSuperAppDashboard />
+
+      {/* Tampilan Desktop Luas Admin, Guru, dan Siswa (>= 1024px) */}
+      <div className="hidden lg:block space-y-6">
+        {/* Primary KPI Stats Grid */}
       <div
         className={`grid grid-cols-1 sm:grid-cols-2 ${
           user?.role === "guru" ? "lg:grid-cols-3" : "lg:grid-cols-4"
@@ -965,5 +977,6 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

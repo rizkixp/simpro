@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +30,7 @@ import {
   Shield,
   Search,
   UserCheck,
+  QrCode,
 } from "lucide-react";
 
 export default function MobileBottomNav() {
@@ -51,48 +52,55 @@ export default function MobileBottomNav() {
     }
   };
 
-  // Navigasi Utama Bawah (Maks 5 Tombol per Role ala Android Bottom Nav)
+  // Buka drawer saat event open-mobile-drawer dipicu
+  useEffect(() => {
+    const handleOpenDrawer = () => setIsDrawerOpen(true);
+    window.addEventListener("open-mobile-drawer", handleOpenDrawer);
+    return () => window.removeEventListener("open-mobile-drawer", handleOpenDrawer);
+  }, []);
+
+  // Navigasi Utama Bawah Bergaya Super-App BRImo (5 Tombol dengan Center Floating FAB)
   const getPrimaryNav = () => {
     switch (currentRole) {
       case "siswa":
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
-          { label: "Tahfidz", href: "/dashboard/tahfidz", icon: BookOpen },
           { label: "SPP Kas", href: "/dashboard/spp-transportasi", icon: Bus },
+          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
+          { label: "Tahfidz", href: "/dashboard/tahfidz", icon: BookOpen },
           { label: "Menu", action: "drawer", icon: Grid },
         ];
       case "ortu":
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
-          { label: "Mutaba'ah", href: "/dashboard/mutabaah", icon: HeartHandshake },
-          { label: "SPP", href: "/dashboard/spp-transportasi", icon: Bus },
+          { label: "SPP & Bus", href: "/dashboard/spp-transportasi", icon: Bus },
+          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
+          { label: "Tahfidz", href: "/dashboard/tahfidz", icon: BookOpen },
           { label: "Menu", action: "drawer", icon: Grid },
         ];
       case "guru":
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
           { label: "E-Rapor", href: "/dashboard/nilai", icon: Award },
+          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
           { label: "LMS", href: "/dashboard/lms", icon: BookOpenCheck },
           { label: "Menu", action: "drawer", icon: Grid },
         ];
       case "bendahara":
         return [
-          { label: "SPP & Bus", href: "/dashboard/spp-transportasi", icon: Bus },
-          { label: "Kas", href: "/dashboard/keuangan", icon: Wallet },
+          { label: "Beranda", href: "/dashboard/spp-transportasi", icon: Bus },
+          { label: "Buku Kas", href: "/dashboard/keuangan", icon: Wallet },
+          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
           { label: "Tabungan", href: "/dashboard/tabungan", icon: PiggyBank },
-          { label: "Info", href: "/dashboard/pengumuman", icon: Bell },
-          { label: "Akun", action: "drawer", icon: Grid },
+          { label: "Menu", action: "drawer", icon: Grid },
         ];
       case "admin":
       default:
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
           { label: "Siswa", href: "/dashboard/siswa", icon: Users },
+          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
           { label: "E-Rapor", href: "/dashboard/nilai", icon: Award },
-          { label: "SPP", href: "/dashboard/spp-transportasi", icon: Bus },
           { label: "Semua", action: "drawer", icon: Grid },
         ];
     }
@@ -126,7 +134,7 @@ export default function MobileBottomNav() {
       {/* 1. NATIVE BOTTOM NAVIGATION BAR (Fixed at bottom on Mobile) */}
       <nav
         aria-label="Navigasi Aplikasi Mobile"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
       >
         <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
           {primaryNavItems.map((item, idx) => {
@@ -138,6 +146,30 @@ export default function MobileBottomNav() {
             );
 
             const IconComponent = item.icon;
+
+            // CENTER FLOATING ACTION BUTTON (ala BRImo QRIS Button)
+            if ("isFab" in item && item.isFab) {
+              return (
+                <div key={`nav-${idx}`} className="relative -top-5 flex flex-col items-center justify-center">
+                  <Link
+                    href={item.href!}
+                    onClick={triggerHaptic}
+                    className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#064e3b] via-emerald-600 to-teal-500 p-0.5 shadow-lg shadow-emerald-700/40 ring-4 ring-white dark:ring-slate-900 flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer group"
+                    title="Scan QR / Barcode Presensi"
+                  >
+                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-[#042d22] via-[#064e3b] to-emerald-600 flex flex-col items-center justify-center">
+                      <IconComponent className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                      <span className="text-[7.5px] font-black tracking-tighter text-amber-300 uppercase leading-none mt-0.5">
+                        QRIS
+                      </span>
+                    </div>
+                  </Link>
+                  <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 mt-1">
+                    Scan QR
+                  </span>
+                </div>
+              );
+            }
 
             if (isDrawerBtn) {
               return (
