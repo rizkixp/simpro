@@ -44,8 +44,17 @@ export async function middleware(request: NextRequest) {
   let appUser: { id: string; role: string; email: string; name?: string } | null = null;
   if (sessionCookie) {
     try {
-      appUser = JSON.parse(decodeURIComponent(sessionCookie));
-    } catch {}
+      appUser = JSON.parse(sessionCookie);
+    } catch {
+      try {
+        const dec = decodeURIComponent(sessionCookie);
+        try {
+          appUser = JSON.parse(dec);
+        } catch {
+          appUser = JSON.parse(decodeURIComponent(dec));
+        }
+      } catch {}
+    }
   }
 
   const effectiveUser = supabaseUser || appUser;

@@ -43,23 +43,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Helper: map Supabase auth user & profile record to application User type
   const mapSupabaseUserToUser = (authUser: any, profileRecord?: any): User => {
     const meta = authUser.user_metadata || {};
+    const email = authUser.email || profileRecord?.email || "";
+    const demoFallback = DEMO_USERS.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase()
+    );
+
     return {
-      id: profileRecord?.id || authUser.id,
-      name: profileRecord?.name || meta.name || authUser.email?.split("@")[0] || "User",
-      email: authUser.email || profileRecord?.email || "",
-      role: (profileRecord?.role || meta.role || "siswa") as UserRole,
+      id: profileRecord?.id || demoFallback?.id || authUser.id,
+      name:
+        profileRecord?.name ||
+        meta.name ||
+        demoFallback?.name ||
+        authUser.email?.split("@")[0] ||
+        "User",
+      email: email,
+      role: (profileRecord?.role || meta.role || demoFallback?.role || "siswa") as UserRole,
       avatar:
         profileRecord?.avatar ||
         meta.avatar ||
+        demoFallback?.avatar ||
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
-          profileRecord?.name || meta.name || "user"
+          profileRecord?.name || meta.name || demoFallback?.name || "user"
         )}`,
-      nisnOrNip: profileRecord?.nisn_or_nip || meta.nisn_or_nip || undefined,
-      kelas: profileRecord?.kelas || meta.kelas || undefined,
-      phone: profileRecord?.phone || meta.phone || undefined,
-      status: (profileRecord?.status || "Aktif") as "Aktif" | "Nonaktif",
+      nisnOrNip: profileRecord?.nisn_or_nip || meta.nisn_or_nip || demoFallback?.nisnOrNip || undefined,
+      kelas: profileRecord?.kelas || meta.kelas || demoFallback?.kelas || undefined,
+      phone: profileRecord?.phone || meta.phone || demoFallback?.phone || undefined,
+      status: (profileRecord?.status || demoFallback?.status || "Aktif") as "Aktif" | "Nonaktif",
       lastLogin: authUser.last_sign_in_at || new Date().toISOString(),
-      createdAt: authUser.created_at || new Date().toISOString(),
+      createdAt: authUser.created_at || demoFallback?.createdAt || new Date().toISOString(),
     };
   };
 
@@ -106,12 +117,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (savedUser) {
               try {
                 const parsed = JSON.parse(savedUser);
-                if (parsed && parsed.id) {
-                  const { data: dbUser } = await supabase
-                    .from("users")
-                    .select("*")
-                    .eq("id", parsed.id)
-                    .maybeSingle();
+                if (parsed && (parsed.id || parsed.email)) {
+                  let dbUserQuery = supabase.from("users").select("*");
+                  if (parsed.id && parsed.email) {
+                    dbUserQuery = dbUserQuery.or(`id.eq.${parsed.id},email.eq.${parsed.email}`);
+                  } else if (parsed.id) {
+                    dbUserQuery = dbUserQuery.eq("id", parsed.id);
+                  } else {
+                    dbUserQuery = dbUserQuery.eq("email", parsed.email);
+                  }
+                  const { data: dbUser } = await dbUserQuery.maybeSingle();
 
                   if (dbUser && dbUser.status !== "Nonaktif") {
                     const restoredUser: User = {
@@ -121,9 +136,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                       status: (dbUser.status || "Aktif") as "Aktif" | "Nonaktif",
                     };
                     setUser(restoredUser);
-                  } else {
+                  } else if (dbUser && dbUser.status === "Nonaktif") {
                     setUser(null);
                     localStorage.removeItem("sim_auth_user");
+                  } else {
+                    // Jika belum terdaftar di DB cloud, cek apakah akun DEMO_USERS atau sesi lokal aktif
+                    const demoMatch = DEMO_USERS.find(
+                      (u) =>
+                        u.id === parsed.id ||
+                        (parsed.email && u.email.toLowerCase() === parsed.email.toLowerCase())
+                    );
+                    if (demoMatch && demoMatch.status !== "Nonaktif") {
+                      setUser({ ...demoMatch, ...parsed });
+                    } else if (parsed.status !== "Nonaktif") {
+                      setUser(parsed);
+                    } else {
+                      setUser(null);
+                      localStorage.removeItem("sim_auth_user");
+                    }
                   }
                 } else {
                   setUser(null);
@@ -225,7 +255,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 1. Pasang langsung cookie sim_session di client (tersedia seketika untuk middleware saat navigasi)
     if (typeof document !== "undefined") {
       const cookieVal = encodeURIComponent(JSON.stringify(sessionUser));
-      document.cookie = `sim_session=${cookieVal}; path=/; max-age=604800; SameSite=Lax;`;
+      const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+      const secureFlag = isHttps ? "; Secure" : "";
+      document.cookie = `sim_session=${cookieVal}; path=/; max-age=604800; SameSite=Lax${secureFlag};`;
     }
     // 2. Simpan di localStorage untuk persistensi sesi client
     if (typeof window !== "undefined") {
@@ -305,8 +337,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const dbProfile = matchedRecords?.[0];
 
-      // Jika user ditemukan di database dan memiliki hash kata sandi (s256:...)
-      if (dbProfile && dbProfile.password) {
+      // Jika user ditemukan di database
+      if (dbProfile) {
         if (dbProfile.status === "Nonaktif") {
           return {
             success: false,
@@ -314,9 +346,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        const verification = await verifyPassword(cleanPass, dbProfile.password);
+        let isPasswordValid = false;
+        if (dbProfile.password) {
+          const verification = await verifyPassword(cleanPass, dbProfile.password);
+          isPasswordValid = verification.valid;
+        }
+
         const isStandardPasswordMatch =
           ((dbProfile.role === "admin" ||
+            cleanId.toLowerCase() === "admin@sekolah.id" ||
             cleanId.toLowerCase() === "rizkixp@gmail.com" ||
             cleanId.toLowerCase() === "efelfori@gmail.com") &&
             (cleanPass === "admin123" ||
@@ -339,7 +377,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           (cleanPass === "bendahara123" && dbProfile.role === "bendahara") ||
           (cleanPass === "ortu123" && dbProfile.role === "ortu");
 
-        if (verification.valid || isStandardPasswordMatch) {
+        if (isPasswordValid || isStandardPasswordMatch) {
           clearLoginRateLimit(cleanId);
           if (dbProfile.email) clearLoginRateLimit(dbProfile.email);
           if (dbProfile.nisn_or_nip) clearLoginRateLimit(dbProfile.nisn_or_nip);

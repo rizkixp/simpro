@@ -123,7 +123,13 @@ export default function LoginPage() {
         setLockoutRemaining(0);
         setSuccessMsg("Autentikasi berhasil! Mengalihkan ke dashboard...");
         setTimeout(() => {
-          window.location.href = "/dashboard";
+          const params = new URLSearchParams(window.location.search);
+          const redirectTo = params.get("redirectTo");
+          if (redirectTo && redirectTo.startsWith("/dashboard")) {
+            window.location.href = redirectTo;
+          } else {
+            window.location.href = "/dashboard";
+          }
         }, 300);
       } else {
         setErrorMsg(result.message || "Gagal masuk. Periksa kembali email atau kata sandi Anda.");

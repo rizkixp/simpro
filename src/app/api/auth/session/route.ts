@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now(),
     };
 
-    const cookieValue = encodeURIComponent(JSON.stringify(sessionPayload));
+    const cookieValue = JSON.stringify(sessionPayload);
     const response = NextResponse.json({ success: true, user: sessionPayload });
 
     const isHttps =

@@ -46,13 +46,17 @@ export default function HomePage() {
   const handleDemoClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (user) {
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
       return;
     }
     setIsDemoLoading(true);
     try {
-      await login("admin@sekolah.id", "admin", "admin123");
-      router.push("/dashboard");
+      const res = await login("admin@sekolah.id", "admin", "admin123");
+      if (res && res.success) {
+        window.location.href = "/dashboard";
+      } else {
+        router.push("/login");
+      }
     } catch {
       router.push("/login");
     } finally {
