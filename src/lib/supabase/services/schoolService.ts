@@ -339,7 +339,7 @@ export const SupabaseSchoolService = {
   async deleteUser(id: string): Promise<boolean> {
     const client = getSupabaseBrowserClient();
     if (!client) return false;
-    const { error } = await client.from("users").delete().eq("id", id);
+    const { error } = await client.from("users").delete().or(`id.eq.${id},email.eq.${id}`);
     return !error;
   },
 

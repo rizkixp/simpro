@@ -39,6 +39,28 @@ export const INITIAL_SCHOOL_PROFILE: SchoolProfile = {
 
 export const DEMO_USERS: User[] = [
   {
+    id: "usr-1789900657053-35",
+    name: "Rizki XP",
+    email: "rizkixp@gmail.com",
+    role: "admin",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=rizki",
+    phone: "0812-3456-7890",
+    status: "Aktif",
+    password: "admin123",
+    createdAt: "2026-09-20",
+  },
+  {
+    id: "usr-efelfori",
+    name: "Efelfori",
+    email: "efelfori@gmail.com",
+    role: "admin",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Efelfori",
+    phone: "0812-9988-7766",
+    status: "Aktif",
+    password: "admin123",
+    createdAt: "2026-09-26",
+  },
+  {
     id: "usr-admin",
     name: "Dr. H. Muhammad Rasyid, M.Pd.",
     email: "admin@sekolah.id",

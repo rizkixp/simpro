@@ -19,7 +19,9 @@ import {
   School,
   BookOpen,
   Sparkles,
+  ArrowLeft,
 } from "lucide-react";
+import Link from "next/link";
 import { checkLoginRateLimit, clearLoginRateLimit } from "@/lib/security";
 
 export default function LoginPage() {
@@ -130,15 +132,16 @@ export default function LoginPage() {
           setLockoutRemaining(status.lockoutRemainingSeconds);
         }
       }
-    } catch {
-      setErrorMsg("Terjadi kesalahan koneksi ke server. Silakan coba lagi.");
+    } catch (err: any) {
+      console.error("[Login] Unexpected authentication error:", err);
+      setErrorMsg(err?.message || "Terjadi kesalahan koneksi ke server. Silakan coba lagi.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-slate-100 dark:bg-slate-950">
+    <div className="min-h-screen w-full flex bg-gradient-to-br from-slate-100 via-emerald-50/20 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       {/* Left Column: Visual & Branding (Visible on Desktop) */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-[#064e3b] via-[#06281e] to-[#041d16] text-white flex-col justify-between p-12 overflow-hidden">
         {/* Subtle Decorative Islamic Glows & Pattern */}
@@ -231,6 +234,17 @@ export default function LoginPage() {
               <h2 className="font-bold text-lg text-slate-900 dark:text-white truncate">{appName}</h2>
               <p className="text-xs text-emerald-700 truncate">{appTagline}</p>
             </div>
+          </div>
+
+          {/* Back to Landing Page */}
+          <div className="mb-5">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors group"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+              <span>Kembali ke Halaman Beranda</span>
+            </Link>
           </div>
 
           <div className="mb-8">
@@ -384,7 +398,7 @@ export default function LoginPage() {
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isLoading || lockoutRemaining > 0}
+                disabled={isLoading}
                 className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-[0.99] text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isLoading ? (
@@ -392,7 +406,8 @@ export default function LoginPage() {
                 ) : lockoutRemaining > 0 ? (
                   <>
                     <ShieldAlert className="h-4 w-4 text-amber-300 animate-pulse" />
-                    <span>Terkunci Sementara ({Math.floor(lockoutRemaining / 60)}m {lockoutRemaining % 60}s)</span>
+                    <span>Buka Kunci & Masuk ({Math.floor(lockoutRemaining / 60)}m {lockoutRemaining % 60}s)</span>
+                    <ArrowRight className="h-4 w-4" />
                   </>
                 ) : (
                   <>
@@ -415,8 +430,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("rizkixp@gmail.com");
                     setEmail("rizkixp@gmail.com");
                     setPassword("admin123");
+                    setLockoutRemaining(0);
+                    setErrorMsg(null);
                   }}
                   className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
                 >
@@ -428,8 +446,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("admin@sekolah.id");
                     setEmail("admin@sekolah.id");
                     setPassword("admin123");
+                    setLockoutRemaining(0);
+                    setErrorMsg(null);
                   }}
                   className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
                 >
@@ -441,8 +462,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("bendahara@sekolah.id");
                     setEmail("bendahara@sekolah.id");
                     setPassword("bendahara123");
+                    setLockoutRemaining(0);
+                    setErrorMsg(null);
                   }}
                   className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
                 >
@@ -454,8 +478,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("guru@sekolah.id");
                     setEmail("guru@sekolah.id");
                     setPassword("guru123");
+                    setLockoutRemaining(0);
+                    setErrorMsg(null);
                   }}
                   className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
                 >
@@ -467,8 +494,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("siswa@sekolah.id");
                     setEmail("siswa@sekolah.id");
                     setPassword("siswa123");
+                    setLockoutRemaining(0);
+                    setErrorMsg(null);
                   }}
                   className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
                 >
@@ -480,8 +510,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("ortu@sekolah.id");
                     setEmail("ortu@sekolah.id");
                     setPassword("ortu123");
+                    setLockoutRemaining(0);
+                    setErrorMsg(null);
                   }}
                   className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
                 >
@@ -493,8 +526,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("0017");
                     setEmail("0017");
                     setPassword("siswa123");
+                    setLockoutRemaining(0);
+                    setErrorMsg(null);
                   }}
                   className="col-span-2 sm:col-span-3 p-2 text-xs text-left rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all cursor-pointer group flex items-center justify-between"
                 >

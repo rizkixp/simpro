@@ -47,6 +47,7 @@ export default function PenggunaPage() {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isResetDefaultConfirmOpen, setIsResetDefaultConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Selected User for Modals
   const [targetUser, setTargetUser] = useState<User | null>(null);
@@ -296,12 +297,23 @@ export default function PenggunaPage() {
     setIsDeleteModalOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!targetUser) return;
-    deleteUser(targetUser.id);
-    setIsDeleteModalOpen(false);
-    showToast(`Akun "${targetUser.name}" berhasil dihapus.`, "success");
-    setTargetUser(null);
+    setIsDeleting(true);
+    try {
+      const res = await deleteUser(targetUser.id);
+      setIsDeleteModalOpen(false);
+      if (res && !res.success) {
+        showToast(res.message || "Gagal menghapus pengguna.", "error");
+      } else {
+        showToast(`Akun "${targetUser.name}" berhasil dihapus.`, "success");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Terjadi kesalahan saat menghapus pengguna.", "error");
+    } finally {
+      setIsDeleting(false);
+      setTargetUser(null);
+    }
   };
 
   // Helper Labels & Icons
@@ -1531,17 +1543,19 @@ export default function PenggunaPage() {
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-sm"
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center gap-1.5"
               >
-                Ya, Hapus Akun
+                {isDeleting ? "Menghapus..." : "Ya, Hapus Akun"}
               </button>
             </div>
           </div>
