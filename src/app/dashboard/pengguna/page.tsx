@@ -317,8 +317,10 @@ export default function PenggunaPage() {
   };
 
   // Helper Labels & Icons
-  const getRoleBadge = (role: UserRole) => {
-    switch (role) {
+  // Helper Labels & Icons with Safe Fallbacks
+  const getRoleBadge = (role?: string) => {
+    const r = (role || "").toLowerCase();
+    switch (r) {
       case "admin":
         return {
           label: "Admin / Kepala Sekolah",
@@ -344,16 +346,24 @@ export default function PenggunaPage() {
           icon: BookOpen,
         };
       case "ortu":
+      case "wali":
         return {
           label: "Wali Murid / Ortu",
           badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800",
           icon: HeartHandshake,
         };
+      default:
+        return {
+          label: role || "Pengguna",
+          badgeClass: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+          icon: UserCheck,
+        };
     }
   };
 
-  const getRoleLabel = (role: UserRole) => {
-    switch (role) {
+  const getRoleLabel = (role?: string) => {
+    const r = (role || "").toLowerCase();
+    switch (r) {
       case "admin":
         return "Admin";
       case "bendahara":
@@ -363,18 +373,25 @@ export default function PenggunaPage() {
       case "siswa":
         return "Siswa";
       case "ortu":
+      case "wali":
         return "Wali Murid";
+      default:
+        return role || "Pengguna";
     }
   };
 
   // Stats Calculations
   const stats = useMemo(() => {
-    const adminCount = userList.filter((u) => u.role === "admin").length;
-    const bendaharaCount = userList.filter((u) => u.role === "bendahara").length;
-    const guruCount = userList.filter((u) => u.role === "guru").length;
-    const siswaCount = userList.filter((u) => u.role === "siswa").length;
-    const ortuCount = userList.filter((u) => u.role === "ortu").length;
-    const activeCount = userList.filter((u) => u.status === "Aktif").length;
+    const list = Array.isArray(userList) ? userList : [];
+    const adminCount = list.filter((u) => (u?.role || "").toLowerCase() === "admin").length;
+    const bendaharaCount = list.filter((u) => (u?.role || "").toLowerCase() === "bendahara").length;
+    const guruCount = list.filter((u) => (u?.role || "").toLowerCase() === "guru").length;
+    const siswaCount = list.filter((u) => (u?.role || "").toLowerCase() === "siswa").length;
+    const ortuCount = list.filter((u) => {
+      const r = (u?.role || "").toLowerCase();
+      return r === "ortu" || r === "wali";
+    }).length;
+    const activeCount = list.filter((u) => u?.status === "Aktif").length;
 
     return {
       admin: adminCount,
@@ -382,16 +399,19 @@ export default function PenggunaPage() {
       guru: guruCount,
       siswa: siswaCount,
       ortu: ortuCount,
-      total: userList.length,
+      total: list.length,
       active: activeCount,
     };
   }, [userList]);
 
   // Filtered Users
   const filteredUsers = useMemo(() => {
-    return userList.filter((u) => {
+    const list = Array.isArray(userList) ? userList : [];
+    return list.filter((u) => {
+      if (!u) return false;
+      const uRole = (u.role || "").toLowerCase();
       // Role Filter
-      if (selectedRoleFilter !== "all" && u.role !== selectedRoleFilter) {
+      if (selectedRoleFilter !== "all" && uRole !== selectedRoleFilter.toLowerCase()) {
         return false;
       }
       // Status Filter
@@ -401,8 +421,8 @@ export default function PenggunaPage() {
       // Search Term
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
-        const matchName = u.name.toLowerCase().includes(q);
-        const matchEmail = u.email.toLowerCase().includes(q);
+        const matchName = (u.name || "").toLowerCase().includes(q);
+        const matchEmail = (u.email || "").toLowerCase().includes(q);
         const matchId = u.nisnOrNip ? u.nisnOrNip.toLowerCase().includes(q) : false;
         const matchPhone = u.phone ? u.phone.toLowerCase().includes(q) : false;
         const matchKelas = u.kelas ? u.kelas.toLowerCase().includes(q) : false;
@@ -411,6 +431,32 @@ export default function PenggunaPage() {
       return true;
     });
   }, [userList, selectedRoleFilter, selectedStatusFilter, searchTerm]);
+
+  // Jika pengguna yang sedang login bukan Administrator, tampilkan kartu notifikasi akses terbatas yang rapi
+  const isUserAdmin = (currentUser?.role || "").toLowerCase() === "admin";
+  if (currentUser && !isUserAdmin) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-4">
+            <ShieldAlert className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+            Akses Terbatas: Khusus Administrator
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+            Halaman Manajemen Pengguna memuat data sensitif kredensial seluruh civitas sekolah dan hanya dapat diakses oleh akun Administrator.
+          </p>
+          <a
+            href="/dashboard"
+            className="py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+          >
+            <span>Kembali ke Dashboard Utama</span>
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -770,15 +816,15 @@ export default function PenggunaPage() {
                           <img
                             src={
                               u.avatar ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=0D8ABC&color=fff`
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || "User")}&background=0D8ABC&color=fff`
                             }
-                            alt={u.name}
+                            alt={u.name || "User"}
                             className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                           />
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span className="font-semibold text-slate-900 dark:text-white">
-                                {u.name}
+                                {u.name || "Pengguna"}
                               </span>
                               {isCurrentSelf && (
                                 <span className="px-1.5 py-0.5 text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded">
@@ -788,7 +834,7 @@ export default function PenggunaPage() {
                             </div>
                             <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                               <Mail className="w-3 h-3" />
-                              <span>{u.email}</span>
+                              <span>{u.email || "-"}</span>
                             </div>
                           </div>
                         </div>

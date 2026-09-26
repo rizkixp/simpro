@@ -41,7 +41,7 @@ export default function MobileBottomNav() {
 
   if (!user) return null;
 
-  const currentRole = user.role;
+  const currentRole = (user.role || "siswa").toLowerCase();
 
   // Haptic feedback saat tab ditekan di smartphone Android
   const triggerHaptic = () => {
@@ -109,21 +109,21 @@ export default function MobileBottomNav() {
   // Daftar Semua Modul Lengkap untuk Bottom Sheet Drawer
   const allModules = [
     { label: "Dashboard Utama", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "guru", "siswa", "ortu"] },
-    { label: "Data Siswa", href: "/dashboard/siswa", icon: Users, roles: ["admin"] },
-    { label: "Data Rombel & Kelas", href: "/dashboard/kelas", icon: Building2, roles: ["admin"] },
-    { label: "Guru & Tenaga Pendidik", href: "/dashboard/guru", icon: GraduationCap, roles: ["admin", "siswa", "ortu"] },
-    { label: "Jadwal Pembelajaran", href: "/dashboard/jadwal", icon: CalendarDays, roles: ["admin"] },
+    { label: "Data Siswa", href: "/dashboard/siswa", icon: Users, roles: ["admin", "guru"] },
+    { label: "Data Rombel & Kelas", href: "/dashboard/kelas", icon: Building2, roles: ["admin", "guru"] },
+    { label: "Guru & Tenaga Pendidik", href: "/dashboard/guru", icon: GraduationCap, roles: ["admin", "guru", "siswa", "ortu"] },
+    { label: "Jadwal Pembelajaran", href: "/dashboard/jadwal", icon: CalendarDays, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Presensi & Scan Barcode", href: "/dashboard/presensi", icon: CalendarCheck2, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "LMS & Tugas Digital", href: "/dashboard/lms", icon: BookOpenCheck, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Jurnal Tahfidz Qur'an", href: "/dashboard/tahfidz", icon: BookOpen, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Mutaba'ah Ibadah Harian", href: "/dashboard/mutabaah", icon: HeartHandshake, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "E-Rapor & Nilai Siswa", href: "/dashboard/nilai", icon: Award, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "SPP & Transportasi Bus", href: "/dashboard/spp-transportasi", icon: Bus, roles: ["admin", "siswa", "ortu", "bendahara"] },
-    { label: "Buku Kas & Tagihan Lainnya", href: "/dashboard/keuangan", icon: Wallet, roles: ["admin", "siswa", "ortu", "bendahara"] },
+    { label: "Buku Kas & Tagihan Lainnya", href: "/dashboard/keuangan", icon: Wallet, roles: ["admin", "bendahara"] },
     { label: "Tabungan Santri", href: "/dashboard/tabungan", icon: PiggyBank, roles: ["admin", "siswa", "ortu", "bendahara"] },
     { label: "Papan Pengumuman", href: "/dashboard/pengumuman", icon: Bell, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Manajemen Pengguna", href: "/dashboard/pengguna", icon: ShieldCheck, roles: ["admin"] },
-    { label: "Pengaturan & Profil Lembaga", href: "/dashboard/pengaturan", icon: Settings, roles: ["admin", "bendahara"] },
+    { label: "Pengaturan & Profil Lembaga", href: "/dashboard/pengaturan", icon: Settings, roles: ["admin"] },
   ];
 
   const filteredModules = allModules.filter((m) => m.roles.includes(currentRole));

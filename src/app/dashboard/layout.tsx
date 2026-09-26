@@ -33,24 +33,36 @@ export default function DashboardLayout({
         }
         return;
       }
-      // 1. Proteksi Halaman Khusus Administrator
+      // 1. Proteksi Halaman Khusus Administrator (Pengguna & Pengaturan)
       const adminOnlyPaths = [
         "/dashboard/pengguna",
         "/dashboard/pengaturan",
-        "/dashboard/siswa",
-        "/dashboard/kelas",
-        "/dashboard/jadwal",
       ];
+      const userRole = (user.role || "").toLowerCase();
       if (
         adminOnlyPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) &&
-        user.role !== "admin"
+        userRole !== "admin"
       ) {
         router.replace("/dashboard");
         return;
       }
 
-      // 2. Bendahara dibatasi hanya ke modul keuangan
-      if (user.role === "bendahara") {
+      // 2. Proteksi Master Data Siswa & Kelas (Khusus Admin & Guru)
+      const teacherAdminPaths = [
+        "/dashboard/siswa",
+        "/dashboard/kelas",
+      ];
+      if (
+        teacherAdminPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) &&
+        userRole !== "admin" &&
+        userRole !== "guru"
+      ) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      // 3. Bendahara dibatasi hanya ke modul keuangan
+      if (userRole === "bendahara") {
         const allowedFinancePaths = [
           "/dashboard/spp-transportasi",
           "/dashboard/keuangan",
@@ -65,9 +77,9 @@ export default function DashboardLayout({
         }
       }
 
-      // 3. Batasi Siswa & Orang Tua dari Pembukuan Kas Internal Sekolah
+      // 4. Batasi Siswa & Orang Tua dari Pembukuan Kas Internal Sekolah
       if (
-        (user.role === "siswa" || user.role === "ortu") &&
+        (userRole === "siswa" || userRole === "ortu") &&
         (pathname === "/dashboard/keuangan" || pathname.startsWith("/dashboard/keuangan/"))
       ) {
         router.replace("/dashboard/spp-transportasi");

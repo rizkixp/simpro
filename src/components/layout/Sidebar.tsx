@@ -54,25 +54,25 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: "Data Siswa",
       href: "/dashboard/siswa",
       icon: Users,
-      roles: ["admin"],
+      roles: ["admin", "guru"],
     },
     {
       title: "Data Kelas",
       href: "/dashboard/kelas",
       icon: Building2,
-      roles: ["admin"],
+      roles: ["admin", "guru"],
     },
     {
       title: "Guru & Staf",
       href: "/dashboard/guru",
       icon: GraduationCap,
-      roles: ["admin", "siswa", "ortu"],
+      roles: ["admin", "guru", "siswa", "ortu"],
     },
     {
       title: "Jadwal Pelajaran",
       href: "/dashboard/jadwal",
       icon: CalendarDays,
-      roles: ["admin"],
+      roles: ["admin", "guru", "siswa", "ortu"],
     },
     {
       title: "Presensi Harian",
@@ -114,7 +114,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: "Kas & Tagihan Lainnya",
       href: "/dashboard/keuangan",
       icon: Wallet,
-      roles: ["admin", "siswa", "ortu", "bendahara"],
+      roles: ["admin", "bendahara"],
     },
     {
       title: "Tabungan Siswa",
@@ -142,7 +142,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     },
   ];
 
-  const currentRole = user?.role || "admin";
+  const currentRole = (user?.role || "siswa").toLowerCase();
   const filteredNavItems = navItems.filter((item) => item.roles.includes(currentRole));
 
   return (

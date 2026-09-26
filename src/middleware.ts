@@ -59,8 +59,8 @@ export async function middleware(request: NextRequest) {
 
   const effectiveUser = supabaseUser || appUser;
   const role = (
-    supabaseUser?.user_metadata?.role ||
     appUser?.role ||
+    supabaseUser?.user_metadata?.role ||
     "siswa"
   ).toLowerCase();
 
@@ -75,13 +75,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // 2. Proteksi Halaman Khusus Administrator (Master Data, Pengguna & Konfigurasi)
+    // 2. Proteksi Halaman Khusus Administrator (Manajemen Pengguna & Konfigurasi Sistem)
     const adminOnlyPrefixes = [
       "/dashboard/pengguna",
       "/dashboard/pengaturan",
-      "/dashboard/siswa",
-      "/dashboard/kelas",
-      "/dashboard/jadwal",
     ];
 
     if (
@@ -89,6 +86,14 @@ export async function middleware(request: NextRequest) {
       role !== "admin"
     ) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    // 3. Proteksi Master Data Siswa & Kelas (Khusus Admin & Asatidz/Guru)
+    if (role === "siswa" || role === "ortu") {
+      const teacherAdminPrefixes = ["/dashboard/siswa", "/dashboard/kelas"];
+      if (teacherAdminPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"))) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
     }
 
     // 3. Batasi Bendahara hanya ke Modul Keuangan

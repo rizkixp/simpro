@@ -107,7 +107,7 @@ export default function CommandPalette() {
         icon: Users,
         path: "/dashboard/guru",
         category: "modul",
-        roles: ["admin", "guru"],
+        roles: ["admin", "guru", "siswa", "ortu"],
         keywords: ["guru", "ustadz", "ustadzah", "staf", "pegawai", "nip"],
       },
       {
@@ -117,7 +117,7 @@ export default function CommandPalette() {
         icon: Layers,
         path: "/dashboard/kelas",
         category: "modul",
-        roles: ["admin"],
+        roles: ["admin", "guru"],
         keywords: ["kelas", "rombel", "ruang", "wali kelas"],
       },
       {
