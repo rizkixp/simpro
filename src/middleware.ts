@@ -119,21 +119,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 5. Jika membuka /login
+  // 5. Jika membuka /login - selalu izinkan halaman login ditampilkan (tidak auto-redirect paksa)
   if (pathname === "/login") {
     // Jika ada parameter logout, hapus cookie sesi seketika dan izinkan akses ke form login
     if (request.nextUrl.searchParams.get("logout") === "true") {
       response.cookies.set("sim_session", "", { path: "/", maxAge: 0 });
-      return response;
     }
-
-    // Jika sudah login dan tidak dalam proses logout, redirect ke dashboard
-    if (effectiveUser) {
-      if (role === "bendahara") {
-        return NextResponse.redirect(new URL("/dashboard/spp-transportasi", request.url));
-      }
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
+    return response;
   }
 
   return response;

@@ -12,6 +12,9 @@ export default function SplashScreen() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Jangan tampilkan splash screen pada rute login agar form autentikasi langsung tampil seketika
+    if (window.location.pathname === "/login") return;
+
     let hasShown = false;
     try {
       hasShown = Boolean(sessionStorage.getItem("sim_splash_shown"));
@@ -22,29 +25,20 @@ export default function SplashScreen() {
     if (!hasShown) {
       setIsVisible(true);
 
-      // Durasi tampil splash screen resmi (1.4 detik) sebelum transisi keluar
-      const timer = setTimeout(() => {
+      const fadeTimer = setTimeout(() => {
         setIsFading(true);
-        // Hapus elemen setelah animasi fade-out selesai
-        const removeTimer = setTimeout(() => {
-          setIsVisible(false);
-          try {
-            sessionStorage.setItem("sim_splash_shown", "true");
-          } catch {}
-        }, 600);
+      }, 1200);
 
-        return () => clearTimeout(removeTimer);
-      }, 1400);
-
-      // Hard timeout pengaman absolut (maksimum 2.2 detik)
-      const hardSafetyTimer = setTimeout(() => {
-        setIsFading(true);
+      const removeTimer = setTimeout(() => {
         setIsVisible(false);
-      }, 2200);
+        try {
+          sessionStorage.setItem("sim_splash_shown", "true");
+        } catch {}
+      }, 1800);
 
       return () => {
-        clearTimeout(timer);
-        clearTimeout(hardSafetyTimer);
+        clearTimeout(fadeTimer);
+        clearTimeout(removeTimer);
       };
     }
   }, []);

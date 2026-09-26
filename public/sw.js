@@ -1,7 +1,7 @@
 // SIM Sekolah PRO - Progressive Web App Service Worker
 // Version: 2.0.0 (Full Offline Cache Engine)
 
-const CACHE_NAME = 'simpro-offline-v2';
+const CACHE_NAME = 'simpro-offline-v3';
 
 const isDevHost =
   self.location.hostname === 'localhost' ||
@@ -28,11 +28,9 @@ if (isDevHost) {
     return;
   });
 } else {
-  // In Production: Full Offline-First Caching Engine
+  // In Production: Full Offline-First Caching Engine (Only static assets precached)
   const PRECACHE_ASSETS = [
     '/',
-    '/login',
-    '/dashboard',
     '/offline.html',
     '/icons/icon.svg',
     '/manifest.webmanifest',
@@ -91,8 +89,13 @@ if (isDevHost) {
     }
 
     // STRATEGY A: Navigation requests (HTML page loads)
-    // Network-First with smart Offline Fallback (Exact Cache -> Dashboard Shell -> offline.html)
+    // Always bypass Service Worker caching for /login to ensure the login screen is always rendered directly
     if (request.mode === 'navigate') {
+      if (url.pathname === '/login' || url.pathname.startsWith('/api/')) {
+        event.respondWith(fetch(request));
+        return;
+      }
+
       event.respondWith(
         fetch(request)
           .then((networkResponse) => {

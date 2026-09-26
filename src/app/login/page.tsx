@@ -35,20 +35,11 @@ export default function LoginPage() {
   const appIconPreset = profile?.appIconPreset || "graduation";
 
   useEffect(() => {
-    // Jika URL membawa ?logout=true, bersihkan sesi lama dan jangan redirect ke dashboard
+    // Jika URL membawa ?logout=true, bersihkan sesi lama
     if (typeof window !== "undefined" && window.location.search.includes("logout")) {
       logout();
-      return;
     }
-
-    if (user) {
-      if (user.role === "bendahara") {
-        router.push("/dashboard/spp-transportasi");
-      } else {
-        router.push("/dashboard");
-      }
-    }
-  }, [user, router, logout]);
+  }, [logout]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -261,6 +252,40 @@ export default function LoginPage() {
               Masukkan email atau ID pengguna dan kata sandi Anda untuk mengakses sistem.
             </p>
           </div>
+
+          {/* Active Session Notification & Switch Account Info */}
+          {user && (
+            <div className="mb-5 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs shadow-sm animate-fadeIn">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-semibold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Sesi Aktif: {user.name} ({user.role})
+                </span>
+                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+                  Terhubung
+                </span>
+              </div>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
+                Anda saat ini sedang masuk dengan akun ini. Ingin beralih akun? Silakan klik akun cepat di bawah atau masukkan kredensial baru.
+              </p>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={user.role === "bendahara" ? "/dashboard/spp-transportasi" : "/dashboard"}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  <span>Lanjut ke Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs transition-colors cursor-pointer"
+                >
+                  Keluar Sesi
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Status Notifications */}
           {timeoutNotice && (
