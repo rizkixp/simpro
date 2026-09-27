@@ -91,7 +91,7 @@ export default function PengumumanPage() {
             onClick={() => setSelectedKategori(kat)}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${
               selectedKategori === kat
-                ? "bg-blue-600 text-white font-semibold shadow-sm"
+                ? "bg-[#056839] text-white font-bold shadow-xs"
                 : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50"
             }`}
           >

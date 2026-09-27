@@ -1,27 +1,35 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { formatRupiah } from "@/lib/utils";
+import { Siswa } from "@/types/school";
+import MobileStudentProfileModal from "@/components/dashboard/MobileStudentProfileModal";
+import MobileBukuPesanDrawer from "@/components/dashboard/MobileBukuPesanDrawer";
+import MobileGaleriModal from "@/components/dashboard/MobileGaleriModal";
 import {
-  Menu,
+  School,
+  Bell,
+  Calendar,
+  FileText,
+  Award,
+  DollarSign,
+  UserCheck,
+  Megaphone,
+  CalendarDays,
+  Image as ImageIcon,
+  MoreHorizontal,
   ChevronRight,
-  Camera,
+  CreditCard,
+  Bus,
   BookOpen,
+  ArrowRight,
   Clock,
   Sparkles,
-  CreditCard,
-  PiggyBank,
-  HeartHandshake,
   CheckCircle2,
-  X,
-  ArrowRight,
-  CalendarCheck2,
-  Award,
-  Bell,
 } from "lucide-react";
 
 export default function MobileSuperAppDashboard() {
@@ -32,38 +40,45 @@ export default function MobileSuperAppDashboard() {
     presensiList,
     sppList,
     tabunganList,
-    tahfidzList,
-    mutabaahList,
+    pengumumanList,
+    profile,
   } = useSchoolData();
 
-  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
-  const [photoStep, setPhotoStep] = useState<"ready" | "capturing" | "done">("ready");
+  // Modals state
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isPesanOpen, setIsPesanOpen] = useState(false);
+  const [isGaleriOpen, setIsGaleriOpen] = useState(false);
 
-  // Nama Pengguna / Santri
-  const firstName = useMemo(() => {
-    if (!user?.name) return "Santri";
-    const clean = user.name.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim();
-    return clean.split(" ")[0] || "Santri";
+  // Dynamic greeting based on user role
+  const greetingTitle = useMemo(() => {
+    if (!user) return "Ayah Bunda";
+    if (user.role === "guru") return `Ustadz ${user.name.split(" ")[0]}`;
+    if (user.role === "admin") return "Administrator";
+    if (user.role === "siswa") return user.name.split(" ")[0];
+    return "Ayah Bunda";
   }, [user]);
 
-  // Data santri aktif
+  // Current active student
   const currentSiswa = useMemo(() => {
     const childNameFromUser =
       user?.phone ||
       user?.name?.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim() ||
-      "Santri Terdaftar";
+      "Ahmad Rafif";
 
-    const fallbackStudent = {
+    const fallbackStudent: Siswa = {
       id: "sis-default",
-      nisn: user?.nisnOrNip || "0012345678",
-      nama: user?.role === "ortu" ? childNameFromUser : user?.name || "Ahmad Rizky Pratama",
-      kelas: user?.kelas || "1A",
+      nisn: user?.nisnOrNip || "20230015",
+      nama: user?.role === "ortu" ? childNameFromUser : user?.name || "Ahmad Rafif",
+      kelas: user?.kelas || "3 - Al Farabi",
       jenisKelamin: "L" as const,
+      tanggalLahir: "2016-01-12",
+      tempatLahir: "Medan",
+      alamat: "Jl. Melati No. 10, Medan",
       status: "Aktif" as const,
       avatar:
         user?.avatar ||
-        "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
-      namaWali: user?.role === "ortu" ? user.name : "Wali Santri",
+        "https://images.unsplash.com/photo-1544717305-2782549b5136?w=200&auto=format&fit=crop&q=80",
+      namaWali: user?.role === "ortu" ? user.name : "Bapak Rizki F., Ibu Sari",
       noHpWali: "0812-3456-7890",
     };
 
@@ -73,32 +88,24 @@ export default function MobileSuperAppDashboard() {
           (user?.nisnOrNip && s?.nisn === user.nisnOrNip) ||
           (user?.phone && s?.nama && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
           (user?.phone && s?.nama && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
-          (user?.role !== "ortu" && s?.nama && s.nama.toLowerCase().includes("ahmad rizky"))
+          (user?.role !== "ortu" && s?.nama && s.nama.toLowerCase().includes("ahmad"))
       ) ||
       (user?.role === "ortu" ? fallbackStudent : (siswaList && siswaList[0]) || fallbackStudent)
     );
   }, [siswaList, user]);
 
-  // Status Tabungan & SPP
-  const displaySaldo = useMemo(() => {
-    if (user?.role === "ortu" || user?.role === "siswa") {
-      const studentTabungan = (tabunganList || []).find((t) => t?.siswaId === currentSiswa?.id);
-      return typeof studentTabungan?.saldo === "number" ? studentTabungan.saldo : 1450000;
+  // Total Tagihan SPP
+  const displayTotalTagihan = useMemo(() => {
+    const studentSpp = (sppList || []).filter(
+      (s) => s?.siswaId === currentSiswa?.id && s?.status !== "Lunas"
+    );
+    if (studentSpp.length > 0) {
+      return studentSpp.reduce((acc, curr) => acc + (curr?.nominal || 0), 0);
     }
-    const totalTabungan = (tabunganList || []).reduce((acc, curr) => acc + (curr?.saldo || 0), 0);
-    return totalTabungan || 24850000;
-  }, [tabunganList, user, currentSiswa]);
+    return 350000; // Sesuai mockup UI Kits (Rp 350.000)
+  }, [sppList, currentSiswa]);
 
-  const sppStatus = useMemo(() => {
-    if (user?.role === "ortu" || user?.role === "siswa") {
-      const studentSpp = (sppList || []).filter((s) => s?.siswaId === currentSiswa?.id);
-      const hasUnpaid = studentSpp.some((s) => s?.status === "Belum Lunas" || s?.status === "Jatuh Tempo");
-      return hasUnpaid ? "Tagihan SPP Belum Lunas" : "SPP Lunas Bulan Ini";
-    }
-    return "Status SPP Terkelola";
-  }, [sppList, user, currentSiswa]);
-
-  // Haptic feedback ringan
+  // Haptic feedback
   const triggerHaptic = () => {
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       try {
@@ -114,383 +121,413 @@ export default function MobileSuperAppDashboard() {
     }
   };
 
-  const handleCaptureAction = () => {
-    triggerHaptic();
-    setPhotoStep("capturing");
-    setTimeout(() => {
-      setPhotoStep("done");
-      setTimeout(() => {
-        setIsCameraModalOpen(false);
-        setPhotoStep("ready");
-      }, 1400);
-    }, 1200);
-  };
+  // 9-Grid Modules matching Education Mobile UI Kits Screen 3 exactly
+  const gridMenuItems = [
+    {
+      label: "Jadwal",
+      href: "/dashboard/jadwal",
+      icon: Calendar,
+      bg: "bg-[#fff7ed] dark:bg-amber-950/40",
+      border: "border-[#ffedd5] dark:border-amber-800/50",
+      color: "text-[#f97316]",
+    },
+    {
+      label: "Tugas",
+      href: "/dashboard/lms",
+      icon: FileText,
+      bg: "bg-[#eff6ff] dark:bg-blue-950/40",
+      border: "border-[#dbeafe] dark:border-blue-800/50",
+      color: "text-[#3b82f6]",
+    },
+    {
+      label: "Nilai",
+      href: "/dashboard/nilai",
+      icon: Award,
+      bg: "bg-[#fefce8] dark:bg-yellow-950/40",
+      border: "border-[#fef9c3] dark:border-yellow-800/50",
+      color: "text-[#eab308]",
+    },
+    {
+      label: "Keuangan",
+      href: "/dashboard/spp-transportasi",
+      icon: DollarSign,
+      bg: "bg-[#f0fdf4] dark:bg-emerald-950/40",
+      border: "border-[#dcfce7] dark:border-emerald-800/50",
+      color: "text-[#16a34a]",
+    },
+    {
+      label: "Absensi",
+      href: "/dashboard/presensi",
+      icon: UserCheck,
+      bg: "bg-[#f0f9ff] dark:bg-sky-950/40",
+      border: "border-[#e0f2fe] dark:border-sky-800/50",
+      color: "text-[#0284c7]",
+    },
+    {
+      label: "Pengumuman",
+      href: "/dashboard/pengumuman",
+      icon: Megaphone,
+      bg: "bg-[#faf5ff] dark:bg-purple-950/40",
+      border: "border-[#f3e8ff] dark:border-purple-800/50",
+      color: "text-[#9333ea]",
+    },
+    {
+      label: "Kalender",
+      href: "/dashboard/jadwal",
+      icon: CalendarDays,
+      bg: "bg-[#eef2ff] dark:bg-indigo-950/40",
+      border: "border-[#e0e7ff] dark:border-indigo-800/50",
+      color: "text-[#4f46e5]",
+    },
+    {
+      label: "Galeri",
+      action: "galeri",
+      icon: ImageIcon,
+      bg: "bg-[#fff1f2] dark:bg-rose-950/40",
+      border: "border-[#ffe4e6] dark:border-rose-800/50",
+      color: "text-[#e11d48]",
+    },
+    {
+      label: "Lainnya",
+      action: "drawer",
+      icon: MoreHorizontal,
+      bg: "bg-[#f0fdfa] dark:bg-teal-950/40",
+      border: "border-[#ccfbf1] dark:border-teal-800/50",
+      color: "text-[#0d9488]",
+    },
+  ];
 
   return (
-    <div className="lg:hidden -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 pb-28 min-h-screen bg-[#fcfdff] dark:bg-slate-950 text-slate-800 dark:text-slate-100 px-5 pt-5 select-none">
-      {/* 1. TOP HEADER: Hamburger Menu */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          type="button"
-          onClick={handleOpenDrawer}
-          className="p-1 text-slate-900 dark:text-white hover:opacity-75 active:scale-95 transition-transform cursor-pointer"
-          aria-label="Buka Menu"
-        >
-          {/* Hamburger icon with 3 bold lines matching the design */}
-          <div className="w-6 h-5 flex flex-col justify-between py-0.5">
-            <span className="w-6 h-1 bg-slate-900 dark:bg-white rounded-full" />
-            <span className="w-6 h-1 bg-slate-900 dark:bg-white rounded-full" />
-            <span className="w-6 h-1 bg-slate-900 dark:bg-white rounded-full" />
+    <div className="lg:hidden -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 pb-28 min-h-screen bg-[#ffffff] dark:bg-slate-950 text-slate-800 dark:text-slate-100 px-5 pt-4 select-none">
+      {/* ========================================================================= */}
+      {/* 1. TOP BAR: School Badge, Greeting & Notification Bell                   */}
+      {/* ========================================================================= */}
+      <div className="flex items-center justify-between mb-4.5">
+        <div className="flex items-center gap-3">
+          {/* Circular Green School Badge */}
+          <div className="w-11 h-11 rounded-full bg-[#f0fdf4] dark:bg-emerald-950/80 border border-[#bbf7d0] dark:border-emerald-800 text-[#056839] dark:text-emerald-400 flex items-center justify-center shadow-xs shrink-0">
+            <School className="w-5 h-5 stroke-[2.2]" />
           </div>
-        </button>
-
-        <Link
-          href="/dashboard/pengumuman"
-          onClick={triggerHaptic}
-          className="relative p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          title="Notifikasi"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500" />
-        </Link>
-      </div>
-
-      {/* 2. GREETING TITLE: Welcome, [Name]! */}
-      <div className="mb-5">
-        <h1 className="text-[28px] sm:text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-          Welcome,{firstName}!
-        </h1>
-      </div>
-
-      {/* 3. CARD 1: Congratulations! Streak Banner (Pastel Yellow / Peach) */}
-      <Link
-        href="/dashboard/mutabaah"
-        onClick={triggerHaptic}
-        className="block mb-5 relative overflow-hidden rounded-[24px] bg-gradient-to-r from-[#ffeab3] via-[#ffdf8a] to-[#ffd470] dark:from-amber-400 dark:to-amber-500 p-4 sm:p-5 shadow-sm active:scale-[0.98] transition-all group"
-      >
-        {/* Subtle decorative background circles */}
-        <div className="absolute top-2 right-14 w-12 h-12 rounded-full bg-white/20 blur-xs pointer-events-none" />
-        <div className="absolute -bottom-4 left-24 w-16 h-16 rounded-full bg-amber-300/30 blur-sm pointer-events-none" />
-
-        <div className="relative z-10 flex items-center justify-between gap-3">
-          <div className="min-w-0 pr-2">
-            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug tracking-tight">
-              Congratulations!
-            </h3>
-            <p className="text-xs sm:text-sm font-semibold text-slate-800/90 mt-0.5">
-              You have been streak for <span className="font-black text-slate-950 text-sm sm:text-base">7</span> days
+          <div>
+            <h1 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+              Assalamu'alaikum {greetingTitle}
+            </h1>
+            <p className="text-[11px] text-slate-400 dark:text-slate-400 mt-0.5">
+              Selamat datang di aplikasi sekolah
             </p>
           </div>
-
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white shadow-xs flex items-center justify-center text-slate-800 shrink-0 group-hover:translate-x-0.5 transition-transform">
-            <ChevronRight className="w-5 h-5 stroke-[2.5]" />
-          </div>
-        </div>
-      </Link>
-
-      {/* 4. CARD 2: Hero Mascot Card - "Check Your Steps" (Pastel Sky Blue) */}
-      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-b from-[#bde7ff] via-[#cceeff] to-[#aee1fc] p-6 shadow-sm border border-sky-200/50 flex flex-col items-center justify-center text-center">
-        {/* Subtle background marine elements (bubbles & bottle silhouette) */}
-        <div className="absolute top-8 left-6 w-8 h-8 rounded-full bg-white/40 blur-2xs pointer-events-none" />
-        <div className="absolute top-28 left-8 w-4 h-4 rounded-full bg-white/50 blur-2xs pointer-events-none" />
-        <div className="absolute top-14 right-8 w-6 h-14 rounded-full bg-white/20 -rotate-45 pointer-events-none" />
-        <div className="absolute bottom-16 right-6 w-9 h-9 rounded-full bg-white/35 blur-2xs pointer-events-none" />
-
-        {/* Mascot: Adorable Blue Dolphin with Lifebuoy Float */}
-        <div className="relative z-10 my-1">
-          <svg
-            viewBox="0 0 200 200"
-            className="w-36 h-36 sm:w-44 sm:h-44 drop-shadow-sm select-none"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {/* Water splashes at bottom */}
-            <path d="M70 170 C60 160 50 165 45 172 C55 175 65 174 70 170 Z" fill="#E0F2FE" opacity="0.9" />
-            <path d="M130 170 C140 160 150 165 155 172 C145 175 135 174 130 170 Z" fill="#E0F2FE" opacity="0.9" />
-            <path d="M85 178 C95 182 105 182 115 178 C110 185 90 185 85 178 Z" fill="#BAE6FD" />
-
-            {/* Dolphin tail below swim ring */}
-            <path
-              d="M92 160 C90 172 82 178 78 184 C88 182 98 175 100 170 C102 175 112 182 122 184 C118 178 110 172 108 160 Z"
-              fill="#38BDF8"
-              stroke="#0284C7"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-            />
-
-            {/* Left Flipper / Waving Hand */}
-            <path
-              d="M60 115 C45 105 32 90 40 80 C48 78 60 92 68 108 Z"
-              fill="#38BDF8"
-              stroke="#0284C7"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-            />
-
-            {/* Right Flipper */}
-            <path
-              d="M140 115 C155 120 168 135 160 142 C152 144 142 132 135 122 Z"
-              fill="#38BDF8"
-              stroke="#0284C7"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-            />
-
-            {/* Dolphin Body / Head */}
-            <path
-              d="M100 35 C65 35 55 65 58 110 C60 140 75 155 100 155 C125 155 140 140 142 110 C145 65 135 35 100 35 Z"
-              fill="#38BDF8"
-              stroke="#0284C7"
-              strokeWidth="2.5"
-            />
-
-            {/* Dorsal Fin on top back */}
-            <path
-              d="M96 35 C98 20 108 12 118 15 C116 25 108 32 104 36 Z"
-              fill="#0EA5E9"
-              stroke="#0284C7"
-              strokeWidth="2"
-            />
-
-            {/* White Belly & Chin */}
-            <path
-              d="M100 65 C80 65 72 85 74 125 C75 145 88 152 100 152 C112 152 125 145 126 125 C128 85 120 65 100 65 Z"
-              fill="#F0F9FF"
-            />
-
-            {/* Swim Ring (Red & White striped Lifebuoy) */}
-            <ellipse cx="100" cy="142" rx="44" ry="16" fill="#EF4444" stroke="#B91C1C" strokeWidth="2.5" />
-            {/* White stripes on swim ring */}
-            <path d="M72 136 C74 133 79 133 82 137 L79 149 C76 150 71 149 70 146 Z" fill="#FFFFFF" />
-            <path d="M118 137 C121 133 126 133 128 136 L130 146 C129 149 124 150 121 149 Z" fill="#FFFFFF" />
-            <path d="M96 128 C98 127 102 127 104 128 L104 158 C102 158 98 158 96 158 Z" fill="#FFFFFF" />
-
-            {/* Cute Dolphin Cheeks */}
-            <ellipse cx="74" cy="98" rx="6" ry="3.5" fill="#FDA4AF" opacity="0.85" />
-            <ellipse cx="126" cy="98" rx="6" ry="3.5" fill="#FDA4AF" opacity="0.85" />
-
-            {/* Big Happy Eyes */}
-            <ellipse cx="80" cy="80" rx="9" ry="12" fill="#0F172A" />
-            <ellipse cx="78" cy="76" rx="4" ry="5.5" fill="#FFFFFF" />
-            <circle cx="83" cy="84" r="2" fill="#FFFFFF" />
-
-            <ellipse cx="120" cy="80" rx="9" ry="12" fill="#0F172A" />
-            <ellipse cx="118" cy="76" rx="4" ry="5.5" fill="#FFFFFF" />
-            <circle cx="123" cy="84" r="2" fill="#FFFFFF" />
-
-            {/* Snout / Open Smile */}
-            <path d="M82 94 C90 106 110 106 118 94 C115 116 85 116 82 94 Z" fill="#0F172A" />
-            {/* Tongue */}
-            <path d="M88 102 C94 112 106 112 112 102 C108 114 92 114 88 102 Z" fill="#F472B6" />
-          </svg>
         </div>
 
-        {/* Title: Check Your Steps */}
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 mb-3">
-          Check Your Steps
-        </h2>
-
-        {/* Big Dark Navy / Indigo Circular Camera Action Button */}
+        {/* Notification Bell with Red Badge (1) */}
         <button
           type="button"
           onClick={() => {
             triggerHaptic();
-            setIsCameraModalOpen(true);
+            setIsPesanOpen(true);
           }}
-          className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#1b1747] hover:bg-[#141038] shadow-xl shadow-indigo-950/25 ring-4 ring-white/60 flex items-center justify-center text-white active:scale-90 transition-all cursor-pointer"
-          title="Buka Kamera Aktivitas"
-          aria-label="Buka Kamera Presensi dan Aktivitas"
+          className="relative p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title="Pesan & Notifikasi"
+          aria-label="Notifikasi Sekolah"
         >
-          <Camera className="w-7 h-7 sm:w-8 sm:h-8 text-white stroke-[2]" />
+          <Bell className="w-5 h-5 stroke-[2]" />
+          <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#ef4444] text-white text-[9px] font-bold flex items-center justify-center shadow-xs">
+            1
+          </span>
         </button>
       </div>
 
-      {/* 5. CARDS 3 & 4: Two Bento Cards - "Practice" & "History" */}
-      <div className="grid grid-cols-2 gap-3.5 sm:gap-4 mt-4">
-        {/* Left Card: Practice (Pastel Pink) */}
-        <Link
-          href="/dashboard/lms"
-          onClick={triggerHaptic}
-          className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#ffd5e5] via-[#ffc6dc] to-[#ffb6d3] p-5 shadow-xs flex flex-col items-center justify-center text-center group active:scale-95 transition-all cursor-pointer"
-        >
-          {/* Subtle math watermark on bottom left */}
-          <span className="absolute bottom-1 left-2 text-2xl font-serif font-black text-pink-400/30 select-none pointer-events-none">
-            √x
-          </span>
+      {/* ========================================================================= */}
+      {/* 2. HERO CARD BANNER: Islamic Students Banner (Forest Emerald Green)      */}
+      {/* ========================================================================= */}
+      <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-[#056839] via-[#047857] to-[#065f46] text-white p-4.5 sm:p-5 shadow-sm shadow-emerald-950/15 mb-6">
+        {/* Subtle decorative curved ambient Islamic backdrop arches */}
+        <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full bg-white/10 blur-xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-emerald-400/15 blur-lg pointer-events-none" />
 
-          <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mb-2.5 text-pink-600 group-hover:scale-105 transition-transform">
-            <BookOpen className="w-6 h-6 stroke-[2.2]" />
+        <div className="relative z-10 flex items-center justify-between gap-2">
+          {/* Left Title & Subtitle */}
+          <div className="flex-1 pr-2">
+            <h2 className="text-base sm:text-lg font-black text-white leading-tight tracking-tight">
+              Membentuk<br />Generasi Qur'ani
+            </h2>
+            <p className="text-xs text-emerald-100/90 font-medium mt-1 leading-snug">
+              Cerdas dan Berakhlak Mulia
+            </p>
           </div>
 
-          <span className="text-sm font-black text-[#9d174d] tracking-tight">
-            Practice
-          </span>
-        </Link>
+          {/* Right SVG Illustration: Two Smiling Islamic Students with Qur'an */}
+          <div className="w-32 h-24 sm:w-36 sm:h-28 shrink-0 flex items-center justify-center">
+            <svg
+              viewBox="0 0 160 120"
+              className="w-full h-full drop-shadow-sm"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* Soft cloud backdrop */}
+              <ellipse cx="80" cy="95" rx="70" ry="22" fill="#04522d" opacity="0.4" />
 
-        {/* Right Card: History (Pastel Purple / Lavender) */}
-        <Link
-          href="/dashboard/nilai"
-          onClick={triggerHaptic}
-          className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#dfd8fd] via-[#d5cafc] to-[#c7bafc] p-5 shadow-xs flex flex-col items-center justify-center text-center group active:scale-95 transition-all cursor-pointer"
-        >
-          {/* Subtle geometry watermark on bottom left */}
-          <span className="absolute bottom-1 left-3 text-xl font-black text-purple-400/30 select-none pointer-events-none">
-            📐
-          </span>
+              {/* Girl with white hijab (Left) */}
+              <g transform="translate(25, 10)">
+                {/* Hijab Drape */}
+                <path
+                  d="M15 45 C10 65 5 80 5 95 C25 98 45 98 60 95 C60 80 55 65 50 45 Z"
+                  fill="#F8FAFC"
+                />
+                {/* Face */}
+                <ellipse cx="32" cy="48" rx="14" ry="16" fill="#FDE68A" />
+                {/* Hijab Inner Frame */}
+                <path
+                  d="M18 42 C18 25 46 25 46 42 C46 54 44 60 32 60 C20 60 18 54 18 42 Z"
+                  fill="#FFFFFF"
+                />
+                <ellipse cx="32" cy="46" rx="11" ry="12" fill="#FCD34D" />
+                {/* Eyes */}
+                <circle cx="28" cy="44" r="1.8" fill="#1E293B" />
+                <circle cx="36" cy="44" r="1.8" fill="#1E293B" />
+                {/* Smile & Cheeks */}
+                <ellipse cx="25" cy="48" rx="2" ry="1" fill="#F472B6" opacity="0.6" />
+                <ellipse cx="39" cy="48" rx="2" ry="1" fill="#F472B6" opacity="0.6" />
+                <path d="M30 49 Q32 52 34 49" stroke="#1E293B" strokeWidth="1.2" strokeLinecap="round" />
+              </g>
 
-          <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mb-2.5 text-purple-600 group-hover:scale-105 transition-transform">
-            <Clock className="w-6 h-6 stroke-[2.2]" />
+              {/* Boy with white peci (Right) */}
+              <g transform="translate(75, 12)">
+                {/* Body / Koko shirt */}
+                <path d="M12 55 L4 95 C20 98 40 98 56 95 L48 55 Z" fill="#E2E8F0" />
+                {/* Face */}
+                <ellipse cx="30" cy="46" rx="13" ry="15" fill="#FCD34D" />
+                {/* Hair under peci */}
+                <path d="M17 38 Q30 36 43 38" stroke="#1E293B" strokeWidth="2" />
+                {/* White Peci */}
+                <path
+                  d="M16 38 C16 26 44 26 44 38 Z"
+                  fill="#FFFFFF"
+                  stroke="#E2E8F0"
+                  strokeWidth="1.5"
+                />
+                {/* Eyes */}
+                <circle cx="26" cy="44" r="1.8" fill="#1E293B" />
+                <circle cx="34" cy="44" r="1.8" fill="#1E293B" />
+                {/* Smile & Cheeks */}
+                <ellipse cx="23" cy="48" rx="2" ry="1" fill="#F472B6" opacity="0.6" />
+                <ellipse cx="37" cy="48" rx="2" ry="1" fill="#F472B6" opacity="0.6" />
+                <path d="M28 49 Q30 52 32 49" stroke="#1E293B" strokeWidth="1.2" strokeLinecap="round" />
+              </g>
+
+              {/* Open Green Al-Qur'an Book in front of both */}
+              <g transform="translate(50, 72)">
+                {/* Left Page */}
+                <path
+                  d="M30 18 C20 12 8 14 0 16 L2 35 C10 33 22 31 30 37 Z"
+                  fill="#10B981"
+                  stroke="#047857"
+                  strokeWidth="1.5"
+                />
+                {/* Right Page */}
+                <path
+                  d="M30 18 C40 12 52 14 60 16 L58 35 C50 33 38 31 30 37 Z"
+                  fill="#059669"
+                  stroke="#047857"
+                  strokeWidth="1.5"
+                />
+                {/* Book Spine */}
+                <path d="M30 18 L30 37" stroke="#FBBF24" strokeWidth="2" />
+                {/* Gold Book Lines */}
+                <path d="M6 22 Q16 20 25 24" stroke="#FDE68A" strokeWidth="1" strokeLinecap="round" />
+                <path d="M6 26 Q16 24 25 28" stroke="#FDE68A" strokeWidth="1" strokeLinecap="round" />
+                <path d="M35 24 Q44 20 54 22" stroke="#FDE68A" strokeWidth="1" strokeLinecap="round" />
+                <path d="M35 28 Q44 24 54 26" stroke="#FDE68A" strokeWidth="1" strokeLinecap="round" />
+              </g>
+            </svg>
           </div>
-
-          <span className="text-sm font-black text-[#5b21b6] tracking-tight">
-            History
-          </span>
-        </Link>
+        </div>
       </div>
 
-      {/* 6. SECONDARY EDUCATION SHORTCUTS (SPP, Tahfidz, Tabungan) */}
-      <div className="mt-6 pt-2">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Menu Sekolah
+      {/* ========================================================================= */}
+      {/* 3. 9-GRID MENU (3x3): Icon pastel seragam persis sesuai Education UI Kits */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-3 gap-x-4 gap-y-5 mb-8">
+        {gridMenuItems.map((item, idx) => {
+          const IconComponent = item.icon;
+          const isDrawer = item.action === "drawer";
+          const isGaleri = item.action === "galeri";
+
+          if (isDrawer) {
+            return (
+              <button
+                key={`menu-${idx}`}
+                type="button"
+                onClick={handleOpenDrawer}
+                className="flex flex-col items-center justify-center text-center group active:scale-95 transition-transform"
+              >
+                <div
+                  className={`w-15 h-15 sm:w-16 sm:h-16 rounded-[22px] ${item.bg} ${item.border} ${item.color} flex items-center justify-center mb-2 shadow-xs group-hover:scale-105 transition-transform`}
+                >
+                  <IconComponent className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-tight">
+                  {item.label}
+                </span>
+              </button>
+            );
+          }
+
+          if (isGaleri) {
+            return (
+              <button
+                key={`menu-${idx}`}
+                type="button"
+                onClick={() => {
+                  triggerHaptic();
+                  setIsGaleriOpen(true);
+                }}
+                className="flex flex-col items-center justify-center text-center group active:scale-95 transition-transform"
+              >
+                <div
+                  className={`w-15 h-15 sm:w-16 sm:h-16 rounded-[22px] ${item.bg} ${item.border} ${item.color} flex items-center justify-center mb-2 shadow-xs group-hover:scale-105 transition-transform`}
+                >
+                  <IconComponent className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-tight">
+                  {item.label}
+                </span>
+              </button>
+            );
+          }
+
+          return (
+            <Link
+              key={`menu-${idx}`}
+              href={item.href || "/dashboard"}
+              onClick={triggerHaptic}
+              className="flex flex-col items-center justify-center text-center group active:scale-95 transition-transform"
+            >
+              <div
+                className={`w-15 h-15 sm:w-16 sm:h-16 rounded-[22px] ${item.bg} ${item.border} ${item.color} flex items-center justify-center mb-2 shadow-xs group-hover:scale-105 transition-transform`}
+              >
+                <IconComponent className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-tight">
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. FEED SECTION: Ringkasan Tagihan Keuangan (Screen 6 Preview)            */}
+      {/* ========================================================================= */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3 px-0.5">
+          <span className="text-xs font-bold text-slate-900 dark:text-white">
+            Tagihan Terkini
           </span>
-          <button
-            type="button"
-            onClick={handleOpenDrawer}
-            className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-0.5"
+          <Link
+            href="/dashboard/spp-transportasi"
+            className="text-[11px] font-bold text-[#056839] hover:underline flex items-center gap-0.5"
           >
-            <span>Semua Modul</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+            <span>Rincian</span>
+            <ChevronRight className="w-3 h-3" />
+          </Link>
         </div>
 
-        <div className="grid grid-cols-3 gap-2.5">
-          {/* Shortcut 1: SPP */}
+        {/* Card Keuangan sesuai Screen 6 */}
+        <div className="p-4 rounded-[22px] bg-slate-50/80 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400">Total Tagihan</p>
+            <p className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
+              {formatRupiah(displayTotalTagihan).replace(",00", "")}
+            </p>
+          </div>
           <Link
             href="/dashboard/spp-transportasi"
             onClick={triggerHaptic}
-            className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col items-center text-center active:scale-95 transition-transform"
+            className="px-4 py-2.5 rounded-xl bg-[#056839] hover:bg-[#04522d] text-white text-xs font-bold shadow-xs active:scale-95 transition-transform flex items-center gap-1.5"
           >
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center mb-1.5">
-              <CreditCard className="w-4 h-4" />
-            </div>
-            <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">SPP & Bus</span>
-            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold truncate w-full mt-0.5">
-              {sppStatus.includes("Lunas") ? "Lunas ✓" : "Cek Tagihan"}
-            </span>
-          </Link>
-
-          {/* Shortcut 2: Tahfidz */}
-          <Link
-            href="/dashboard/tahfidz"
-            onClick={triggerHaptic}
-            className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col items-center text-center active:scale-95 transition-transform"
-          >
-            <div className="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-950 text-teal-600 flex items-center justify-center mb-1.5">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Tahfidz</span>
-            <span className="text-[9px] text-teal-600 dark:text-teal-400 font-semibold truncate w-full mt-0.5">
-              Juz 30
-            </span>
-          </Link>
-
-          {/* Shortcut 3: Tabungan */}
-          <Link
-            href="/dashboard/tabungan"
-            onClick={triggerHaptic}
-            className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col items-center text-center active:scale-95 transition-transform"
-          >
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 flex items-center justify-center mb-1.5">
-              <PiggyBank className="w-4 h-4" />
-            </div>
-            <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Tabungan</span>
-            <span className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold truncate w-full mt-0.5 font-mono">
-              {formatRupiah(displaySaldo || 0).replace(",00", "")}
-            </span>
+            <span>Bayar Sekarang</span>
           </Link>
         </div>
       </div>
 
-      {/* 7. INTERACTIVE CAMERA CHECK-IN MODAL (When tapping the center camera button) */}
-      {isCameraModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-950 text-[#1b1747] dark:text-indigo-300 flex items-center justify-center">
-                  <Camera className="w-4 h-4" />
-                </div>
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                  Check Your Steps
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCameraModalOpen(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Dokumentasikan aktivitas belajar, mutaba&apos;ah mandiri, atau ambil presensi kehadiran harian ananda.
-            </p>
-
-            {photoStep === "ready" && (
-              <div className="space-y-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={handleCaptureAction}
-                  className="w-full py-3 px-4 rounded-2xl bg-[#1b1747] hover:bg-[#141038] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Ambil Foto Kehadiran / Aktivitas</span>
-                </button>
-
-                <Link
-                  href="/dashboard/presensi"
-                  onClick={() => setIsCameraModalOpen(false)}
-                  className="w-full py-2.5 px-4 rounded-2xl bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-200 font-semibold text-xs flex items-center justify-center gap-2 border border-sky-200 dark:border-sky-800"
-                >
-                  <CalendarCheck2 className="w-4 h-4" />
-                  <span>Buka Halaman Presensi Lengkap</span>
-                </Link>
-
-                <Link
-                  href="/dashboard/mutabaah"
-                  onClick={() => setIsCameraModalOpen(false)}
-                  className="w-full py-2.5 px-4 rounded-2xl bg-pink-50 dark:bg-pink-950 text-pink-800 dark:text-pink-200 font-semibold text-xs flex items-center justify-center gap-2 border border-pink-200 dark:border-pink-800"
-                >
-                  <HeartHandshake className="w-4 h-4" />
-                  <span>Isi Mutaba&apos;ah Yaumiyah Mandiri</span>
-                </Link>
-              </div>
-            )}
-
-            {photoStep === "capturing" && (
-              <div className="py-6 flex flex-col items-center justify-center gap-3">
-                <div className="w-12 h-12 rounded-full border-3 border-indigo-600 border-t-transparent animate-spin" />
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Mengambil foto & mencatat langkah santri...
-                </p>
-              </div>
-            )}
-
-            {photoStep === "done" && (
-              <div className="py-6 flex flex-col items-center justify-center gap-2">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center animate-bounce">
-                  <CheckCircle2 className="w-7 h-7" />
-                </div>
-                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                  Alhamdulillah! Langkah & Ibadah Berhasil Dicatat!
-                </p>
-              </div>
-            )}
-          </div>
+      {/* ========================================================================= */}
+      {/* 5. FEED SECTION: Tugas & Agenda Terkini (Screen 9 & 10 Preview)          */}
+      {/* ========================================================================= */}
+      <div className="space-y-3 mb-6">
+        <div className="flex items-center justify-between px-0.5">
+          <span className="text-xs font-bold text-slate-900 dark:text-white">
+            Tugas & Agenda Santri
+          </span>
+          <Link
+            href="/dashboard/lms"
+            className="text-[11px] font-bold text-[#056839] hover:underline flex items-center gap-0.5"
+          >
+            <span>Lihat Semua</span>
+            <ChevronRight className="w-3 h-3" />
+          </Link>
         </div>
-      )}
+
+        {/* Item 1: Tugas Bahasa Indonesia */}
+        <Link
+          href="/dashboard/lms"
+          onClick={triggerHaptic}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex items-center gap-3 active:scale-98 transition-transform"
+        >
+          <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-500 flex items-center justify-center shrink-0">
+            <BookOpen className="w-5 h-5 stroke-[2]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              Bahasa Indonesia
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              Membuat rangkuman cerita &bull; Batas: 25 September
+            </p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+        </Link>
+
+        {/* Item 2: Pengumuman STS */}
+        <Link
+          href="/dashboard/pengumuman"
+          onClick={triggerHaptic}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex items-center gap-3 active:scale-98 transition-transform"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-[#056839] flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 stroke-[2]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              Pelaksanaan Sumatif Tengah Semester
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              Agenda Kurikulum Merdeka &bull; 24 September 2026
+            </p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+        </Link>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 6. MODALS: Profil Siswa, Pesan / Buku Penghubung, Galeri                 */}
+      {/* ========================================================================= */}
+      <MobileStudentProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        siswa={currentSiswa}
+        user={user}
+      />
+
+      <MobileBukuPesanDrawer
+        isOpen={isPesanOpen}
+        onClose={() => setIsPesanOpen(false)}
+        user={user}
+      />
+
+      <MobileGaleriModal
+        isOpen={isGaleriOpen}
+        onClose={() => setIsGaleriOpen(false)}
+      />
     </div>
   );
 }

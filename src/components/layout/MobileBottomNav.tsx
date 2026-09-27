@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
+import { Siswa } from "@/types/school";
+import MobileStudentProfileModal from "@/components/dashboard/MobileStudentProfileModal";
+import MobileBukuPesanDrawer from "@/components/dashboard/MobileBukuPesanDrawer";
 import {
   LayoutDashboard,
   CalendarCheck2,
@@ -29,14 +32,17 @@ import {
   ChevronRight,
   Shield,
   Search,
-  UserCheck,
+  MessageSquare,
+  User as UserIcon,
 } from "lucide-react";
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { profile } = useSchoolData();
+  const { profile, siswaList } = useSchoolData();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isPesanOpen, setIsPesanOpen] = useState(false);
 
   if (!user) return null;
 
@@ -52,6 +58,42 @@ export default function MobileBottomNav() {
     }
   };
 
+  // Current active student for Profile modal
+  const currentSiswa = useMemo(() => {
+    const childNameFromUser =
+      user?.phone ||
+      user?.name?.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim() ||
+      "Ahmad Rafif";
+
+    const fallbackStudent: Siswa = {
+      id: "sis-default",
+      nisn: user?.nisnOrNip || "20230015",
+      nama: user?.role === "ortu" ? childNameFromUser : user?.name || "Ahmad Rafif",
+      kelas: user?.kelas || "3 - Al Farabi",
+      jenisKelamin: "L" as const,
+      tanggalLahir: "2016-01-12",
+      tempatLahir: "Medan",
+      alamat: "Jl. Melati No. 10, Medan",
+      status: "Aktif" as const,
+      avatar:
+        user?.avatar ||
+        "https://images.unsplash.com/photo-1544717305-2782549b5136?w=200&auto=format&fit=crop&q=80",
+      namaWali: user?.role === "ortu" ? user.name : "Bapak Rizki F., Ibu Sari",
+      noHpWali: "0812-3456-7890",
+    };
+
+    return (
+      (siswaList || []).find(
+        (s) =>
+          (user?.nisnOrNip && s?.nisn === user.nisnOrNip) ||
+          (user?.phone && s?.nama && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
+          (user?.phone && s?.nama && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
+          (user?.role !== "ortu" && s?.nama && s.nama.toLowerCase().includes("ahmad"))
+      ) ||
+      (user?.role === "ortu" ? fallbackStudent : (siswaList && siswaList[0]) || fallbackStudent)
+    );
+  }, [siswaList, user]);
+
   // Buka drawer saat event open-mobile-drawer dipicu
   useEffect(() => {
     const handleOpenDrawer = () => setIsDrawerOpen(true);
@@ -59,52 +101,35 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener("open-mobile-drawer", handleOpenDrawer);
   }, []);
 
-  // Navigasi Utama Bawah Mobile (5 Tombol Simetris & Ergonomis)
-  const getPrimaryNav = () => {
-    switch (currentRole) {
-      case "siswa":
-        return [
-          { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-          { label: "SPP Kas", href: "/dashboard/spp-transportasi", icon: Bus },
-          { label: "Mutaba'ah", href: "/dashboard/mutabaah", icon: HeartHandshake },
-          { label: "Tahfidz", href: "/dashboard/tahfidz", icon: BookOpen },
-          { label: "Menu", action: "drawer", icon: Grid },
-        ];
-      case "ortu":
-        return [
-          { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-          { label: "SPP & Bus", href: "/dashboard/spp-transportasi", icon: Bus },
-          { label: "Mutaba'ah", href: "/dashboard/mutabaah", icon: HeartHandshake },
-          { label: "Tahfidz", href: "/dashboard/tahfidz", icon: BookOpen },
-          { label: "Menu", action: "drawer", icon: Grid },
-        ];
-      case "guru":
-        return [
-          { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
-          { label: "E-Rapor", href: "/dashboard/nilai", icon: Award },
-          { label: "LMS", href: "/dashboard/lms", icon: BookOpenCheck },
-          { label: "Menu", action: "drawer", icon: Grid },
-        ];
-      case "bendahara":
-        return [
-          { label: "Beranda", href: "/dashboard/spp-transportasi", icon: Bus },
-          { label: "Buku Kas", href: "/dashboard/keuangan", icon: Wallet },
-          { label: "Tabungan", href: "/dashboard/tabungan", icon: PiggyBank },
-          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
-          { label: "Menu", action: "drawer", icon: Grid },
-        ];
-      case "admin":
-      default:
-        return [
-          { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-          { label: "Siswa", href: "/dashboard/siswa", icon: Users },
-          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
-          { label: "E-Rapor", href: "/dashboard/nilai", icon: Award },
-          { label: "Semua", action: "drawer", icon: Grid },
-        ];
-    }
-  };
+  // Navigasi Utama Bawah Mobile (4 Tab Sesuai Education Mobile UI Kits Screen 3)
+  // [Beranda, Siswa, Pesan, Profil]
+  const primaryNavItems = [
+    {
+      label: "Beranda",
+      href: "/dashboard",
+      icon: LayoutDashboard,
+      isActive: safePathname === "/dashboard",
+    },
+    {
+      label: "Siswa",
+      href: currentRole === "admin" || currentRole === "guru" ? "/dashboard/siswa" : undefined,
+      action: currentRole === "admin" || currentRole === "guru" ? undefined : "profil-siswa",
+      icon: Users,
+      isActive: safePathname === "/dashboard/siswa",
+    },
+    {
+      label: "Pesan",
+      action: "pesan",
+      icon: MessageSquare,
+      isActive: false,
+    },
+    {
+      label: "Profil",
+      action: "profil",
+      icon: UserIcon,
+      isActive: safePathname === "/dashboard/pengaturan",
+    },
+  ];
 
   // Daftar Semua Modul Lengkap untuk Bottom Sheet Drawer
   const allModules = [
@@ -127,41 +152,47 @@ export default function MobileBottomNav() {
   ];
 
   const filteredModules = allModules.filter((m) => m.roles.includes(currentRole));
-  const primaryNavItems = getPrimaryNav();
 
   return (
     <>
-      {/* 1. NATIVE BOTTOM NAVIGATION BAR (Fixed at bottom on Mobile) */}
+      {/* 1. NATIVE BOTTOM NAVIGATION BAR (4 Tab Simetris ala Education Mobile UI Kits) */}
       <nav
         aria-label="Navigasi Aplikasi Mobile"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
       >
-        <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
+        <div className="grid grid-cols-4 h-16 max-w-md mx-auto px-2">
           {primaryNavItems.map((item, idx) => {
-            const isDrawerBtn = item.action === "drawer";
-            const isActive = !isDrawerBtn && item.href && (
-              item.href === "/dashboard"
-                ? safePathname === "/dashboard"
-                : safePathname === item.href || safePathname.startsWith(item.href + "/")
-            );
-
             const IconComponent = item.icon;
 
-            if (isDrawerBtn) {
+            if (item.action) {
               return (
                 <button
                   key={`nav-${idx}`}
                   type="button"
                   onClick={() => {
                     triggerHaptic();
-                    setIsDrawerOpen(true);
+                    if (item.action === "profil-siswa" || item.action === "profil") {
+                      setIsProfileOpen(true);
+                    } else if (item.action === "pesan") {
+                      setIsPesanOpen(true);
+                    }
                   }}
-                  className="flex flex-col items-center justify-center gap-1 text-slate-500 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 active:scale-90 transition-transform cursor-pointer"
+                  className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform cursor-pointer ${
+                    item.isActive
+                      ? "text-[#056839] dark:text-emerald-400 font-bold"
+                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  }`}
                 >
-                  <div className={`p-1 rounded-xl transition-all ${isDrawerOpen ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : ""}`}>
-                    <IconComponent className="h-5 w-5" />
+                  <div
+                    className={`p-1.5 px-3 rounded-full transition-all ${
+                      item.isActive
+                        ? "bg-emerald-50 dark:bg-emerald-950/70 text-[#056839] dark:text-emerald-400 font-bold shadow-xs"
+                        : ""
+                    }`}
+                  >
+                    <IconComponent className="h-5 w-5 stroke-[2]" />
                   </div>
-                  <span className="text-[10px] font-semibold leading-none">{item.label}</span>
+                  <span className="text-[10px] font-bold leading-none">{item.label}</span>
                 </button>
               );
             }
@@ -172,28 +203,28 @@ export default function MobileBottomNav() {
                 href={item.href!}
                 onClick={triggerHaptic}
                 className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform ${
-                  isActive
-                    ? "text-emerald-700 dark:text-emerald-400 font-bold"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 font-medium"
+                  item.isActive
+                    ? "text-[#056839] dark:text-emerald-400 font-bold"
+                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 }`}
               >
                 <div
                   className={`p-1.5 px-3 rounded-full transition-all ${
-                    isActive
-                      ? "bg-emerald-100/90 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 shadow-xs"
+                    item.isActive
+                      ? "bg-emerald-50 dark:bg-emerald-950/70 text-[#056839] dark:text-emerald-400 font-bold shadow-xs"
                       : ""
                   }`}
                 >
-                  <IconComponent className="h-5 w-5" />
+                  <IconComponent className="h-5 w-5 stroke-[2]" />
                 </div>
-                <span className="text-[10px] leading-none truncate max-w-[64px]">{item.label}</span>
+                <span className="text-[10px] font-bold leading-none truncate max-w-[64px]">{item.label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
 
-      {/* 2. BOTTOM SHEET DRAWER: "Lainnya / Semua Modul" ala Android Sheet */}
+      {/* 2. BOTTOM SHEET DRAWER: "Lainnya / Semua Modul" */}
       {isDrawerOpen && (
         <div
           role="dialog"
@@ -202,7 +233,7 @@ export default function MobileBottomNav() {
           onClick={() => setIsDrawerOpen(false)}
         >
           <div
-            className="w-full bg-white dark:bg-slate-900 rounded-t-3xl max-h-[85vh] flex flex-col shadow-2xl border-t border-slate-200 dark:border-slate-800 overflow-hidden animate-slideUp"
+            className="w-full bg-white dark:bg-slate-900 rounded-t-[32px] max-h-[85vh] flex flex-col shadow-2xl border-t border-slate-200 dark:border-slate-800 overflow-hidden animate-slideUp"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Sheet Drag Handle */}
@@ -251,23 +282,19 @@ export default function MobileBottomNav() {
               <button
                 type="button"
                 onClick={() => {
-                  triggerHaptic();
                   setIsDrawerOpen(false);
-                  window.dispatchEvent(new CustomEvent("open-command-palette"));
+                  window.dispatchEvent(
+                    new KeyboardEvent("keydown", { key: "k", ctrlKey: true })
+                  );
                 }}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/60 dark:to-teal-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-950 dark:text-emerald-100 font-semibold text-xs shadow-xs active:scale-98 transition-all"
+                className="w-full py-2.5 px-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-between text-xs transition-colors"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 rounded-xl bg-emerald-600 text-white shadow-xs">
-                    <Search className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="text-left">
-                    <span className="block font-bold">Pencarian Universal</span>
-                    <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400 font-normal">Cari siswa, guru, modul & aksi cepat</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4 text-slate-400" />
+                  <span>Pencarian Cepat Menu / Data (Ctrl+K)...</span>
                 </div>
-                <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 text-[10px] font-bold shadow-2xs">
-                  Buka
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-white dark:bg-slate-900 font-mono text-slate-400 border border-slate-200 dark:border-slate-700">
+                  ⌘K
                 </span>
               </button>
 
@@ -290,12 +317,12 @@ export default function MobileBottomNav() {
                         }}
                         className={`p-2.5 rounded-2xl flex flex-col items-center text-center gap-1.5 transition-all active:scale-90 ${
                           isModActive
-                            ? "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold"
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-[#056839] dark:text-emerald-300 font-bold"
                             : "bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:border-emerald-400"
                         }`}
                       >
-                        <div className={`p-2 rounded-xl ${isModActive ? "bg-emerald-600 text-white shadow-sm" : "bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-400"}`}>
-                          <ModIcon className="h-5 w-5" />
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 shadow-xs">
+                          <ModIcon className="w-4 h-4 text-[#056839] dark:text-emerald-400" />
                         </div>
                         <span className="text-[10px] leading-tight line-clamp-2">
                           {item.label}
@@ -306,34 +333,39 @@ export default function MobileBottomNav() {
                 </div>
               </div>
 
-              {/* Quick Actions Footer */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <Link
-                  href="/dashboard/pengaturan"
-                  onClick={() => setIsDrawerOpen(false)}
-                  className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-emerald-600 p-2"
-                >
-                  <Settings className="h-4 w-4 text-slate-400" />
-                  <span>Pengaturan Akun</span>
-                </Link>
-
+              {/* Logout Option in Sheet */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={async () => {
+                  onClick={() => {
                     setIsDrawerOpen(false);
-                    await logout();
+                    logout();
                     window.location.href = "/login?logout=true";
                   }}
-                  className="flex items-center gap-2 text-xs font-semibold text-rose-600 hover:text-rose-700 p-2 cursor-pointer"
+                  className="w-full py-2.5 px-3 rounded-2xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center gap-2 text-xs font-semibold transition-colors"
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>Keluar Akun</span>
+                  <LogOut className="w-4 h-4" />
+                  <span>Keluar dari Aplikasi</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* 3. MODALS TRIGGERED FROM BOTTOM NAV */}
+      <MobileStudentProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        siswa={currentSiswa}
+        user={user}
+      />
+
+      <MobileBukuPesanDrawer
+        isOpen={isPesanOpen}
+        onClose={() => setIsPesanOpen(false)}
+        user={user}
+      />
     </>
   );
 }
