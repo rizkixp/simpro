@@ -35,8 +35,12 @@ export default function MobileStudentProfileModal({
 
   if (!isOpen) return null;
 
-  const displayName = siswa?.nama || "Ahmad Rafif";
-  const displayKelas = siswa?.kelas ? `Kelas ${siswa.kelas}` : "Kelas 3 - Al Farabi";
+  const displayName = siswa?.nama || "Ahmad Fauzan";
+  const displayKelas = siswa?.kelas
+    ? siswa.kelas.startsWith("Kelas")
+      ? siswa.kelas
+      : `Kelas ${siswa.kelas}`
+    : "Kelas 3 Al Farabi";
   const displayNis = siswa?.nisn || "20230015";
   const displayTtl = "Medan, 12 Januari 2016";
   const displayGender = siswa?.jenisKelamin === "P" ? "Perempuan" : "Laki-laki";

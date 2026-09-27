@@ -102,7 +102,7 @@ export default function MobileBottomNav() {
   }, []);
 
   // Navigasi Utama Bawah Mobile (4 Tab Sesuai Education Mobile UI Kits Screen 3)
-  // [Beranda, Siswa, Pesan, Profil]
+  // [Beranda, Jadwal, Pesan, Profil]
   const primaryNavItems = [
     {
       label: "Beranda",
@@ -111,11 +111,10 @@ export default function MobileBottomNav() {
       isActive: safePathname === "/dashboard",
     },
     {
-      label: "Siswa",
-      href: currentRole === "admin" || currentRole === "guru" ? "/dashboard/siswa" : undefined,
-      action: currentRole === "admin" || currentRole === "guru" ? undefined : "profil-siswa",
-      icon: Users,
-      isActive: safePathname === "/dashboard/siswa",
+      label: "Jadwal",
+      href: "/dashboard/jadwal",
+      icon: CalendarDays,
+      isActive: safePathname === "/dashboard/jadwal",
     },
     {
       label: "Pesan",
