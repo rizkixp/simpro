@@ -18,6 +18,7 @@ import {
   LMSJadwalMateri,
 } from "@/types/school";
 import { generateBankSoalQuestions, REKOMENDASI_TOPIK_MAPEL } from "@/lib/lms-question-generator";
+import MobileLMSView from "@/components/dashboard/MobileLMSView";
 import {
   BookOpenCheck,
   BookOpen,
@@ -1253,7 +1254,14 @@ export default function LMSPage() {
 
   // --- MAIN LMS DASHBOARD VIEW ---
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div>
+      {/* Mobile Super App UI Kit View (Screen 9 Tugas) */}
+      <div className="block lg:hidden -m-4 sm:-m-6">
+        <MobileLMSView />
+      </div>
+
+      {/* Desktop Administrative View */}
+      <div className="hidden lg:block p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 border border-slate-700 animate-bounce">
@@ -5833,6 +5841,7 @@ export default function LMSPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

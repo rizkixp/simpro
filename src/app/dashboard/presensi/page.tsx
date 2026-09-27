@@ -62,6 +62,7 @@ import AttendanceSettingsModal, {
   getAttendanceSettings,
   AttendanceSettings,
 } from "@/components/presensi/AttendanceSettingsModal";
+import MobilePresensiView from "@/components/dashboard/MobilePresensiView";
 
 export default function PresensiPage() {
   const { user } = useAuth();
@@ -382,9 +383,16 @@ export default function PresensiPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      {/* Mobile Super App UI Kit View (Screen 7 Absensi) */}
+      <div className="block lg:hidden -m-4 sm:-m-6">
+        <MobilePresensiView />
+      </div>
+
+      {/* Desktop Administrative View */}
+      <div className="hidden lg:block space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
             <CalendarCheck2 className="h-7 w-7 text-purple-600" />
@@ -1572,6 +1580,7 @@ export default function PresensiPage() {
           </div>
         );
       })()}
+      </div>
 
       {/* Toast Notification */}
       {toastMessage && (

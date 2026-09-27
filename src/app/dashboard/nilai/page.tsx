@@ -13,6 +13,7 @@ import {
   formatDateIndo,
 } from "@/lib/utils";
 import { exportSingleRaporXls, exportBatchRaporXls } from "@/lib/exportRaporExcel";
+import MobileNilaiView from "@/components/dashboard/MobileNilaiView";
 import {
   Award,
   Search,
@@ -3890,8 +3891,15 @@ export default function NilaiManagementPage() {
   const bulkClassRemedialCount = bulkClassRows.length - bulkClassTuntasCount;
 
   return (
-    <div className="space-y-6">
-      {/* Toast Notification */}
+    <div>
+      {/* Mobile Super App UI Kit View (Screen 8 Nilai) */}
+      <div className="block lg:hidden -m-4 sm:-m-6">
+        <MobileNilaiView />
+      </div>
+
+      {/* Desktop Administrative View */}
+      <div className="hidden lg:block space-y-6">
+        {/* Toast Notification */}
       {notification && (
         <div
           className={`fixed top-5 right-5 z-50 p-4 rounded-2xl shadow-xl flex items-center gap-3 border transition-all duration-300 max-w-md ${
@@ -12741,6 +12749,7 @@ export default function NilaiManagementPage() {
           </div>
         );
       })()}
+      </div>
     </div>
   );
 }

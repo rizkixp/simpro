@@ -15,6 +15,7 @@ import {
 import { formatRupiah, formatDateIndo } from "@/lib/utils";
 import Pagination from "@/components/common/Pagination";
 import { OnlinePaymentModal } from "@/components/payment/OnlinePaymentModal";
+import MobileKeuanganView from "@/components/dashboard/MobileKeuanganView";
 import {
   Bus,
   CreditCard,
@@ -505,9 +506,21 @@ export default function SPPTransportasiPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5 no-print">
+    <div>
+      {/* Mobile Super App UI Kit View (Screen 6 Keuangan) */}
+      <div className="block lg:hidden -m-4 sm:-m-6">
+        <MobileKeuanganView
+          onPayNow={() => {
+            const firstUnpaidStudent = siswaList[0]?.id || "";
+            handleOpenOnlinePayment(firstUnpaidStudent);
+          }}
+        />
+      </div>
+
+      {/* Desktop Administrative View */}
+      <div className="hidden lg:block space-y-6">
+        {/* Header Banner */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5 no-print">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 text-[11px] font-extrabold tracking-wide uppercase">
@@ -2691,6 +2704,7 @@ export default function SPPTransportasiPage() {
           </div>
         );
       })()}
+      </div>
 
       {/* ========================================================================= */}
       {/* MODAL 5: PEMBAYARAN ONLINE (MIDTRANS SNAP & QRIS)                         */}
