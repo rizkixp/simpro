@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { UserRole } from "@/types/school";
@@ -14,6 +14,8 @@ interface HeaderProps {
 
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const isHomeDashboard = pathname === "/dashboard";
   const { user, switchRole, switchUser, userList } = useAuth();
   const { isSupabaseConnected, isSyncing, isAutoPushEnabled, isAutoPushing, lastAutoPushTime, profile } = useSchoolData();
 
@@ -28,7 +30,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const teacherUsers = userList.filter((u) => u.role === "guru");
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 px-4 sm:px-8 flex items-center justify-between shadow-xs no-print">
+    <header className={`sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 px-4 sm:px-8 items-center justify-between shadow-xs no-print ${isHomeDashboard ? "hidden lg:flex" : "flex"}`}>
       {/* Left section: Hamburger, Title & Hijri Date */}
       <div className="flex items-center gap-2.5 sm:gap-5 min-w-0">
         <button

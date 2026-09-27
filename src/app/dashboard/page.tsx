@@ -78,17 +78,21 @@ export default function DashboardOverviewPage() {
   const totalSppTerkumpul = sppLunas.reduce((acc, curr) => acc + curr.nominal, 0);
 
   // Student specific data (if role is siswa or ortu) with guaranteed fallback
+  const childNameFromUser =
+    user?.phone ||
+    user?.name?.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim() ||
+    "Santri Terdaftar";
+
   const fallbackStudent = {
     id: "sis-default",
     nisn: user?.nisnOrNip || "0012345678",
-    nama: user?.name || "Ahmad Rizky Pratama",
-    kelas: user?.kelas || "6",
+    nama: user?.role === "ortu" ? childNameFromUser : user?.name || "Ahmad Rizky Pratama",
+    kelas: user?.kelas || "1A",
     jenisKelamin: "L" as const,
     status: "Aktif" as const,
     avatar:
-      user?.avatar ||
       "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
-    namaWali: "Wali Santri",
+    namaWali: user?.role === "ortu" ? user.name : "Wali Santri",
     noHpWali: "0812-3456-7890",
   };
 
@@ -96,10 +100,11 @@ export default function DashboardOverviewPage() {
     (siswaList || []).find(
       (s) =>
         (user?.nisnOrNip && s.nisn === user.nisnOrNip) ||
-        s.nama.toLowerCase().includes("ahmad rizky")
+        (user?.phone && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
+        (user?.phone && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
+        (user?.role !== "ortu" && s.nama.toLowerCase().includes("ahmad rizky"))
     ) ||
-    (siswaList && siswaList[0]) ||
-    fallbackStudent;
+    (user?.role === "ortu" ? fallbackStudent : (siswaList && siswaList[0]) || fallbackStudent);
 
   // Interactive Buku Penghubung State (Parent Portal)
   const [bukuPenghubungList, setBukuPenghubungList] = useState<

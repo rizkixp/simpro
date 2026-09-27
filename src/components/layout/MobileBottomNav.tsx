@@ -30,7 +30,6 @@ import {
   Shield,
   Search,
   UserCheck,
-  QrCode,
 } from "lucide-react";
 
 export default function MobileBottomNav() {
@@ -59,14 +58,14 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener("open-mobile-drawer", handleOpenDrawer);
   }, []);
 
-  // Navigasi Utama Bawah Bergaya Super-App BRImo (5 Tombol dengan Center Floating FAB)
+  // Navigasi Utama Bawah Mobile (5 Tombol Simetris & Ergonomis)
   const getPrimaryNav = () => {
     switch (currentRole) {
       case "siswa":
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
           { label: "SPP Kas", href: "/dashboard/spp-transportasi", icon: Bus },
-          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
+          { label: "Mutaba'ah", href: "/dashboard/mutabaah", icon: HeartHandshake },
           { label: "Tahfidz", href: "/dashboard/tahfidz", icon: BookOpen },
           { label: "Menu", action: "drawer", icon: Grid },
         ];
@@ -74,15 +73,15 @@ export default function MobileBottomNav() {
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
           { label: "SPP & Bus", href: "/dashboard/spp-transportasi", icon: Bus },
-          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
+          { label: "Mutaba'ah", href: "/dashboard/mutabaah", icon: HeartHandshake },
           { label: "Tahfidz", href: "/dashboard/tahfidz", icon: BookOpen },
           { label: "Menu", action: "drawer", icon: Grid },
         ];
       case "guru":
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
           { label: "E-Rapor", href: "/dashboard/nilai", icon: Award },
-          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
           { label: "LMS", href: "/dashboard/lms", icon: BookOpenCheck },
           { label: "Menu", action: "drawer", icon: Grid },
         ];
@@ -90,8 +89,8 @@ export default function MobileBottomNav() {
         return [
           { label: "Beranda", href: "/dashboard/spp-transportasi", icon: Bus },
           { label: "Buku Kas", href: "/dashboard/keuangan", icon: Wallet },
-          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
           { label: "Tabungan", href: "/dashboard/tabungan", icon: PiggyBank },
+          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
           { label: "Menu", action: "drawer", icon: Grid },
         ];
       case "admin":
@@ -99,7 +98,7 @@ export default function MobileBottomNav() {
         return [
           { label: "Beranda", href: "/dashboard", icon: LayoutDashboard },
           { label: "Siswa", href: "/dashboard/siswa", icon: Users },
-          { label: "Scan QR", href: "/dashboard/presensi", icon: QrCode, isFab: true },
+          { label: "Presensi", href: "/dashboard/presensi", icon: CalendarCheck2 },
           { label: "E-Rapor", href: "/dashboard/nilai", icon: Award },
           { label: "Semua", action: "drawer", icon: Grid },
         ];
@@ -113,7 +112,7 @@ export default function MobileBottomNav() {
     { label: "Data Rombel & Kelas", href: "/dashboard/kelas", icon: Building2, roles: ["admin", "guru"] },
     { label: "Guru & Tenaga Pendidik", href: "/dashboard/guru", icon: GraduationCap, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Jadwal Pembelajaran", href: "/dashboard/jadwal", icon: CalendarDays, roles: ["admin", "guru", "siswa", "ortu"] },
-    { label: "Presensi & Scan Barcode", href: "/dashboard/presensi", icon: CalendarCheck2, roles: ["admin", "guru", "siswa", "ortu"] },
+    { label: "Presensi & Kehadiran", href: "/dashboard/presensi", icon: CalendarCheck2, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "LMS & Tugas Digital", href: "/dashboard/lms", icon: BookOpenCheck, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Jurnal Tahfidz Qur'an", href: "/dashboard/tahfidz", icon: BookOpen, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Mutaba'ah Ibadah Harian", href: "/dashboard/mutabaah", icon: HeartHandshake, roles: ["admin", "guru", "siswa", "ortu"] },
@@ -146,30 +145,6 @@ export default function MobileBottomNav() {
             );
 
             const IconComponent = item.icon;
-
-            // CENTER FLOATING ACTION BUTTON (ala BRImo QRIS Button)
-            if ("isFab" in item && item.isFab) {
-              return (
-                <div key={`nav-${idx}`} className="relative -top-5 flex flex-col items-center justify-center">
-                  <Link
-                    href={item.href!}
-                    onClick={triggerHaptic}
-                    className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#064e3b] via-emerald-600 to-teal-500 p-0.5 shadow-lg shadow-emerald-700/40 ring-4 ring-white dark:ring-slate-900 flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer group"
-                    title="Scan QR / Barcode Presensi"
-                  >
-                    <div className="w-full h-full rounded-full bg-gradient-to-tr from-[#042d22] via-[#064e3b] to-emerald-600 flex flex-col items-center justify-center">
-                      <IconComponent className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
-                      <span className="text-[7.5px] font-black tracking-tighter text-amber-300 uppercase leading-none mt-0.5">
-                        QRIS
-                      </span>
-                    </div>
-                  </Link>
-                  <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 mt-1">
-                    Scan QR
-                  </span>
-                </div>
-              );
-            }
 
             if (isDrawerBtn) {
               return (

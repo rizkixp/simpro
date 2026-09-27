@@ -133,12 +133,20 @@ export default function LMSPage() {
       );
     }
     if (isOrtu) {
+      const childName =
+        user?.phone ||
+        user?.name?.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim() ||
+        "Siswa Anak Asuh";
       return (
-        siswaList[0] || {
+        siswaList.find(
+          (s) =>
+            (user?.nisnOrNip && s.nisn === user.nisnOrNip) ||
+            (user?.phone && s.nama.toLowerCase().includes(user.phone.toLowerCase()))
+        ) || {
           id: "sis-child",
-          nama: "Siswa Anak Asuh",
-          nisn: "0081234567",
-          kelas: "X MIPA 1",
+          nama: childName,
+          nisn: user?.nisnOrNip || "0081234567",
+          kelas: user?.kelas || "X MIPA 1",
         }
       );
     }

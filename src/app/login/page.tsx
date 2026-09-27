@@ -541,18 +541,19 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearLoginRateLimit("wali@sekolah.id");
                     clearLoginRateLimit("ortu@sekolah.id");
-                    setEmail("ortu@sekolah.id");
-                    setPassword("ortu123");
+                    setEmail("wali@sekolah.id");
+                    setPassword("wali");
                     setLockoutRemaining(0);
                     setErrorMsg(null);
                   }}
                   className="p-2 text-xs text-left rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all cursor-pointer group"
                 >
                   <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 truncate">
-                    👨‍👩‍👧 Wali Murid
+                    👨‍👩‍👧 Wali Santri
                   </div>
-                  <div className="text-[10px] text-slate-400 truncate">ortu123</div>
+                  <div className="text-[10px] text-slate-400 truncate">wali@sekolah.id</div>
                 </button>
                 <button
                   type="button"

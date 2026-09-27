@@ -7,32 +7,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { formatRupiah } from "@/lib/utils";
 import {
-  Bell,
-  Headphones,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  CreditCard,
-  Clock,
-  BookCheck,
-  PiggyBank,
-  Search,
-  Calendar,
-  FileText,
-  Bus,
-  HeartHandshake,
-  BookOpen,
-  Receipt,
-  QrCode,
-  Sparkles,
+  Menu,
   ChevronRight,
+  Camera,
+  BookOpen,
+  Clock,
+  Sparkles,
+  CreditCard,
+  PiggyBank,
+  HeartHandshake,
   CheckCircle2,
-  AlertCircle,
-  Shield,
-  Layers,
-  Phone,
-  Wallet,
-  GraduationCap,
+  X,
+  ArrowRight,
+  CalendarCheck2,
+  Award,
+  Bell,
 } from "lucide-react";
 
 export default function MobileSuperAppDashboard() {
@@ -40,44 +29,41 @@ export default function MobileSuperAppDashboard() {
   const { user } = useAuth();
   const {
     siswaList,
-    profile,
     presensiList,
     sppList,
     tabunganList,
     tahfidzList,
-    pengumumanList,
+    mutabaahList,
   } = useSchoolData();
 
-  const [showBalance, setShowBalance] = useState(false);
-  const [greeting, setGreeting] = useState("Selamat Datang");
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [photoStep, setPhotoStep] = useState<"ready" | "capturing" | "done">("ready");
 
-  // Determine dynamic greeting based on current local time
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour >= 3 && hour < 11) {
-      setGreeting("Selamat Pagi");
-    } else if (hour >= 11 && hour < 15) {
-      setGreeting("Selamat Siang");
-    } else if (hour >= 15 && hour < 18) {
-      setGreeting("Selamat Sore");
-    } else {
-      setGreeting("Selamat Malam");
-    }
-  }, []);
+  // Nama Pengguna / Santri
+  const firstName = useMemo(() => {
+    if (!user?.name) return "Santri";
+    const clean = user.name.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim();
+    return clean.split(" ")[0] || "Santri";
+  }, [user]);
 
-  // Student specific data (if role is siswa or ortu) with fallback
+  // Data santri aktif
   const currentSiswa = useMemo(() => {
+    const childNameFromUser =
+      user?.phone ||
+      user?.name?.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim() ||
+      "Santri Terdaftar";
+
     const fallbackStudent = {
       id: "sis-default",
       nisn: user?.nisnOrNip || "0012345678",
-      nama: user?.name || "Ahmad Rizky Pratama",
-      kelas: user?.kelas || "6",
+      nama: user?.role === "ortu" ? childNameFromUser : user?.name || "Ahmad Rizky Pratama",
+      kelas: user?.kelas || "1A",
       jenisKelamin: "L" as const,
       status: "Aktif" as const,
       avatar:
         user?.avatar ||
         "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
-      namaWali: "Wali Santri",
+      namaWali: user?.role === "ortu" ? user.name : "Wali Santri",
       noHpWali: "0812-3456-7890",
     };
 
@@ -85,457 +71,426 @@ export default function MobileSuperAppDashboard() {
       (siswaList || []).find(
         (s) =>
           (user?.nisnOrNip && s.nisn === user.nisnOrNip) ||
-          s.nama.toLowerCase().includes("ahmad rizky")
+          (user?.phone && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
+          (user?.phone && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
+          (user?.role !== "ortu" && s.nama.toLowerCase().includes("ahmad rizky"))
       ) ||
-      (siswaList && siswaList[0]) ||
-      fallbackStudent
+      (user?.role === "ortu" ? fallbackStudent : (siswaList && siswaList[0]) || fallbackStudent)
     );
   }, [siswaList, user]);
 
-  // Compute student tabungan balance or school general balance
+  // Status Tabungan & SPP
   const displaySaldo = useMemo(() => {
     if (user?.role === "ortu" || user?.role === "siswa") {
-      const studentTabungan = tabunganList.find(
-        (t) => t.siswaId === currentSiswa?.id
-      );
+      const studentTabungan = tabunganList.find((t) => t.siswaId === currentSiswa?.id);
       return studentTabungan ? studentTabungan.saldo : 1450000;
     }
-    // Admin / Bendahara view
     const totalTabungan = tabunganList.reduce((acc, curr) => acc + (curr.saldo || 0), 0);
     return totalTabungan || 24850000;
   }, [tabunganList, user, currentSiswa]);
 
-  // Compute student SPP status
   const sppStatus = useMemo(() => {
     if (user?.role === "ortu" || user?.role === "siswa") {
       const studentSpp = sppList.filter((s) => s.siswaId === currentSiswa?.id);
       const hasUnpaid = studentSpp.some((s) => s.status === "Belum Lunas" || s.status === "Jatuh Tempo");
-      return hasUnpaid ? "Tagihan SPP: Menunggak (Rp 350.000)" : "Status SPP: Lunas Bulan Ini";
+      return hasUnpaid ? "Tagihan SPP Belum Lunas" : "SPP Lunas Bulan Ini";
     }
-    return "Status Kas & SPP: Terkelola Baik";
+    return "Status SPP Terkelola";
   }, [sppList, user, currentSiswa]);
 
-  // Check today's attendance for student
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
-  const todayPresensi = useMemo(() => {
-    return presensiList.find(
-      (p) => p.siswaId === currentSiswa?.id && p.tanggal === todayStr
-    );
-  }, [presensiList, currentSiswa, todayStr]);
-
-  // Trigger haptic vibration on touch
+  // Haptic feedback ringan
   const triggerHaptic = () => {
-    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate(10);
+    if (typeof window !== "undefined" && "vibrate" in navigator) {
+      try {
+        navigator.vibrate(10);
+      } catch {}
     }
   };
 
+  const handleOpenDrawer = () => {
+    triggerHaptic();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("open-mobile-drawer"));
+    }
+  };
+
+  const handleCaptureAction = () => {
+    triggerHaptic();
+    setPhotoStep("capturing");
+    setTimeout(() => {
+      setPhotoStep("done");
+      setTimeout(() => {
+        setIsCameraModalOpen(false);
+        setPhotoStep("ready");
+      }, 1400);
+    }, 1200);
+  };
+
   return (
-    <div className="lg:hidden -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 pb-24 bg-slate-50 dark:bg-slate-950 min-h-screen text-slate-800 dark:text-slate-100">
-      {/* 1. TOP HEADER: Dusk / Islamic Twilight Cityscape with Greeting & Actions */}
-      <div className="relative pt-6 pb-14 px-5 bg-gradient-to-b from-[#031d16] via-[#064e3b] to-[#0a5c46] text-white overflow-hidden shadow-lg">
-        {/* Ambient Glow & Sunset Cityscape Silhouettes */}
-        <div className="absolute inset-0 opacity-15 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-400 via-emerald-600 to-transparent" />
-        <div className="absolute -bottom-6 -right-6 w-44 h-44 rounded-full bg-emerald-400/20 blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex items-center justify-between">
-          {/* Logo & Greeting */}
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-emerald-500 p-0.5 shadow-md shrink-0">
-              <div className="h-full w-full rounded-[14px] bg-[#04241b] flex items-center justify-center overflow-hidden">
-                {profile?.appLogoUrl ? (
-                  <img src={profile.appLogoUrl} alt="Logo" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="font-black text-xs text-amber-300">SDI</span>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] text-emerald-200/90 font-medium leading-none">
-                {greeting},
-              </p>
-              <h2 className="text-base font-extrabold tracking-tight text-white mt-1 leading-tight truncate max-w-[170px]">
-                {user?.name?.split(" ")[0] || "Wali Santri"}
-              </h2>
-            </div>
+    <div className="lg:hidden -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 pb-28 min-h-screen bg-[#fcfdff] dark:bg-slate-950 text-slate-800 dark:text-slate-100 px-5 pt-5 select-none">
+      {/* 1. TOP HEADER: Hamburger Menu */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          type="button"
+          onClick={handleOpenDrawer}
+          className="p-1 text-slate-900 dark:text-white hover:opacity-75 active:scale-95 transition-transform cursor-pointer"
+          aria-label="Buka Menu"
+        >
+          {/* Hamburger icon with 3 bold lines matching the design */}
+          <div className="w-6 h-5 flex flex-col justify-between py-0.5">
+            <span className="w-6 h-1 bg-slate-900 dark:bg-white rounded-full" />
+            <span className="w-6 h-1 bg-slate-900 dark:bg-white rounded-full" />
+            <span className="w-6 h-1 bg-slate-900 dark:bg-white rounded-full" />
           </div>
+        </button>
 
-          {/* Right Header Icons (Bell & Help Center CS) */}
-          <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/pengumuman"
-              onClick={triggerHaptic}
-              className="relative p-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white backdrop-blur-md"
-              title="Notifikasi & Pengumuman"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#064e3b] animate-pulse" />
-            </Link>
-
-            <a
-              href="https://wa.me/6285711223344?text=Halo%20Admin%20Sekolah,%20saya%20membutuhkan%20bantuan%20terkait%20aplikasi."
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={triggerHaptic}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white backdrop-blur-md text-xs font-semibold"
-              title="Pusat Bantuan WhatsApp TU"
-            >
-              <Headphones className="w-3.5 h-3.5 text-amber-300" />
-              <span className="text-[11px]">Bantuan</span>
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. HERO FLOATING CARD: Overlapping White Card with Embedded Emerald Card & 4 Quick Actions */}
-      <div className="px-4 -mt-9 relative z-20">
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-xl shadow-slate-900/10 border border-slate-100 dark:border-slate-800">
-          {/* Top Embedded Card: Gradient Emerald (Balance & SPP status) */}
-          <div className="rounded-2xl p-4 bg-gradient-to-r from-[#042d22] via-[#064e3b] to-[#085f47] text-white shadow-md border border-emerald-500/20 relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-emerald-200/90 font-medium">
-                {user?.role === "ortu" || user?.role === "siswa"
-                  ? "Saldo Tabungan Santri"
-                  : "Total Kas Operasional"}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic();
-                  setShowBalance(!showBalance);
-                }}
-                className="p-1 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 transition-colors"
-                title={showBalance ? "Sembunyikan Saldo" : "Lihat Saldo"}
-              >
-                {showBalance ? (
-                  <EyeOff className="w-4 h-4 text-emerald-300" />
-                ) : (
-                  <Eye className="w-4 h-4 text-emerald-300" />
-                )}
-              </button>
-            </div>
-
-            {/* Nominal Display */}
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-xl sm:text-2xl font-black tracking-tight text-white font-mono">
-                {showBalance ? formatRupiah(displaySaldo) : "Rp ••••••••••"}
-              </span>
-            </div>
-
-            {/* Bottom Status Row inside Card */}
-            <Link
-              href="/dashboard/spp-transportasi"
-              onClick={triggerHaptic}
-              className="mt-3.5 pt-2.5 border-t border-emerald-700/60 flex items-center justify-between text-xs text-emerald-100/90 hover:text-white group"
-            >
-              <div className="flex items-center gap-1.5 truncate">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="truncate font-medium">{sppStatus}</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-emerald-300 group-hover:translate-x-1 transition-transform shrink-0" />
-            </Link>
-          </div>
-
-          {/* Bottom 4 Quick Action Buttons (Transfer, SPP, Presensi, Tahfidz) */}
-          <div className="grid grid-cols-4 gap-2 pt-4 text-center">
-            {/* Action 1: Bayar SPP */}
-            <Link
-              href="/dashboard/spp-transportasi"
-              onClick={triggerHaptic}
-              className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shadow-2xs group-hover:bg-emerald-100 transition-colors">
-                <CreditCard className="w-5 h-5" />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate w-full">
-                Bayar SPP
-              </span>
-            </Link>
-
-            {/* Action 2: Presensi Siswa */}
-            <Link
-              href="/dashboard/presensi"
-              onClick={triggerHaptic}
-              className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/80 flex items-center justify-center text-blue-700 dark:text-blue-300 shadow-2xs group-hover:bg-blue-100 transition-colors">
-                <Clock className="w-5 h-5" />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate w-full">
-                Presensi
-              </span>
-            </Link>
-
-            {/* Action 3: Tahfidz Qur'an */}
-            <Link
-              href="/dashboard/tahfidz"
-              onClick={triggerHaptic}
-              className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200/80 dark:border-teal-800/80 flex items-center justify-center text-teal-700 dark:text-teal-300 shadow-2xs group-hover:bg-teal-100 transition-colors">
-                <BookCheck className="w-5 h-5" />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate w-full">
-                Tahfidz
-              </span>
-            </Link>
-
-            {/* Action 4: Tabungan Santri */}
-            <Link
-              href="/dashboard/tabungan"
-              onClick={triggerHaptic}
-              className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-800/80 flex items-center justify-center text-amber-700 dark:text-amber-300 shadow-2xs group-hover:bg-amber-100 transition-colors">
-                <PiggyBank className="w-5 h-5" />
-              </div>
-              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate w-full">
-                Tabungan
-              </span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. PROMOTIONAL / MADRASAH ANNOUNCEMENT CAROUSEL BANNER */}
-      <div className="px-4 mt-4">
         <Link
           href="/dashboard/pengumuman"
           onClick={triggerHaptic}
-          className="block relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 p-4 text-white shadow-md active:scale-98 transition-all"
+          className="relative p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title="Notifikasi"
         >
-          <div className="relative z-10 flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-xs">
-                Agenda Madrasah
-              </span>
-              <h3 className="font-extrabold text-sm sm:text-base leading-tight mt-1 truncate">
-                Ujian PTS & Khotmil Qur&apos;an Santri
-              </h3>
-              <p className="text-[11px] text-amber-100/90 truncate mt-0.5">
-                Cek jadwal ujian dan setoran tahfidz semester ini
-              </p>
-            </div>
-            <div className="px-3 py-1.5 rounded-xl bg-white text-amber-800 font-bold text-xs shrink-0 shadow-sm flex items-center gap-1">
-              <span>Buka</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </div>
-          </div>
+          <Bell className="w-5 h-5" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500" />
         </Link>
       </div>
 
-      {/* 4. SEARCH BAR (Triggers Universal Command Center Ctrl+K) */}
-      <div className="px-4 mt-4">
+      {/* 2. GREETING TITLE: Welcome, [Name]! */}
+      <div className="mb-5">
+        <h1 className="text-[28px] sm:text-[32px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
+          Welcome,{firstName}!
+        </h1>
+      </div>
+
+      {/* 3. CARD 1: Congratulations! Streak Banner (Pastel Yellow / Peach) */}
+      <Link
+        href="/dashboard/mutabaah"
+        onClick={triggerHaptic}
+        className="block mb-5 relative overflow-hidden rounded-[24px] bg-gradient-to-r from-[#ffeab3] via-[#ffdf8a] to-[#ffd470] dark:from-amber-400 dark:to-amber-500 p-4 sm:p-5 shadow-sm active:scale-[0.98] transition-all group"
+      >
+        {/* Subtle decorative background circles */}
+        <div className="absolute top-2 right-14 w-12 h-12 rounded-full bg-white/20 blur-xs pointer-events-none" />
+        <div className="absolute -bottom-4 left-24 w-16 h-16 rounded-full bg-amber-300/30 blur-sm pointer-events-none" />
+
+        <div className="relative z-10 flex items-center justify-between gap-3">
+          <div className="min-w-0 pr-2">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug tracking-tight">
+              Congratulations!
+            </h3>
+            <p className="text-xs sm:text-sm font-semibold text-slate-800/90 mt-0.5">
+              You have been streak for <span className="font-black text-slate-950 text-sm sm:text-base">7</span> days
+            </p>
+          </div>
+
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white shadow-xs flex items-center justify-center text-slate-800 shrink-0 group-hover:translate-x-0.5 transition-transform">
+            <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+          </div>
+        </div>
+      </Link>
+
+      {/* 4. CARD 2: Hero Mascot Card - "Check Your Steps" (Pastel Sky Blue) */}
+      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-b from-[#bde7ff] via-[#cceeff] to-[#aee1fc] p-6 shadow-sm border border-sky-200/50 flex flex-col items-center justify-center text-center">
+        {/* Subtle background marine elements (bubbles & bottle silhouette) */}
+        <div className="absolute top-8 left-6 w-8 h-8 rounded-full bg-white/40 blur-2xs pointer-events-none" />
+        <div className="absolute top-28 left-8 w-4 h-4 rounded-full bg-white/50 blur-2xs pointer-events-none" />
+        <div className="absolute top-14 right-8 w-6 h-14 rounded-full bg-white/20 -rotate-45 pointer-events-none" />
+        <div className="absolute bottom-16 right-6 w-9 h-9 rounded-full bg-white/35 blur-2xs pointer-events-none" />
+
+        {/* Mascot: Adorable Blue Dolphin with Lifebuoy Float */}
+        <div className="relative z-10 my-1">
+          <svg
+            viewBox="0 0 200 200"
+            className="w-36 h-36 sm:w-44 sm:h-44 drop-shadow-sm select-none"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Water splashes at bottom */}
+            <path d="M70 170 C60 160 50 165 45 172 C55 175 65 174 70 170 Z" fill="#E0F2FE" opacity="0.9" />
+            <path d="M130 170 C140 160 150 165 155 172 C145 175 135 174 130 170 Z" fill="#E0F2FE" opacity="0.9" />
+            <path d="M85 178 C95 182 105 182 115 178 C110 185 90 185 85 178 Z" fill="#BAE6FD" />
+
+            {/* Dolphin tail below swim ring */}
+            <path
+              d="M92 160 C90 172 82 178 78 184 C88 182 98 175 100 170 C102 175 112 182 122 184 C118 178 110 172 108 160 Z"
+              fill="#38BDF8"
+              stroke="#0284C7"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+
+            {/* Left Flipper / Waving Hand */}
+            <path
+              d="M60 115 C45 105 32 90 40 80 C48 78 60 92 68 108 Z"
+              fill="#38BDF8"
+              stroke="#0284C7"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+
+            {/* Right Flipper */}
+            <path
+              d="M140 115 C155 120 168 135 160 142 C152 144 142 132 135 122 Z"
+              fill="#38BDF8"
+              stroke="#0284C7"
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+
+            {/* Dolphin Body / Head */}
+            <path
+              d="M100 35 C65 35 55 65 58 110 C60 140 75 155 100 155 C125 155 140 140 142 110 C145 65 135 35 100 35 Z"
+              fill="#38BDF8"
+              stroke="#0284C7"
+              strokeWidth="2.5"
+            />
+
+            {/* Dorsal Fin on top back */}
+            <path
+              d="M96 35 C98 20 108 12 118 15 C116 25 108 32 104 36 Z"
+              fill="#0EA5E9"
+              stroke="#0284C7"
+              strokeWidth="2"
+            />
+
+            {/* White Belly & Chin */}
+            <path
+              d="M100 65 C80 65 72 85 74 125 C75 145 88 152 100 152 C112 152 125 145 126 125 C128 85 120 65 100 65 Z"
+              fill="#F0F9FF"
+            />
+
+            {/* Swim Ring (Red & White striped Lifebuoy) */}
+            <ellipse cx="100" cy="142" rx="44" ry="16" fill="#EF4444" stroke="#B91C1C" strokeWidth="2.5" />
+            {/* White stripes on swim ring */}
+            <path d="M72 136 C74 133 79 133 82 137 L79 149 C76 150 71 149 70 146 Z" fill="#FFFFFF" />
+            <path d="M118 137 C121 133 126 133 128 136 L130 146 C129 149 124 150 121 149 Z" fill="#FFFFFF" />
+            <path d="M96 128 C98 127 102 127 104 128 L104 158 C102 158 98 158 96 158 Z" fill="#FFFFFF" />
+
+            {/* Cute Dolphin Cheeks */}
+            <ellipse cx="74" cy="98" rx="6" ry="3.5" fill="#FDA4AF" opacity="0.85" />
+            <ellipse cx="126" cy="98" rx="6" ry="3.5" fill="#FDA4AF" opacity="0.85" />
+
+            {/* Big Happy Eyes */}
+            <ellipse cx="80" cy="80" rx="9" ry="12" fill="#0F172A" />
+            <ellipse cx="78" cy="76" rx="4" ry="5.5" fill="#FFFFFF" />
+            <circle cx="83" cy="84" r="2" fill="#FFFFFF" />
+
+            <ellipse cx="120" cy="80" rx="9" ry="12" fill="#0F172A" />
+            <ellipse cx="118" cy="76" rx="4" ry="5.5" fill="#FFFFFF" />
+            <circle cx="123" cy="84" r="2" fill="#FFFFFF" />
+
+            {/* Snout / Open Smile */}
+            <path d="M82 94 C90 106 110 106 118 94 C115 116 85 116 82 94 Z" fill="#0F172A" />
+            {/* Tongue */}
+            <path d="M88 102 C94 112 106 112 112 102 C108 114 92 114 88 102 Z" fill="#F472B6" />
+          </svg>
+        </div>
+
+        {/* Title: Check Your Steps */}
+        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1 mb-3">
+          Check Your Steps
+        </h2>
+
+        {/* Big Dark Navy / Indigo Circular Camera Action Button */}
         <button
           type="button"
           onClick={() => {
             triggerHaptic();
-            window.dispatchEvent(new CustomEvent("open-command-palette"));
+            setIsCameraModalOpen(true);
           }}
-          className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-slate-400 text-xs shadow-xs active:bg-slate-100 transition-colors"
+          className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#1b1747] hover:bg-[#141038] shadow-xl shadow-indigo-950/25 ring-4 ring-white/60 flex items-center justify-center text-white active:scale-90 transition-all cursor-pointer"
+          title="Buka Kamera Aktivitas"
+          aria-label="Buka Kamera Presensi dan Aktivitas"
         >
-          <div className="flex items-center gap-2.5">
-            <Search className="w-4 h-4 text-slate-400" />
-            <span className="text-slate-500 dark:text-slate-400 font-medium">
-              Cari fitur, siswa, nilai, modul...
-            </span>
-          </div>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
-            Ctrl K
-          </span>
+          <Camera className="w-7 h-7 sm:w-8 sm:h-8 text-white stroke-[2]" />
         </button>
       </div>
 
-      {/* 5. 8-GRID SERVICE MENU (4x2 Pastel Squircle Cards) */}
-      <div className="px-4 mt-5">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Layanan Akademik & Santri
-          </h3>
-          <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
-            8 Layanan
+      {/* 5. CARDS 3 & 4: Two Bento Cards - "Practice" & "History" */}
+      <div className="grid grid-cols-2 gap-3.5 sm:gap-4 mt-4">
+        {/* Left Card: Practice (Pastel Pink) */}
+        <Link
+          href="/dashboard/lms"
+          onClick={triggerHaptic}
+          className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#ffd5e5] via-[#ffc6dc] to-[#ffb6d3] p-5 shadow-xs flex flex-col items-center justify-center text-center group active:scale-95 transition-all cursor-pointer"
+        >
+          {/* Subtle math watermark on bottom left */}
+          <span className="absolute bottom-1 left-2 text-2xl font-serif font-black text-pink-400/30 select-none pointer-events-none">
+            √x
           </span>
-        </div>
 
-        <div className="grid grid-cols-4 gap-3">
-          {/* Item 1: Presensi Barcode */}
-          <Link
-            href="/dashboard/presensi"
-            onClick={triggerHaptic}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/70 dark:border-emerald-800/70 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs relative">
-              <Calendar className="w-6 h-6" />
-              {todayPresensi && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
-              )}
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              Presensi
-            </span>
-          </Link>
+          <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mb-2.5 text-pink-600 group-hover:scale-105 transition-transform">
+            <BookOpen className="w-6 h-6 stroke-[2.2]" />
+          </div>
 
-          {/* Item 2: E-Rapor & Nilai */}
-          <Link
-            href="/dashboard/nilai"
-            onClick={triggerHaptic}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 dark:border-blue-800/70 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-xs">
-              <FileText className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              E-Rapor
-            </span>
-          </Link>
+          <span className="text-sm font-black text-[#9d174d] tracking-tight">
+            Practice
+          </span>
+        </Link>
 
-          {/* Item 3: Bus Jemputan */}
-          <Link
-            href="/dashboard/spp-transportasi"
-            onClick={triggerHaptic}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200/70 dark:border-amber-800/70 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-xs">
-              <Bus className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              Bus Sekolah
-            </span>
-          </Link>
+        {/* Right Card: History (Pastel Purple / Lavender) */}
+        <Link
+          href="/dashboard/nilai"
+          onClick={triggerHaptic}
+          className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#dfd8fd] via-[#d5cafc] to-[#c7bafc] p-5 shadow-xs flex flex-col items-center justify-center text-center group active:scale-95 transition-all cursor-pointer"
+        >
+          {/* Subtle geometry watermark on bottom left */}
+          <span className="absolute bottom-1 left-3 text-xl font-black text-purple-400/30 select-none pointer-events-none">
+            📐
+          </span>
 
-          {/* Item 4: Mutaba'ah Ibadah */}
-          <Link
-            href="/dashboard/mutabaah"
-            onClick={triggerHaptic}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200/70 dark:border-rose-800/70 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-xs">
-              <HeartHandshake className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              Mutaba&apos;ah
-            </span>
-          </Link>
+          <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mb-2.5 text-purple-600 group-hover:scale-105 transition-transform">
+            <Clock className="w-6 h-6 stroke-[2.2]" />
+          </div>
 
-          {/* Item 5: E-Learning LMS */}
-          <Link
-            href="/dashboard/lms"
-            onClick={triggerHaptic}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/70 dark:border-indigo-800/70 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
-              <BookOpen className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              LMS Tugas
-            </span>
-          </Link>
+          <span className="text-sm font-black text-[#5b21b6] tracking-tight">
+            History
+          </span>
+        </Link>
+      </div>
 
-          {/* Item 6: Kuitansi Kas */}
-          <Link
-            href="/dashboard/spp-transportasi"
-            onClick={triggerHaptic}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200/70 dark:border-teal-800/70 flex items-center justify-center text-teal-600 dark:text-teal-400 shadow-xs">
-              <Receipt className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              Kuitansi
-            </span>
-          </Link>
-
-          {/* Item 7: Smart ID Card */}
-          <Link
-            href="/dashboard/siswa"
-            onClick={triggerHaptic}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200/70 dark:border-purple-800/70 flex items-center justify-center text-purple-600 dark:text-purple-400 shadow-xs">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              Kartu Santri
-            </span>
-          </Link>
-
-          {/* Item 8: Semua Modul Drawer */}
+      {/* 6. SECONDARY EDUCATION SHORTCUTS (SPP, Tahfidz, Tabungan) */}
+      <div className="mt-6 pt-2">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            Menu Sekolah
+          </span>
           <button
             type="button"
-            onClick={() => {
-              triggerHaptic();
-              window.dispatchEvent(new CustomEvent("open-mobile-drawer"));
-            }}
-            className="flex flex-col items-center gap-1.5 group active:scale-95 transition-transform"
+            onClick={handleOpenDrawer}
+            className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-0.5"
           >
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-xs">
-              <Layers className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 text-center leading-tight">
-              Semua Menu
-            </span>
+            <span>Semua Modul</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
 
-      {/* 6. RECENT MUTATION & ACTIVITY SNIPPET */}
-      <div className="px-4 mt-6">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Aktivitas Terkini Ananda
-          </h3>
+        <div className="grid grid-cols-3 gap-2.5">
+          {/* Shortcut 1: SPP */}
           <Link
-            href="/dashboard/presensi"
+            href="/dashboard/spp-transportasi"
             onClick={triggerHaptic}
-            className="text-xs text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-0.5"
+            className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col items-center text-center active:scale-95 transition-transform"
           >
-            <span>Selengkapnya</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center mb-1.5">
+              <CreditCard className="w-4 h-4" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">SPP & Bus</span>
+            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold truncate w-full mt-0.5">
+              {sppStatus.includes("Lunas") ? "Lunas ✓" : "Cek Tagihan"}
+            </span>
+          </Link>
+
+          {/* Shortcut 2: Tahfidz */}
+          <Link
+            href="/dashboard/tahfidz"
+            onClick={triggerHaptic}
+            className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col items-center text-center active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-950 text-teal-600 flex items-center justify-center mb-1.5">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Tahfidz</span>
+            <span className="text-[9px] text-teal-600 dark:text-teal-400 font-semibold truncate w-full mt-0.5">
+              Juz 30
+            </span>
+          </Link>
+
+          {/* Shortcut 3: Tabungan */}
+          <Link
+            href="/dashboard/tabungan"
+            onClick={triggerHaptic}
+            className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col items-center text-center active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-600 flex items-center justify-center mb-1.5">
+              <PiggyBank className="w-4 h-4" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Tabungan</span>
+            <span className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold truncate w-full mt-0.5 font-mono">
+              {formatRupiah(displaySaldo).replace(",00", "")}
+            </span>
           </Link>
         </div>
+      </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-xs space-y-3">
-          {/* Activity 1: Presensi Hari Ini */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
-                <Clock className="w-5 h-5" />
+      {/* 7. INTERACTIVE CAMERA CHECK-IN MODAL (When tapping the center camera button) */}
+      {isCameraModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-950 text-[#1b1747] dark:text-indigo-300 flex items-center justify-center">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  Check Your Steps
+                </h3>
               </div>
-              <div className="min-w-0">
-                <p className="font-bold text-xs text-slate-800 dark:text-white truncate">
-                  Presensi Kedatangan Madrasah
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {todayPresensi ? `Hadir pukul ${todayPresensi.waktuMasuk || "06:55"} WIB` : "Belum ada rekaman tap hari ini"}
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsCameraModalOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
-              {todayPresensi ? "Hadir" : "Belum Tap"}
-            </span>
-          </div>
 
-          {/* Activity 2: Setoran Tahfidz */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 flex items-center justify-center shrink-0">
-                <BookCheck className="w-5 h-5" />
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Dokumentasikan aktivitas belajar, mutaba&apos;ah mandiri, atau ambil presensi kehadiran harian ananda.
+            </p>
+
+            {photoStep === "ready" && (
+              <div className="space-y-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleCaptureAction}
+                  className="w-full py-3 px-4 rounded-2xl bg-[#1b1747] hover:bg-[#141038] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Ambil Foto Kehadiran / Aktivitas</span>
+                </button>
+
+                <Link
+                  href="/dashboard/presensi"
+                  onClick={() => setIsCameraModalOpen(false)}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-200 font-semibold text-xs flex items-center justify-center gap-2 border border-sky-200 dark:border-sky-800"
+                >
+                  <CalendarCheck2 className="w-4 h-4" />
+                  <span>Buka Halaman Presensi Lengkap</span>
+                </Link>
+
+                <Link
+                  href="/dashboard/mutabaah"
+                  onClick={() => setIsCameraModalOpen(false)}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-pink-50 dark:bg-pink-950 text-pink-800 dark:text-pink-200 font-semibold text-xs flex items-center justify-center gap-2 border border-pink-200 dark:border-pink-800"
+                >
+                  <HeartHandshake className="w-4 h-4" />
+                  <span>Isi Mutaba&apos;ah Yaumiyah Mandiri</span>
+                </Link>
               </div>
-              <div className="min-w-0">
-                <p className="font-bold text-xs text-slate-800 dark:text-white truncate">
-                  Setoran Ziyadah Hafalan
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  Surah An-Naba&apos; (Ayat 1-20) • Mutqin
+            )}
+
+            {photoStep === "capturing" && (
+              <div className="py-6 flex flex-col items-center justify-center gap-3">
+                <div className="w-12 h-12 rounded-full border-3 border-indigo-600 border-t-transparent animate-spin" />
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Mengambil foto & mencatat langkah santri...
                 </p>
               </div>
-            </div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 shrink-0">
-              A (Mumtaz)
-            </span>
+            )}
+
+            {photoStep === "done" && (
+              <div className="py-6 flex flex-col items-center justify-center gap-2">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center animate-bounce">
+                  <CheckCircle2 className="w-7 h-7" />
+                </div>
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                  Alhamdulillah! Langkah & Ibadah Berhasil Dicatat!
+                </p>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
