@@ -22,7 +22,7 @@ interface MobileStudentProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   siswa?: Partial<Siswa> | Siswa | null;
-  user: User | null;
+  user?: User | null;
 }
 
 export default function MobileStudentProfileModal({

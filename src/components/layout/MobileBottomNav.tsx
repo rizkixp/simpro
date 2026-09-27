@@ -34,6 +34,8 @@ import {
   Search,
   MessageSquare,
   User as UserIcon,
+  QrCode,
+  Receipt,
 } from "lucide-react";
 
 export default function MobileBottomNav() {
@@ -101,8 +103,8 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener("open-mobile-drawer", handleOpenDrawer);
   }, []);
 
-  // Navigasi Utama Bawah Mobile (4 Tab Sesuai Education Mobile UI Kits Screen 3)
-  // [Beranda, Jadwal, Pesan, Profil]
+  // Navigasi Utama Bawah Mobile (5 Tab ala BRImo dengan Tombol QRIS Floating di Tengah)
+  // [Beranda, Mutasi, QRIS (Floating), Pesan, Akun]
   const primaryNavItems = [
     {
       label: "Beranda",
@@ -111,10 +113,17 @@ export default function MobileBottomNav() {
       isActive: safePathname === "/dashboard",
     },
     {
-      label: "Jadwal",
-      href: "/dashboard/jadwal",
-      icon: CalendarDays,
-      isActive: safePathname === "/dashboard/jadwal",
+      label: "Mutasi",
+      href: "/dashboard/spp-transportasi",
+      icon: Receipt,
+      isActive: safePathname === "/dashboard/spp-transportasi" || safePathname === "/dashboard/keuangan",
+    },
+    {
+      label: "QRIS",
+      href: "/dashboard/presensi",
+      icon: QrCode,
+      isCenterFloating: true,
+      isActive: safePathname === "/dashboard/presensi",
     },
     {
       label: "Pesan",
@@ -123,7 +132,7 @@ export default function MobileBottomNav() {
       isActive: false,
     },
     {
-      label: "Profil",
+      label: "Akun",
       action: "profil",
       icon: UserIcon,
       isActive: safePathname === "/dashboard/pengaturan",
@@ -154,14 +163,33 @@ export default function MobileBottomNav() {
 
   return (
     <>
-      {/* 1. NATIVE BOTTOM NAVIGATION BAR (4 Tab Simetris ala Education Mobile UI Kits) */}
+      {/* 1. NATIVE BOTTOM NAVIGATION BAR (5 Tab ala BRImo dengan Tombol QRIS Floating di Tengah) */}
       <nav
         aria-label="Navigasi Aplikasi Mobile"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
       >
-        <div className="grid grid-cols-4 h-16 max-w-md mx-auto px-2">
+        <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
           {primaryNavItems.map((item, idx) => {
             const IconComponent = item.icon;
+
+            // Center Floating QRIS Button
+            if ((item as any).isCenterFloating) {
+              return (
+                <Link
+                  key={`nav-${idx}`}
+                  href={item.href!}
+                  onClick={triggerHaptic}
+                  className="flex flex-col items-center justify-center -mt-6 group active:scale-95 transition-transform"
+                >
+                  <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#00529C] to-[#0A6EC7] text-white shadow-lg shadow-blue-900/30 flex items-center justify-center ring-4 ring-[#F4F7FB] dark:ring-slate-900">
+                    <QrCode className="h-6 w-6 stroke-[2.5]" />
+                  </div>
+                  <span className="text-[10px] font-extrabold text-[#00529C] dark:text-blue-400 mt-1">
+                    QRIS
+                  </span>
+                </Link>
+              );
+            }
 
             if (item.action) {
               return (
@@ -178,14 +206,14 @@ export default function MobileBottomNav() {
                   }}
                   className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform cursor-pointer ${
                     item.isActive
-                      ? "text-[#056839] dark:text-emerald-400 font-bold"
+                      ? "text-[#00529C] dark:text-blue-400 font-bold"
                       : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                   }`}
                 >
                   <div
-                    className={`p-1.5 px-3 rounded-full transition-all ${
+                    className={`p-1.5 px-2.5 rounded-full transition-all ${
                       item.isActive
-                        ? "bg-emerald-50 dark:bg-emerald-950/70 text-[#056839] dark:text-emerald-400 font-bold shadow-xs"
+                        ? "bg-blue-50 dark:bg-blue-950/70 text-[#00529C] dark:text-blue-400 font-bold shadow-xs"
                         : ""
                     }`}
                   >
@@ -203,14 +231,14 @@ export default function MobileBottomNav() {
                 onClick={triggerHaptic}
                 className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform ${
                   item.isActive
-                    ? "text-[#056839] dark:text-emerald-400 font-bold"
+                    ? "text-[#00529C] dark:text-blue-400 font-bold"
                     : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 }`}
               >
                 <div
-                  className={`p-1.5 px-3 rounded-full transition-all ${
+                  className={`p-1.5 px-2.5 rounded-full transition-all ${
                     item.isActive
-                      ? "bg-emerald-50 dark:bg-emerald-950/70 text-[#056839] dark:text-emerald-400 font-bold shadow-xs"
+                      ? "bg-blue-50 dark:bg-blue-950/70 text-[#00529C] dark:text-blue-400 font-bold shadow-xs"
                       : ""
                   }`}
                 >

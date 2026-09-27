@@ -15,7 +15,7 @@ import { User as UserType } from "@/types/school";
 interface MobileBukuPesanDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  user: UserType | null;
+  user?: UserType | null;
 }
 
 export default function MobileBukuPesanDrawer({
