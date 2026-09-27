@@ -138,10 +138,10 @@ export default function LMSPage() {
         user?.name?.replace(/^(wali murid|wali santri|wali|orang tua|ayah|bunda|ibu|abi|umi)\s+/i, "").trim() ||
         "Siswa Anak Asuh";
       return (
-        siswaList.find(
+        (siswaList || []).find(
           (s) =>
-            (user?.nisnOrNip && s.nisn === user.nisnOrNip) ||
-            (user?.phone && s.nama.toLowerCase().includes(user.phone.toLowerCase()))
+            (user?.nisnOrNip && s?.nisn === user.nisnOrNip) ||
+            (user?.phone && s?.nama && s.nama.toLowerCase().includes(user.phone.toLowerCase()))
         ) || {
           id: "sis-child",
           nama: childName,

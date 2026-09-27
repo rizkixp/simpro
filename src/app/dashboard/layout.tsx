@@ -29,10 +29,13 @@ export default function DashboardLayout({
         }
         if (typeof window !== "undefined") {
           localStorage.removeItem("sim_auth_user");
-          window.location.replace("/login?redirectTo=" + encodeURIComponent(pathname));
+          window.location.replace("/login?redirectTo=" + encodeURIComponent(pathname || "/dashboard"));
         }
         return;
       }
+
+      if (!pathname) return;
+
       // 1. Proteksi Halaman Khusus Administrator (Pengguna & Pengaturan)
       const adminOnlyPaths = [
         "/dashboard/pengguna",
@@ -40,7 +43,7 @@ export default function DashboardLayout({
       ];
       const userRole = (user.role || "").toLowerCase();
       if (
-        adminOnlyPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) &&
+        adminOnlyPaths.some((p) => pathname === p || Boolean(pathname?.startsWith(p + "/"))) &&
         userRole !== "admin"
       ) {
         router.replace("/dashboard");
@@ -53,7 +56,7 @@ export default function DashboardLayout({
         "/dashboard/kelas",
       ];
       if (
-        teacherAdminPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) &&
+        teacherAdminPaths.some((p) => pathname === p || Boolean(pathname?.startsWith(p + "/"))) &&
         userRole !== "admin" &&
         userRole !== "guru"
       ) {
@@ -69,7 +72,7 @@ export default function DashboardLayout({
           "/dashboard/tabungan",
         ];
         const isAllowed = allowedFinancePaths.some(
-          (p) => pathname === p || pathname.startsWith(p + "/")
+          (p) => pathname === p || Boolean(pathname?.startsWith(p + "/"))
         );
         if (!isAllowed) {
           router.replace("/dashboard/spp-transportasi");
@@ -80,7 +83,7 @@ export default function DashboardLayout({
       // 4. Batasi Siswa & Orang Tua dari Pembukuan Kas Internal Sekolah
       if (
         (userRole === "siswa" || userRole === "ortu") &&
-        (pathname === "/dashboard/keuangan" || pathname.startsWith("/dashboard/keuangan/"))
+        (pathname === "/dashboard/keuangan" || Boolean(pathname?.startsWith("/dashboard/keuangan/")))
       ) {
         router.replace("/dashboard/spp-transportasi");
         return;

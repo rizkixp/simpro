@@ -41,6 +41,7 @@ export default function MobileBottomNav() {
   if (!user) return null;
 
   const currentRole = (user.role || "siswa").toLowerCase();
+  const safePathname = pathname || "";
 
   // Haptic feedback saat tab ditekan di smartphone Android
   const triggerHaptic = () => {
@@ -140,8 +141,8 @@ export default function MobileBottomNav() {
             const isDrawerBtn = item.action === "drawer";
             const isActive = !isDrawerBtn && item.href && (
               item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname === item.href || pathname.startsWith(item.href + "/")
+                ? safePathname === "/dashboard"
+                : safePathname === item.href || safePathname.startsWith(item.href + "/")
             );
 
             const IconComponent = item.icon;
@@ -276,7 +277,7 @@ export default function MobileBottomNav() {
                 </p>
                 <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-4">
                   {filteredModules.map((item, idx) => {
-                    const isModActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+                    const isModActive = safePathname === item.href || (item.href !== "/dashboard" && safePathname.startsWith(item.href + "/"));
                     const ModIcon = item.icon;
 
                     return (

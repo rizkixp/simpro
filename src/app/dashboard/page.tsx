@@ -99,10 +99,10 @@ export default function DashboardOverviewPage() {
   const currentSiswa =
     (siswaList || []).find(
       (s) =>
-        (user?.nisnOrNip && s.nisn === user.nisnOrNip) ||
-        (user?.phone && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
-        (user?.phone && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
-        (user?.role !== "ortu" && s.nama.toLowerCase().includes("ahmad rizky"))
+        (user?.nisnOrNip && s?.nisn === user.nisnOrNip) ||
+        (user?.phone && s?.nama && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
+        (user?.phone && s?.nama && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
+        (user?.role !== "ortu" && s?.nama && s.nama.toLowerCase().includes("ahmad rizky"))
     ) ||
     (user?.role === "ortu" ? fallbackStudent : (siswaList && siswaList[0]) || fallbackStudent);
 
@@ -152,25 +152,25 @@ export default function DashboardOverviewPage() {
   };
 
   // Student specific data for Parent Portal
-  const studentNilaiRecords = nilaiList.filter((n) => n.siswaId === currentSiswa?.id);
+  const studentNilaiRecords = (nilaiList || []).filter((n) => n?.siswaId === currentSiswa?.id);
   const studentAvgScore =
     studentNilaiRecords.length > 0
       ? Math.round(
-          studentNilaiRecords.reduce((acc, curr) => acc + (curr.nilaiAkhir || curr.nilaiMid || 80), 0) /
+          studentNilaiRecords.reduce((acc, curr) => acc + (curr?.nilaiAkhir || curr?.nilaiMid || 80), 0) /
             studentNilaiRecords.length
         )
       : 88;
 
   const studentTodayRecord =
-    mutabaahList.find((m) => m.siswaId === currentSiswa?.id && m.tanggal === todayStr) ||
-    mutabaahList.find((m) => m.siswaId === currentSiswa?.id);
+    (mutabaahList || []).find((m) => m?.siswaId === currentSiswa?.id && m?.tanggal === todayStr) ||
+    (mutabaahList || []).find((m) => m?.siswaId === currentSiswa?.id);
 
-  const studentTodayPresensi = presensiList.find(
-    (p) => p.siswaId === currentSiswa?.id && p.tanggal === todayStr
+  const studentTodayPresensi = (presensiList || []).find(
+    (p) => p?.siswaId === currentSiswa?.id && p?.tanggal === todayStr
   );
 
-  const studentSpp = sppList.filter((s) => s.siswaId === currentSiswa?.id);
-  const isStudentSppLunas = studentSpp.some((s) => s.status === "Lunas");
+  const studentSpp = (sppList || []).filter((s) => s?.siswaId === currentSiswa?.id);
+  const isStudentSppLunas = studentSpp.some((s) => s?.status === "Lunas");
 
   // =========================================================================
   // RENDER KHUSUS: PORTAL WALI SANTRI (PARENT PORTAL) JIKA ROLE ADALAH ORTU
@@ -664,7 +664,7 @@ export default function DashboardOverviewPage() {
                 <span>
                   {teacherScope.isTeacher
                     ? `Wali: ${teacherScope.teacherName}`
-                    : `${siswaList.filter((s) => s.status === "Aktif").length} Santri Aktif`}
+                    : `${(siswaList || []).filter((s) => s?.status === "Aktif").length} Santri Aktif`}
                 </span>
               </div>
             </div>

@@ -70,10 +70,10 @@ export default function MobileSuperAppDashboard() {
     return (
       (siswaList || []).find(
         (s) =>
-          (user?.nisnOrNip && s.nisn === user.nisnOrNip) ||
-          (user?.phone && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
-          (user?.phone && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
-          (user?.role !== "ortu" && s.nama.toLowerCase().includes("ahmad rizky"))
+          (user?.nisnOrNip && s?.nisn === user.nisnOrNip) ||
+          (user?.phone && s?.nama && s.nama.toLowerCase() === user.phone.toLowerCase()) ||
+          (user?.phone && s?.nama && s.nama.toLowerCase().includes(user.phone.toLowerCase())) ||
+          (user?.role !== "ortu" && s?.nama && s.nama.toLowerCase().includes("ahmad rizky"))
       ) ||
       (user?.role === "ortu" ? fallbackStudent : (siswaList && siswaList[0]) || fallbackStudent)
     );
@@ -82,17 +82,17 @@ export default function MobileSuperAppDashboard() {
   // Status Tabungan & SPP
   const displaySaldo = useMemo(() => {
     if (user?.role === "ortu" || user?.role === "siswa") {
-      const studentTabungan = tabunganList.find((t) => t.siswaId === currentSiswa?.id);
-      return studentTabungan ? studentTabungan.saldo : 1450000;
+      const studentTabungan = (tabunganList || []).find((t) => t?.siswaId === currentSiswa?.id);
+      return typeof studentTabungan?.saldo === "number" ? studentTabungan.saldo : 1450000;
     }
-    const totalTabungan = tabunganList.reduce((acc, curr) => acc + (curr.saldo || 0), 0);
+    const totalTabungan = (tabunganList || []).reduce((acc, curr) => acc + (curr?.saldo || 0), 0);
     return totalTabungan || 24850000;
   }, [tabunganList, user, currentSiswa]);
 
   const sppStatus = useMemo(() => {
     if (user?.role === "ortu" || user?.role === "siswa") {
-      const studentSpp = sppList.filter((s) => s.siswaId === currentSiswa?.id);
-      const hasUnpaid = studentSpp.some((s) => s.status === "Belum Lunas" || s.status === "Jatuh Tempo");
+      const studentSpp = (sppList || []).filter((s) => s?.siswaId === currentSiswa?.id);
+      const hasUnpaid = studentSpp.some((s) => s?.status === "Belum Lunas" || s?.status === "Jatuh Tempo");
       return hasUnpaid ? "Tagihan SPP Belum Lunas" : "SPP Lunas Bulan Ini";
     }
     return "Status SPP Terkelola";
@@ -406,7 +406,7 @@ export default function MobileSuperAppDashboard() {
             </div>
             <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Tabungan</span>
             <span className="text-[9px] text-amber-700 dark:text-amber-400 font-semibold truncate w-full mt-0.5 font-mono">
-              {formatRupiah(displaySaldo).replace(",00", "")}
+              {formatRupiah(displaySaldo || 0).replace(",00", "")}
             </span>
           </Link>
         </div>

@@ -351,29 +351,29 @@ export default function CommandPalette() {
       // Siswa/Ortu hanya bisa melihat profil sendiri/anaknya
       return [];
     }
-    if (!query.trim()) return siswaList.slice(0, 4); // Rekomendasi 4 siswa awal
+    if (!query.trim()) return (siswaList || []).slice(0, 4); // Rekomendasi 4 siswa awal
     const q = query.toLowerCase().trim();
-    return siswaList
+    return (siswaList || [])
       .filter(
         (s) =>
-          s.nama.toLowerCase().includes(q) ||
-          s.nisn.toLowerCase().includes(q) ||
-          s.kelas.toLowerCase().includes(q) ||
-          (s.namaWali && s.namaWali.toLowerCase().includes(q))
+          Boolean(s?.nama && s.nama.toLowerCase().includes(q)) ||
+          Boolean(s?.nisn && s.nisn.toLowerCase().includes(q)) ||
+          Boolean(s?.kelas && s.kelas.toLowerCase().includes(q)) ||
+          Boolean(s?.namaWali && s.namaWali.toLowerCase().includes(q))
       )
       .slice(0, 6);
   }, [siswaList, user, query]);
 
   const filteredGuru = useMemo(() => {
     if (!user || user.role === "siswa") return [];
-    if (!query.trim()) return guruList.slice(0, 3);
+    if (!query.trim()) return (guruList || []).slice(0, 3);
     const q = query.toLowerCase().trim();
-    return guruList
+    return (guruList || [])
       .filter(
         (g) =>
-          g.nama.toLowerCase().includes(q) ||
-          g.nip.toLowerCase().includes(q) ||
-          g.mataPelajaran.some((m) => m.toLowerCase().includes(q))
+          Boolean(g?.nama && g.nama.toLowerCase().includes(q)) ||
+          Boolean(g?.nip && g.nip.toLowerCase().includes(q)) ||
+          Boolean(Array.isArray(g?.mataPelajaran) && g.mataPelajaran.some((m) => m?.toLowerCase().includes(q)))
       )
       .slice(0, 5);
   }, [guruList, user, query]);
