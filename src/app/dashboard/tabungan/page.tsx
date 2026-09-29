@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,9 +29,15 @@ import {
   Calendar,
   Building2,
   ChevronRight,
+  ChevronLeft,
   TrendingUp,
   GraduationCap,
   Trash2,
+  Sparkles,
+  Save,
+  RotateCcw,
+  FileText,
+  Check,
 } from "lucide-react";
 
 export default function TabunganSiswaPage() {
@@ -49,10 +55,211 @@ export default function TabunganSiswaPage() {
     guruList,
   } = useSchoolData();
 
-  // Active Tab: "saldo" | "kelas" | "mutasi"
-  const [activeTab, setActiveTab] = useState<"saldo" | "kelas" | "mutasi">("saldo");
+  // Helper date functions for Weekly Senin-Kamis
+  const toDateString = (d: Date) => d.toISOString().split("T")[0];
+  const getMondayOf = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay(); // 0 is Sun, 1 is Mon, ..., 6 is Sat
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  };
+  const addDays = (d: Date, days: number) => {
+    const result = new Date(d);
+    result.setDate(result.getDate() + days);
+    return result;
+  };
+
+  // Active Tab: "saldo" | "mingguan" | "kelas" | "mutasi"
+  const [activeTab, setActiveTab] = useState<"saldo" | "mingguan" | "kelas" | "mutasi">("saldo");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedKelas, setSelectedKelas] = useState("Semua");
+
+  // =========================================================================
+  // STATE KHUSUS: INPUT CEPAT TABUNGAN MINGGUAN (SENIN - KAMIS)
+  // =========================================================================
+  const [weeklyMondayStr, setWeeklyMondayStr] = useState<string>(() => {
+    return toDateString(getMondayOf(new Date()));
+  });
+  const [weeklyKelas, setWeeklyKelas] = useState<string>(() => kelasList[0]?.nama || "Kelas 1");
+  const [weeklySearch, setWeeklySearch] = useState("");
+  const [weeklyValues, setWeeklyValues] = useState<
+    Record<string, { senin: number; selasa: number; rabu: number; kamis: number }>
+  >({});
+  const [quickColumnDay, setQuickColumnDay] = useState<"senin" | "selasa" | "rabu" | "kamis">("senin");
+  const [quickColumnNominal, setQuickColumnNominal] = useState<number>(0);
+  const [isPrintWeeklyModalOpen, setIsPrintWeeklyModalOpen] = useState(false);
+
+  // Date objects for Monday - Thursday
+  const mondayDate = useMemo(() => new Date(weeklyMondayStr + "T00:00:00"), [weeklyMondayStr]);
+  const tuesdayDate = useMemo(() => addDays(mondayDate, 1), [mondayDate]);
+  const wednesdayDate = useMemo(() => addDays(mondayDate, 2), [mondayDate]);
+  const thursdayDate = useMemo(() => addDays(mondayDate, 3), [mondayDate]);
+
+  const daysInfo = useMemo(
+    () => [
+      { key: "senin" as const, name: "Senin", date: toDateString(mondayDate), label: formatDateIndo(toDateString(mondayDate)) },
+      { key: "selasa" as const, name: "Selasa", date: toDateString(tuesdayDate), label: formatDateIndo(toDateString(tuesdayDate)) },
+      { key: "rabu" as const, name: "Rabu", date: toDateString(wednesdayDate), label: formatDateIndo(toDateString(wednesdayDate)) },
+      { key: "kamis" as const, name: "Kamis", date: toDateString(thursdayDate), label: formatDateIndo(toDateString(thursdayDate)) },
+    ],
+    [mondayDate, tuesdayDate, wednesdayDate, thursdayDate]
+  );
+
+  // Students in selected weekly class
+  const weeklyStudents = useMemo(() => {
+    const list = siswaList.filter(
+      (s) => s.kelas.toLowerCase() === weeklyKelas.toLowerCase()
+    );
+    if (!weeklySearch.trim()) return list;
+    const q = weeklySearch.toLowerCase();
+    return list.filter((s) => s.nama.toLowerCase().includes(q) || s.nisn.includes(q));
+  }, [siswaList, weeklyKelas, weeklySearch]);
+
+  // Weekly Real-time summary calculation
+  const weeklySummary = useMemo(() => {
+    let totalSenin = 0;
+    let totalSelasa = 0;
+    let totalRabu = 0;
+    let totalKamis = 0;
+    let activeSaversCount = 0;
+
+    weeklyStudents.forEach((student) => {
+      const v = weeklyValues[student.id] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+      totalSenin += v.senin || 0;
+      totalSelasa += v.selasa || 0;
+      totalRabu += v.rabu || 0;
+      totalKamis += v.kamis || 0;
+      const sum = (v.senin || 0) + (v.selasa || 0) + (v.rabu || 0) + (v.kamis || 0);
+      if (sum > 0) activeSaversCount++;
+    });
+
+    const grandTotal = totalSenin + totalSelasa + totalRabu + totalKamis;
+    return {
+      totalSenin,
+      totalSelasa,
+      totalRabu,
+      totalKamis,
+      grandTotal,
+      activeSaversCount,
+    };
+  }, [weeklyStudents, weeklyValues]);
+
+  // Handlers for Weekly Input Actions
+  const handlePrevWeek = () => {
+    setWeeklyMondayStr(toDateString(addDays(mondayDate, -7)));
+  };
+
+  const handleNextWeek = () => {
+    setWeeklyMondayStr(toDateString(addDays(mondayDate, 7)));
+  };
+
+  const handleCurrentWeek = () => {
+    setWeeklyMondayStr(toDateString(getMondayOf(new Date())));
+  };
+
+  const handleCellChange = (
+    studentId: string,
+    day: "senin" | "selasa" | "rabu" | "kamis",
+    val: number
+  ) => {
+    setWeeklyValues((prev) => {
+      const current = prev[studentId] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+      return {
+        ...prev,
+        [studentId]: {
+          ...current,
+          [day]: Math.max(0, val),
+        },
+      };
+    });
+  };
+
+  const handleQuickAddChip = (
+    studentId: string,
+    day: "senin" | "selasa" | "rabu" | "kamis",
+    amount: number
+  ) => {
+    setWeeklyValues((prev) => {
+      const current = prev[studentId] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+      return {
+        ...prev,
+        [studentId]: {
+          ...current,
+          [day]: (current[day] || 0) + amount,
+        },
+      };
+    });
+  };
+
+  const handleApplyColumnNominal = () => {
+    if (quickColumnNominal <= 0) return;
+    setWeeklyValues((prev) => {
+      const next = { ...prev };
+      weeklyStudents.forEach((st) => {
+        const current = next[st.id] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+        next[st.id] = {
+          ...current,
+          [quickColumnDay]: quickColumnNominal,
+        };
+      });
+      return next;
+    });
+  };
+
+  const handleApplyFlatAllDays = (nominal: number) => {
+    setWeeklyValues((prev) => {
+      const next = { ...prev };
+      weeklyStudents.forEach((st) => {
+        next[st.id] = {
+          senin: nominal,
+          selasa: nominal,
+          rabu: nominal,
+          kamis: nominal,
+        };
+      });
+      return next;
+    });
+  };
+
+  const handleResetWeeklyValues = () => {
+    if (confirm("Kosongkan seluruh isian draft tabungan pekan ini?")) {
+      setWeeklyValues({});
+    }
+  };
+
+  const handleSaveWeekly = () => {
+    const itemsToSave: { siswaId: string; nominal: number; keterangan: string; tanggal: string }[] = [];
+
+    weeklyStudents.forEach((student) => {
+      const vals = weeklyValues[student.id] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+      daysInfo.forEach((day) => {
+        const nominal = vals[day.key];
+        if (nominal && nominal > 0) {
+          itemsToSave.push({
+            siswaId: student.id,
+            nominal,
+            keterangan: `Setoran Tabungan ${day.name} (${weeklyKelas})`,
+            tanggal: day.date,
+          });
+        }
+      });
+    });
+
+    if (itemsToSave.length === 0) {
+      alert("Tidak ada setoran yang diisi. Masukkan nominal setoran minimal untuk satu santri.");
+      return;
+    }
+
+    const totalNominal = itemsToSave.reduce((sum, item) => sum + item.nominal, 0);
+    const confirmed = confirm(
+      `Konfirmasi Simpan Setoran Pekanan:\n\n• Jumlah Transaksi: ${itemsToSave.length} setoran\n• Kelas: ${weeklyKelas}\n• Periode: ${daysInfo[0].label} s/d ${daysInfo[3].label}\n• Total Kas: ${formatRupiah(totalNominal)}\n\nLanjutkan simpan ke sistem?`
+    );
+    if (!confirmed) return;
+
+    bulkSetorTabungan(itemsToSave, user?.name || "Wali Kelas / Bendahara");
+    alert(`Alhamdulillah! Berhasil mencatat setoran tabungan pekanan sebesar ${formatRupiah(totalNominal)} untuk kelas ${weeklyKelas}!`);
+    setWeeklyValues({});
+  };
 
   // Modal States
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -79,7 +286,7 @@ export default function TabunganSiswaPage() {
     { siswaId: string; nama: string; nisn: string; included: boolean; nominal: number }[]
   >([]);
 
-  const canManage = user?.role === "admin" || user?.role === "bendahara";
+  const canManage = user?.role === "admin" || user?.role === "bendahara" || user?.role === "guru";
 
   // Filtered Tabungan List (Daftar Saldo)
   const filteredTabungan = tabunganList.filter((t) => {
@@ -247,7 +454,7 @@ export default function TabunganSiswaPage() {
         nama: s.nama,
         nisn: s.nisn,
         included: true,
-        nominal: 10000, // Default 10rb
+        nominal: 0, // Default 0
       }))
     );
     setIsBulkModalOpen(true);
@@ -264,7 +471,7 @@ export default function TabunganSiswaPage() {
         nama: s.nama,
         nisn: s.nisn,
         included: true,
-        nominal: 10000,
+        nominal: 0, // Default 0
       }))
     );
   };
@@ -324,33 +531,6 @@ export default function TabunganSiswaPage() {
     }
   };
 
-  // Guard: Restrict Guru from viewing or accessing Tabungan Siswa
-  if (user?.role === "guru") {
-    return (
-      <div className="min-h-[65vh] flex items-center justify-center p-4">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center mx-auto">
-            <ShieldAlert className="w-8 h-8" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-            Akses Tabungan Siswa Dibatasi
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-            Menu Tabungan Siswa tidak ditampilkan untuk akun dengan mode peran Guru. Pencatatan transaksi dan rekapitulasi kas tabungan dikelola langsung oleh Administrator atau Bagian Keuangan & Tata Usaha Sekolah.
-          </p>
-          <div className="pt-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition-all"
-            >
-              Kembali ke Dashboard
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -366,7 +546,7 @@ export default function TabunganSiswaPage() {
         </div>
 
         {canManage && (
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5">
             <button
               onClick={() => handleOpenSingle("Tarik")}
               className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5"
@@ -383,7 +563,20 @@ export default function TabunganSiswaPage() {
               <span>Setor Tunggal</span>
             </button>
 
-            {/* Main Requested Feature: BULK MENABUNG */}
+            {/* Main Requested Feature: INPUT CEPAT TABUNGAN MINGGUAN (SENIN - KAMIS) */}
+            <button
+              onClick={() => setActiveTab("mingguan")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ${
+                activeTab === "mingguan"
+                  ? "bg-amber-500 text-white shadow-amber-500/25 ring-2 ring-amber-400"
+                  : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+              }`}
+            >
+              <Calendar className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span>📅 Input Cepat Senin - Kamis</span>
+            </button>
+
+            {/* Bulk Menabung Cepat Modal */}
             <button
               onClick={() => handleOpenBulk()}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 transform hover:-translate-y-0.5"
@@ -504,7 +697,29 @@ export default function TabunganSiswaPage() {
             <span>Daftar Saldo Siswa</span>
           </button>
 
-          {/* New Tab Option: Tabungan Per Kelas */}
+          {/* TAB BARU: INPUT CEPAT MINGGUAN (SENIN - KAMIS) */}
+          <button
+            onClick={() => setActiveTab("mingguan")}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "mingguan"
+                ? "bg-emerald-600 text-white shadow-sm font-bold"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            }`}
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            <span>Input Cepat Mingguan (Senin - Kamis)</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                activeTab === "mingguan"
+                  ? "bg-white/20 text-white"
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+              }`}
+            >
+              4 Hari
+            </span>
+          </button>
+
+          {/* Tab Option: Tabungan Per Kelas */}
           <button
             onClick={() => setActiveTab("kelas")}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
@@ -640,9 +855,10 @@ export default function TabunganSiswaPage() {
             </div>
           )}
 
-          {/* Table Saldo Siswa */}
+          {/* Table & Mobile Cards Saldo Siswa */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
                 <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
@@ -720,6 +936,798 @@ export default function TabunganSiswaPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Cards View (md:hidden) */}
+            <div className="block md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredTabungan.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  Tidak ada data tabungan yang cocok dengan filter kriteria ini.
+                </div>
+              ) : (
+                filteredTabungan.map((tab) => (
+                  <div key={tab.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-extrabold flex items-center justify-center shrink-0 text-sm shadow-xs">
+                          {tab.siswaNama?.charAt(0) || "S"}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                            {tab.siswaNama}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono mt-0.5">
+                            <span>NISN: {tab.nisn}</span>
+                            <span>&bull;</span>
+                            <span className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold text-[10px]">
+                              {tab.kelas}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-slate-400 block font-medium">Saldo</span>
+                        <span className="font-black font-mono text-base text-emerald-700 dark:text-emerald-400">
+                          {formatRupiah(tab.saldo)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatDateIndo(tab.terakhirUpdate)}</span>
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setSelectedTabunganForDetail(tab)}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center gap-1 active:scale-95 transition-all"
+                        >
+                          <Receipt className="h-3.5 w-3.5 text-slate-500" />
+                          <span>Buku</span>
+                        </button>
+                        {canManage && (
+                          <>
+                            <button
+                              onClick={() => handleOpenSingle("Setor", tab.siswaId)}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 active:scale-95 shadow-sm"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Setor</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenSingle("Tarik", tab.siswaId)}
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 active:scale-95 shadow-sm"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                              <span>Tarik</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB KHUSUS: INPUT CEPAT TABUNGAN MINGGUAN (SENIN - KAMIS)                  */}
+      {/* ========================================================================= */}
+      {activeTab === "mingguan" && (
+        <div className="space-y-6">
+          {/* Header Banner Mode Mingguan */}
+          <div className="p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-emerald-500/10 border border-amber-200 dark:border-amber-900/60 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30">
+                <Calendar className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Input Cepat Tabungan Santri (Senin s/d Kamis)
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    Mode Rapel Pekanan
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                  Santri menabung dari hari <strong>Senin hingga Kamis</strong>. Karena penginputan tidak dilakukan setiap hari, menu ini memungkinkan Wali Kelas/Bendahara memasukkan seluruh setoran santri sekaligus dalam 1 pekan. Setiap transaksi akan otomatis tercatat dengan tanggal historis masing-masing hari.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setIsPrintWeeklyModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <Printer className="h-4 w-4 text-slate-500" />
+                <span>Cetak Rekap Pekan Ini</span>
+              </button>
+
+              <button
+                onClick={handleSaveWeekly}
+                disabled={weeklySummary.grandTotal <= 0}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition-all"
+              >
+                <Save className="h-4 w-4" />
+                <span>Simpan Setoran ({formatRupiah(weeklySummary.grandTotal)})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bar Kontrol Kelas, Rentang Pekan, dan Pencarian */}
+          <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 no-print">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              {/* Pemilihan Kelas */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 mr-1">
+                  <Building2 className="h-4 w-4 text-emerald-600" />
+                  <span>Pilih Rombel:</span>
+                </span>
+                {kelasList.map((k) => (
+                  <button
+                    key={k.id}
+                    onClick={() => {
+                      setWeeklyKelas(k.nama);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      weeklyKelas.toLowerCase() === k.nama.toLowerCase()
+                        ? "bg-emerald-600 text-white shadow-sm font-bold scale-105"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    {k.nama}
+                  </button>
+                ))}
+              </div>
+
+              {/* Navigasi Pekan */}
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={handlePrevWeek}
+                  className="p-1.5 rounded-xl bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 shadow-sm transition-all"
+                  title="Pekan Sebelumnya"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                <div className="px-2 text-center">
+                  <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">
+                    Periode Pekan (Senin - Kamis)
+                  </span>
+                  <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <span>{daysInfo[0].label}</span>
+                    <span className="text-slate-400 font-normal">&mdash;</span>
+                    <span>{daysInfo[3].label}</span>
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleNextWeek}
+                  className="p-1.5 rounded-xl bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 shadow-sm transition-all"
+                  title="Pekan Berikutnya"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+
+                <button
+                  onClick={handleCurrentWeek}
+                  className="ml-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 transition-all"
+                >
+                  Pekan Ini
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Search dan Status Info Rombel */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={weeklySearch}
+                  onChange={(e) => setWeeklySearch(e.target.value)}
+                  placeholder={`Cari siswa di ${weeklyKelas}...`}
+                  className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-slate-400" />
+                  <span>
+                    Jumlah Siswa: <strong className="text-slate-800 dark:text-slate-200">{weeklyStudents.length} Santri</strong>
+                  </span>
+                </span>
+                <span>&bull;</span>
+                <span className="flex items-center gap-1.5">
+                  <PiggyBank className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>
+                    Aktif Menabung: <strong className="text-emerald-600 dark:text-emerald-400">{weeklySummary.activeSaversCount} Santri</strong>
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 5 Kartu KPI Real-Time Kas Tabungan Pekanan */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 no-print">
+            {daysInfo.map((day, idx) => {
+              const nominalDay =
+                day.key === "senin"
+                  ? weeklySummary.totalSenin
+                  : day.key === "selasa"
+                  ? weeklySummary.totalSelasa
+                  : day.key === "rabu"
+                  ? weeklySummary.totalRabu
+                  : weeklySummary.totalKamis;
+
+              const saversCount = weeklyStudents.filter((s) => {
+                const v = weeklyValues[s.id];
+                return v && v[day.key] > 0;
+              }).length;
+
+              return (
+                <div
+                  key={day.key}
+                  className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      Hari {idx + 1}
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-400">
+                      {formatDateIndo(day.date)}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    {day.name}
+                  </h4>
+                  <p className="text-base sm:text-lg font-extrabold font-mono text-emerald-700 dark:text-emerald-400 mt-1">
+                    {formatRupiah(nominalDay)}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">
+                    {saversCount} santri menabung
+                  </p>
+                </div>
+              );
+            })}
+
+            {/* Total Kas Pekan Ini Card */}
+            <div className="col-span-2 sm:col-span-1 lg:col-span-1 p-4 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-700/20 relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-white/20 text-white">
+                    Grand Total
+                  </span>
+                  <Coins className="h-4 w-4 text-amber-300" />
+                </div>
+                <h4 className="text-xs font-semibold text-emerald-100">
+                  Total Kas Pekan Ini
+                </h4>
+                <p className="text-lg sm:text-xl font-black font-mono text-amber-300 mt-1">
+                  {formatRupiah(weeklySummary.grandTotal)}
+                </p>
+              </div>
+              <p className="text-[10px] text-emerald-200 mt-2 font-medium">
+                {weeklySummary.activeSaversCount} santri aktif menabung
+              </p>
+            </div>
+          </div>
+
+          {/* Shortcut Pengisian Cepat Massal (Mass Fill Toolbar) */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-emerald-50/70 via-teal-50/70 to-blue-50/70 dark:from-slate-800/90 dark:to-slate-850/90 border border-emerald-200 dark:border-emerald-800/60 shadow-sm space-y-3.5 no-print">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Shortcut Pengisian Cepat Massal (Hemat Waktu)
+                </h4>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Gunakan jika setoran santri memiliki nominal seragam
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 pt-1">
+              {/* Opsi 1: Isi 1 Kolom Penuh Sekaligus */}
+              <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2.5">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">
+                  Isi 1 Kolom:
+                </span>
+
+                <select
+                  value={quickColumnDay}
+                  onChange={(e) => setQuickColumnDay(e.target.value as any)}
+                  className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="senin">Hari Senin</option>
+                  <option value="selasa">Hari Selasa</option>
+                  <option value="rabu">Hari Rabu</option>
+                  <option value="kamis">Hari Kamis</option>
+                </select>
+
+                <div className="flex items-center gap-1.5">
+                  {[2000, 5000, 10000, 20000].map((nom) => (
+                    <button
+                      key={nom}
+                      type="button"
+                      onClick={() => setQuickColumnNominal(nom)}
+                      className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        quickColumnNominal === nom
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                      }`}
+                    >
+                      {nom / 1000}k
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative w-28">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={quickColumnNominal}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setQuickColumnNominal(Number(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none"
+                    placeholder="0"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleApplyColumnNominal}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all ml-auto"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  <span>Terapkan</span>
+                </button>
+              </div>
+
+              {/* Opsi 2: Isi Rata Seluruh Hari (Senin - Kamis) */}
+              <div className="lg:col-span-5 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">
+                  Isi Rata Semua Hari:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyFlatAllDays(2000)}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition-all"
+                    title="Semua hari Rp 2.000 untuk seluruh siswa"
+                  >
+                    @2k
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyFlatAllDays(5000)}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition-all"
+                    title="Semua hari Rp 5.000 untuk seluruh siswa"
+                  >
+                    @5k
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyFlatAllDays(10000)}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition-all"
+                    title="Semua hari Rp 10.000 untuk seluruh siswa"
+                  >
+                    @10k
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetWeeklyValues}
+                    className="p-1.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 transition-all ml-1"
+                    title="Kosongkan Draft Isian"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* TABEL MATRIKS DESKTOP (SENIN - KAMIS) */}
+          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="px-3.5 py-3.5 text-center w-12">No</th>
+                    <th className="px-4 py-3.5 min-w-[200px]">Data Santri</th>
+                    {daysInfo.map((day) => (
+                      <th key={day.key} className="px-3 py-3.5 min-w-[155px] text-center border-l border-slate-200 dark:border-slate-800">
+                        <div className="font-bold text-slate-800 dark:text-white">{day.name}</div>
+                        <div className="text-[9px] font-normal text-slate-400 normal-case mt-0.5">
+                          {formatDateIndo(day.date)}
+                        </div>
+                      </th>
+                    ))}
+                    <th className="px-4 py-3.5 text-right min-w-[140px] border-l border-slate-200 dark:border-slate-800 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300">
+                      Total Pekan Ini
+                    </th>
+                    <th className="px-4 py-3.5 text-right min-w-[140px] border-l border-slate-200 dark:border-slate-800">
+                      Estimasi Saldo Akhir
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {weeklyStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-5 py-12 text-center text-slate-400">
+                        Tidak ada data santri pada rombel {weeklyKelas}.
+                      </td>
+                    </tr>
+                  ) : (
+                    weeklyStudents.map((student, idx) => {
+                      const vals = weeklyValues[student.id] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+                      const sumThisWeek = (vals.senin || 0) + (vals.selasa || 0) + (vals.rabu || 0) + (vals.kamis || 0);
+                      const currentTab = tabunganList.find((t) => t.siswaId === student.id);
+                      const currentSaldo = currentTab ? currentTab.saldo : 0;
+                      const newEstimatedSaldo = currentSaldo + sumThisWeek;
+
+                      return (
+                        <tr
+                          key={student.id}
+                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="px-3.5 py-3 text-center text-slate-400 font-mono text-[11px]">
+                            {idx + 1}
+                          </td>
+
+                          {/* Data Siswa */}
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-900 dark:text-white">
+                              {student.nama}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                              <span>NISN: {student.nisn}</span>
+                              <span>&bull;</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                Saldo: {formatRupiah(currentSaldo)}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* 4 Kolom Hari (Senin - Kamis) */}
+                          {daysInfo.map((day) => {
+                            const currentNominal = vals[day.key] || 0;
+                            return (
+                              <td
+                                key={day.key}
+                                className="px-2.5 py-2 border-l border-slate-100 dark:border-slate-800/80 align-top"
+                              >
+                                <div className="space-y-1">
+                                  <div className="relative">
+                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold">
+                                      Rp
+                                    </span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1000"
+                                      value={currentNominal}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(e) =>
+                                        handleCellChange(
+                                          student.id,
+                                          day.key,
+                                          Number(e.target.value) || 0
+                                        )
+                                      }
+                                      placeholder="0"
+                                      className={`w-full pl-7 pr-2 py-1.5 text-xs font-mono font-bold rounded-xl border text-right outline-none transition-all ${
+                                        currentNominal > 0
+                                          ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500/30"
+                                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:border-emerald-500"
+                                      }`}
+                                    />
+                                  </div>
+
+                                  {/* Quick Chips (+2k, +5k, +10k, x) */}
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickAddChip(student.id, day.key, 2000)}
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 hover:text-emerald-700 transition-all"
+                                      title="Tambah Rp 2.000"
+                                    >
+                                      +2k
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickAddChip(student.id, day.key, 5000)}
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 hover:text-emerald-700 transition-all"
+                                      title="Tambah Rp 5.000"
+                                    >
+                                      +5k
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickAddChip(student.id, day.key, 10000)}
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 hover:text-emerald-700 transition-all"
+                                      title="Tambah Rp 10.000"
+                                    >
+                                      +10k
+                                    </button>
+                                    {currentNominal > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCellChange(student.id, day.key, 0)}
+                                        className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all"
+                                        title="Nol-kan isian"
+                                      >
+                                        &times;
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          })}
+
+                          {/* Total Pekan Ini */}
+                          <td className="px-4 py-3 text-right border-l border-slate-100 dark:border-slate-800/80 bg-emerald-50/30 dark:bg-emerald-950/10">
+                            <span className="font-mono font-bold text-xs text-emerald-700 dark:text-emerald-400 block">
+                              {formatRupiah(sumThisWeek)}
+                            </span>
+                            {sumThisWeek > 0 && (
+                              <span className="text-[10px] text-emerald-600 font-medium">
+                                Siap setor
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Estimasi Saldo Akhir */}
+                          <td className="px-4 py-3 text-right border-l border-slate-100 dark:border-slate-800/80">
+                            <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200 block">
+                              {formatRupiah(newEstimatedSaldo)}
+                            </span>
+                            {sumThisWeek > 0 && (
+                              <span className="text-[10px] text-emerald-600 flex items-center justify-end gap-0.5">
+                                <ArrowUpRight className="h-3 w-3" />
+                                <span>+{formatRupiah(sumThisWeek)}</span>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+
+                {/* Table Footer: Rekapitulasi Baris Total */}
+                <tfoot className="bg-slate-100/80 dark:bg-slate-800 border-t-2 border-slate-300 dark:border-slate-700 font-bold">
+                  <tr>
+                    <td colSpan={2} className="px-4 py-3.5 text-right text-slate-800 dark:text-white uppercase tracking-wider text-[11px]">
+                      TOTAL SETORAN PEKAN INI ({weeklyKelas}):
+                    </td>
+                    <td className="px-3 py-3.5 text-center font-mono text-xs text-emerald-800 dark:text-emerald-300 border-l border-slate-200 dark:border-slate-700">
+                      {formatRupiah(weeklySummary.totalSenin)}
+                    </td>
+                    <td className="px-3 py-3.5 text-center font-mono text-xs text-emerald-800 dark:text-emerald-300 border-l border-slate-200 dark:border-slate-700">
+                      {formatRupiah(weeklySummary.totalSelasa)}
+                    </td>
+                    <td className="px-3 py-3.5 text-center font-mono text-xs text-emerald-800 dark:text-emerald-300 border-l border-slate-200 dark:border-slate-700">
+                      {formatRupiah(weeklySummary.totalRabu)}
+                    </td>
+                    <td className="px-3 py-3.5 text-center font-mono text-xs text-emerald-800 dark:text-emerald-300 border-l border-slate-200 dark:border-slate-700">
+                      {formatRupiah(weeklySummary.totalKamis)}
+                    </td>
+                    <td className="px-4 py-3.5 text-right font-mono text-sm font-extrabold text-emerald-800 dark:text-emerald-300 border-l border-slate-200 dark:border-slate-700 bg-emerald-100/50 dark:bg-emerald-950/40">
+                      {formatRupiah(weeklySummary.grandTotal)}
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-[11px] text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700">
+                      {weeklySummary.activeSaversCount} Santri
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* TAMPILAN MOBILE (KARTU PER SANTRI DENGAN INPUT 4 HARI) */}
+          <div className="md:hidden space-y-4 no-print">
+            {weeklyStudents.length === 0 ? (
+              <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+                Tidak ada data santri pada rombel {weeklyKelas}.
+              </div>
+            ) : (
+              weeklyStudents.map((student, idx) => {
+                const vals = weeklyValues[student.id] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+                const sumThisWeek = (vals.senin || 0) + (vals.selasa || 0) + (vals.rabu || 0) + (vals.kamis || 0);
+                const currentTab = tabunganList.find((t) => t.siswaId === student.id);
+                const currentSaldo = currentTab ? currentTab.saldo : 0;
+                const newEstimatedSaldo = currentSaldo + sumThisWeek;
+
+                return (
+                  <div
+                    key={student.id}
+                    className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3"
+                  >
+                    {/* Header Card */}
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center justify-center">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                            {student.nama}
+                          </h4>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            NISN: {student.nisn}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block">Saldo Saat Ini:</span>
+                        <span className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                          {formatRupiah(currentSaldo)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 4 Days Inputs (2x2 Grid) */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {daysInfo.map((day) => {
+                        const currentNominal = vals[day.key] || 0;
+                        return (
+                          <div
+                            key={day.key}
+                            className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                {day.name}
+                              </span>
+                              <span className="text-[9px] text-slate-400">
+                                {day.date.slice(8)}/{day.date.slice(5, 7)}
+                              </span>
+                            </div>
+
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-semibold">
+                                Rp
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1000"
+                                value={currentNominal}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) =>
+                                  handleCellChange(
+                                    student.id,
+                                    day.key,
+                                    Number(e.target.value) || 0
+                                  )
+                                }
+                                placeholder="0"
+                                className="w-full pl-6 pr-2 py-1 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-right outline-none"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between gap-1 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAddChip(student.id, day.key, 2000)}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
+                              >
+                                +2k
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAddChip(student.id, day.key, 5000)}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
+                              >
+                                +5k
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickAddChip(student.id, day.key, 10000)}
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
+                              >
+                                +10k
+                              </button>
+                              {currentNominal > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCellChange(student.id, day.key, 0)}
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-600"
+                                >
+                                  &times;
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Card Footer */}
+                    <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-emerald-800 dark:text-emerald-300 block">
+                          Setoran Pekan Ini:
+                        </span>
+                        <strong className="text-xs font-mono text-emerald-700 dark:text-emerald-300 font-bold">
+                          {formatRupiah(sumThisWeek)}
+                        </strong>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                          Estimasi Saldo Baru:
+                        </span>
+                        <strong className="text-xs font-mono text-slate-800 dark:text-slate-200 font-bold">
+                          {formatRupiah(newEstimatedSaldo)}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Sticky / Fixed Bottom Action Bar */}
+          <div className="sticky bottom-4 z-30 p-4 rounded-3xl bg-slate-900/95 dark:bg-slate-850/95 text-white backdrop-blur-md shadow-2xl border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                <PiggyBank className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[11px] text-slate-300">
+                  Total Setoran Pekanan ({weeklyKelas}):
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-mono font-black text-amber-300">
+                    {formatRupiah(weeklySummary.grandTotal)}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    &bull; {weeklySummary.activeSaversCount} santri aktif
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetWeeklyValues}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Draft</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPrintWeeklyModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span>Cetak Rekap</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveWeekly}
+                disabled={weeklySummary.grandTotal <= 0}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all"
+              >
+                <Save className="h-4 w-4" />
+                <span>Simpan Semua Setoran Pekan Ini</span>
+              </button>
             </div>
           </div>
         </div>
@@ -937,7 +1945,8 @@ export default function TabunganSiswaPage() {
       {/* ========================================================================= */}
       {activeTab === "mutasi" && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
               <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
@@ -1021,6 +2030,73 @@ export default function TabunganSiswaPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (md:hidden) */}
+          <div className="block md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            {filteredMutasi.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                Belum ada catatan mutasi transaksi tabungan.
+              </div>
+            ) : (
+              filteredMutasi.map((m) => (
+                <div key={m.id} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`p-2 rounded-2xl text-xs font-bold shrink-0 inline-flex items-center justify-center ${
+                          m.tipe === "Setor"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400"
+                        }`}
+                      >
+                        {m.tipe === "Setor" ? (
+                          <ArrowDownLeft className="h-4 w-4" />
+                        ) : (
+                          <ArrowUpRight className="h-4 w-4" />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                          {m.siswaNama}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          {m.kelas} &bull; {formatDateIndo(m.tanggal)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span
+                        className={`font-mono font-extrabold text-sm block ${
+                          m.tipe === "Setor"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {m.tipe === "Setor" ? "+" : "-"}
+                        {formatRupiah(m.nominal)}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Saldo: {formatRupiah(m.saldoAkhir)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500">
+                    <span className="truncate max-w-[200px] text-[10px]">
+                      {m.keterangan || "Transaksi Tabungan"}
+                    </span>
+                    <button
+                      onClick={() => setReceiptTrx(m)}
+                      className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center gap-1 active:scale-95 transition-all"
+                    >
+                      <Printer className="h-3 w-3 text-slate-500" />
+                      <span>Struk</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -1771,6 +2847,213 @@ export default function TabunganSiswaPage() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: CETAK REKAPITULASI TABUNGAN MINGGUAN (SENIN - KAMIS)              */}
+      {/* ========================================================================= */}
+      {isPrintWeeklyModalOpen && (() => {
+        const weeklyKelasObj = kelasList.find((k) => k.nama.toLowerCase() === weeklyKelas.toLowerCase());
+        const waliGuru = guruList.find((g) => g.id === weeklyKelasObj?.waliKelasId);
+        const waliKelasNama =
+          (waliGuru?.nama ? `${waliGuru.nama}, ${waliGuru.gelar || ""}`.trim() : null) ||
+          weeklyKelasObj?.waliKelasNama ||
+          "Wali Kelas";
+        const waliNip = waliGuru?.nip || "-";
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
+            <div className="w-full max-w-4xl bg-white text-slate-900 rounded-3xl p-8 sm:p-10 shadow-2xl relative my-8">
+              {/* Header Action di luar print */}
+              <div className="flex items-center justify-between border-b pb-4 mb-6 no-print">
+                <div className="flex items-center gap-2">
+                  <Printer className="h-5 w-5 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-700">
+                    Pratinjau Cetak Lembar Rekap Tabungan Santri Mingguan
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-2 shadow-md transition-all"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span>Cetak Sekarang</span>
+                  </button>
+                  <button
+                    onClick={() => setIsPrintWeeklyModalOpen(false)}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* KOP RESMI LEMBAGA */}
+              <div className="text-center border-b-2 border-slate-900 pb-4 mb-5">
+                <div className="flex items-center justify-center gap-3 mb-1.5">
+                  <div className="h-12 w-12 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold">
+                    <PiggyBank className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base uppercase leading-tight text-slate-900">
+                      {profile.namaSekolah}
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium">
+                      NPSN: {profile.npsn} &bull; Akreditasi: {profile.akreditasi}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 max-w-xl mx-auto">
+                  {profile.alamat} &bull; Telp: {profile.telepon} &bull; Website: {profile.website}
+                </p>
+              </div>
+
+              {/* Judul Lembar */}
+              <div className="text-center mb-5">
+                <h4 className="text-sm font-extrabold underline uppercase tracking-wider text-slate-900">
+                  LEMBAR REKAPITULASI TABUNGAN SANTRI MINGGUAN (SENIN - KAMIS)
+                </h4>
+                <p className="text-xs text-slate-600 mt-1 font-medium">
+                  Periode: <strong>{daysInfo[0].label}</strong> s/d <strong>{daysInfo[3].label}</strong> &bull; Rombel: <strong>{weeklyKelas}</strong>
+                </p>
+              </div>
+
+              {/* Meta Info Box */}
+              <div className="grid grid-cols-3 gap-3 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200 mb-5">
+                <div>
+                  <span className="text-slate-500 block">Wali Kelas:</span>
+                  <strong className="text-slate-900">{waliKelasNama}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Peserta Menabung:</span>
+                  <strong className="text-slate-900">
+                    {weeklySummary.activeSaversCount} dari {weeklyStudents.length} Santri
+                  </strong>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500 block">Total Kas Pekan Ini:</span>
+                  <strong className="text-emerald-700 font-mono text-sm">
+                    {formatRupiah(weeklySummary.grandTotal)}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Tabel Matriks Siswa */}
+              <table className="w-full text-[11px] text-left border-collapse border border-slate-300 mb-6">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-800 font-bold">
+                    <th className="border border-slate-300 px-2 py-2 text-center w-8">No</th>
+                    <th className="border border-slate-300 px-3 py-2 min-w-[140px]">Nama Santri</th>
+                    <th className="border border-slate-300 px-2 py-2 font-mono text-center w-24">NISN</th>
+                    <th className="border border-slate-300 px-2 py-2 text-right w-24">Senin</th>
+                    <th className="border border-slate-300 px-2 py-2 text-right w-24">Selasa</th>
+                    <th className="border border-slate-300 px-2 py-2 text-right w-24">Rabu</th>
+                    <th className="border border-slate-300 px-2 py-2 text-right w-24">Kamis</th>
+                    <th className="border border-slate-300 px-3 py-2 text-right w-28 bg-emerald-50 text-emerald-900 font-bold">
+                      Total Pekan
+                    </th>
+                    <th className="border border-slate-300 px-3 py-2 text-right w-28">Saldo Akhir</th>
+                    <th className="border border-slate-300 px-2 py-2 text-center w-16">Paraf</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeklyStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="border border-slate-300 px-3 py-6 text-center text-slate-400">
+                        Tidak ada siswa terdaftar pada rombel ini.
+                      </td>
+                    </tr>
+                  ) : (
+                    weeklyStudents.map((st, idx) => {
+                      const vals = weeklyValues[st.id] || { senin: 0, selasa: 0, rabu: 0, kamis: 0 };
+                      const sum = (vals.senin || 0) + (vals.selasa || 0) + (vals.rabu || 0) + (vals.kamis || 0);
+                      const currentTab = tabunganList.find((t) => t.siswaId === st.id);
+                      const saldo = currentTab ? currentTab.saldo : 0;
+
+                      return (
+                        <tr key={st.id} className={idx % 2 === 1 ? "bg-slate-50/50" : ""}>
+                          <td className="border border-slate-300 px-2 py-1.5 text-center font-mono">{idx + 1}</td>
+                          <td className="border border-slate-300 px-3 py-1.5 font-semibold text-slate-900">
+                            {st.nama}
+                          </td>
+                          <td className="border border-slate-300 px-2 py-1.5 font-mono text-center text-slate-600">
+                            {st.nisn}
+                          </td>
+                          <td className="border border-slate-300 px-2 py-1.5 text-right font-mono">
+                            {vals.senin > 0 ? formatRupiah(vals.senin) : "-"}
+                          </td>
+                          <td className="border border-slate-300 px-2 py-1.5 text-right font-mono">
+                            {vals.selasa > 0 ? formatRupiah(vals.selasa) : "-"}
+                          </td>
+                          <td className="border border-slate-300 px-2 py-1.5 text-right font-mono">
+                            {vals.rabu > 0 ? formatRupiah(vals.rabu) : "-"}
+                          </td>
+                          <td className="border border-slate-300 px-2 py-1.5 text-right font-mono">
+                            {vals.kamis > 0 ? formatRupiah(vals.kamis) : "-"}
+                          </td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-right font-mono font-bold text-emerald-800 bg-emerald-50/60">
+                            {sum > 0 ? formatRupiah(sum) : "-"}
+                          </td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-right font-mono font-bold text-slate-800">
+                            {formatRupiah(saldo + sum)}
+                          </td>
+                          <td className="border border-slate-300 px-2 py-1.5 text-center text-[10px] text-slate-400">
+                            &nbsp;
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-400">
+                    <td colSpan={3} className="border border-slate-300 px-3 py-2 text-right text-slate-800">
+                      Total Setoran Pekanan:
+                    </td>
+                    <td className="border border-slate-300 px-2 py-2 text-right font-mono text-emerald-800">
+                      {formatRupiah(weeklySummary.totalSenin)}
+                    </td>
+                    <td className="border border-slate-300 px-2 py-2 text-right font-mono text-emerald-800">
+                      {formatRupiah(weeklySummary.totalSelasa)}
+                    </td>
+                    <td className="border border-slate-300 px-2 py-2 text-right font-mono text-emerald-800">
+                      {formatRupiah(weeklySummary.totalRabu)}
+                    </td>
+                    <td className="border border-slate-300 px-2 py-2 text-right font-mono text-emerald-800">
+                      {formatRupiah(weeklySummary.totalKamis)}
+                    </td>
+                    <td className="border border-slate-300 px-3 py-2 text-right font-mono font-extrabold text-emerald-800 bg-emerald-100">
+                      {formatRupiah(weeklySummary.grandTotal)}
+                    </td>
+                    <td colSpan={2} className="border border-slate-300 px-2 py-2 text-center text-[10px] text-slate-500">
+                      {weeklySummary.activeSaversCount} Penabung
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* Tanda Tangan */}
+              <div className="grid grid-cols-2 text-center text-xs pt-4 border-t border-slate-200">
+                <div>
+                  <p className="text-slate-500">Mengetahui, Wali Kelas {weeklyKelas}</p>
+                  <div className="h-16" />
+                  <p className="font-bold underline">{waliKelasNama}</p>
+                  <p className="text-[10px] text-slate-400">NIP: {waliNip}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">
+                    Dicetak pada: {formatDateIndo(new Date().toISOString().split("T")[0])}
+                  </p>
+                  <p className="text-slate-500">Kepala Sekolah,</p>
+                  <div className="h-14" />
+                  <p className="font-bold underline">{profile.kepalaSekolah}</p>
+                  <p className="text-[10px] text-slate-400">NIP: 197204151998031002</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

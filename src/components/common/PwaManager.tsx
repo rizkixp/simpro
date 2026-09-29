@@ -26,7 +26,11 @@ export function PwaManager() {
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1" ||
       window.location.hostname.endsWith(".local") ||
-      window.location.port === "3000"
+      window.location.port === "3000" ||
+      window.location.port === "3001" ||
+      window.location.hostname.startsWith("192.168.") ||
+      window.location.hostname.startsWith("10.") ||
+      window.location.hostname.startsWith("172.")
     );
 
     // 1. In Local Development: Completely unregister Service Workers & clear cached shells
@@ -57,7 +61,7 @@ export function PwaManager() {
     } else {
       // 2. In Production: Register Service Worker & handle updates
       if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
+        const registerSW = () => {
           navigator.serviceWorker
             .register("/sw.js")
             .then((registration) => {
@@ -79,9 +83,15 @@ export function PwaManager() {
               });
             })
             .catch((error) => {
-              console.warn("SIM PRO: Pendaftaran Service Worker gagal:", error);
+              console.warn("SIM PRO: Pendaftaran Service Worker non-fatal:", error);
             });
-        });
+        };
+
+        if (document.readyState === "complete") {
+          registerSW();
+        } else {
+          window.addEventListener("load", registerSW);
+        }
       }
 
       // 3. Capture BeforeInstallPrompt for Android & Chrome/Edge

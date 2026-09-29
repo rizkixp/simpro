@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { AlertTriangle, RefreshCw, Home, LogIn } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { AlertTriangle, RefreshCw, Home, LogIn, ChevronDown, ChevronUp, ShieldAlert } from "lucide-react";
 
 export default function Error({
   error,
@@ -10,13 +10,35 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
+
   useEffect(() => {
     console.error("[NextAppError] Client-side exception caught by error.tsx:", error);
   }, [error]);
 
-  const handleReload = () => {
+  const handleReload = async () => {
+    setIsCleaning(true);
     if (typeof window !== "undefined") {
-      window.location.reload();
+      try {
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch {}
+
+      if (typeof reset === "function") {
+        try {
+          reset();
+          return;
+        } catch {}
+      }
+
+      window.location.replace(window.location.pathname + "?_r=" + Date.now());
     }
   };
 
@@ -52,11 +74,12 @@ export default function Error({
         <div className="w-full space-y-2.5">
           <button
             type="button"
-            onClick={() => (typeof reset === "function" ? reset() : handleReload())}
-            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-900/20 flex items-center justify-center gap-2 cursor-pointer"
+            onClick={handleReload}
+            disabled={isCleaning}
+            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-900/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Muat Ulang Tampilan</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isCleaning ? "animate-spin" : ""}`} />
+            <span>{isCleaning ? "Memperbarui..." : "Muat Ulang Tampilan"}</span>
           </button>
 
           <button
@@ -76,6 +99,32 @@ export default function Error({
             <LogIn className="w-3 h-3" />
             <span>Masuk Ulang Akun</span>
           </button>
+        </div>
+
+        {/* Collapsible Technical Error Details for Debugging */}
+        <div className="w-full mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-left">
+          <button
+            type="button"
+            onClick={() => setShowDetails(!showDetails)}
+            className="w-full flex items-center justify-between text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors py-1 cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <ShieldAlert className="w-3 h-3 text-amber-500" />
+              <span>Detail Teknis Error</span>
+            </span>
+            {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+
+          {showDetails && (
+            <div className="mt-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300 font-mono break-all max-h-36 overflow-y-auto leading-relaxed">
+              <p className="font-semibold text-rose-600 dark:text-rose-400 mb-1">
+                {error?.name || "Error"}: {error?.message || "Tidak ada detail error"}
+              </p>
+              {error?.digest && (
+                <p className="text-[10px] text-slate-400">Digest: {error.digest}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

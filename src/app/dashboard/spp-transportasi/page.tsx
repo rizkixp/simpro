@@ -64,6 +64,7 @@ export default function SPPTransportasiPage() {
     updatePesertaTransport,
     bayarSPPTransport,
     bulkBayarSPPTransportDariTabungan,
+    bulkBayarSPPTransport,
     getStudentSPPTransportRecord,
   } = useSchoolData();
 
@@ -73,8 +74,8 @@ export default function SPPTransportasiPage() {
   );
   const daftarTahunAjaran = ["2024/2025", "2025/2026", "2026/2027"];
 
-  // Navigation Tabs: "kartu" | "matriks" | "transport" | "riwayat"
-  const [activeTab, setActiveTab] = useState<"kartu" | "matriks" | "transport" | "riwayat">("kartu");
+  // Navigation Tabs: "kartu" | "matriks" | "bulk" | "transport" | "riwayat"
+  const [activeTab, setActiveTab] = useState<"kartu" | "matriks" | "bulk" | "transport" | "riwayat">("kartu");
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -91,6 +92,27 @@ export default function SPPTransportasiPage() {
   const [selectedRecordForPrint, setSelectedRecordForPrint] = useState<RecordSPPTransportTahunAjaran | null>(null);
   const [selectedTrxForReceipt, setSelectedTrxForReceipt] = useState<TransaksiSPPTransport | null>(null);
   const [selectedKelasForClassPrint, setSelectedKelasForClassPrint] = useState<string | null>(null);
+
+  // =========================================================================
+  // STATE KHUSUS: BULK PEMBAYARAN CEPAT SPP & TRANSPORTASI
+  // =========================================================================
+  const [bulkKelas, setBulkKelas] = useState<string>("Semua");
+  const [bulkJenis, setBulkJenis] = useState<"SPP" | "Transportasi" | "Paket Keduanya">("SPP");
+  const [bulkBulanList, setBulkBulanList] = useState<BulanSPP[]>(["Juli"]);
+  const [bulkMetode, setBulkMetode] = useState<MetodePembayaranTagihan>("Tunai");
+  const [bulkTanggal, setBulkTanggal] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [bulkPetugas, setBulkPetugas] = useState<string>(user?.name || "Petugas Bendahara");
+  const [bulkKeterangan, setBulkKeterangan] = useState<string>("Pembayaran Massal Cepat");
+  const [bulkSelectedSiswaIds, setBulkSelectedSiswaIds] = useState<string[]>([]);
+  const [bulkSearch, setBulkSearch] = useState<string>("");
+  const [bulkResult, setBulkResult] = useState<{
+    success: boolean;
+    successCount: number;
+    failedCount: number;
+    totalAmount: number;
+    message: string;
+  } | null>(null);
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState<boolean>(false);
 
   // Bulk Autodebet Modal State
   const [bulkAutodebetKelas, setBulkAutodebetKelas] = useState<string>(kelasList[0]?.nama || "Kelas 1");
@@ -336,6 +358,196 @@ export default function SPPTransportasiPage() {
     });
   };
 
+  // =========================================================================
+  // LOGIKA DAN KALKULASI: BULK PEMBAYARAN CEPAT SPP & TRANSPORTASI
+  // =========================================================================
+  const bulkCandidateStudents = useMemo(() => {
+    let list = siswaList;
+    if (bulkKelas !== "Semua") {
+      list = list.filter((s) => s.kelas.toLowerCase() === bulkKelas.toLowerCase());
+    }
+    if (bulkSearch.trim()) {
+      const q = bulkSearch.toLowerCase();
+      list = list.filter((s) => s.nama.toLowerCase().includes(q) || s.nisn.includes(q));
+    }
+
+    return list.map((siswa) => {
+      const rec = getStudentSPPTransportRecord(siswa.id, selectedTahunAjaran);
+      const transportCfg = pesertaTransportList.find((t) => t.siswaId === siswa.id);
+      const isTransportActive = transportCfg ? transportCfg.isAktif : false;
+      const transportTarif = transportCfg?.biayaBulanan || 100000;
+      const tabungan = tabunganList.find((t) => t.siswaId === siswa.id);
+      const saldoTabungan = tabungan ? tabungan.saldo : 0;
+
+      let sppTagihan = 0;
+      let transportTagihan = 0;
+      const unpaidMonths: BulanSPP[] = [];
+
+      bulkBulanList.forEach((bln) => {
+        const bData = rec.bulan[bln];
+        let hasUnpaid = false;
+
+        if (bulkJenis === "SPP" || bulkJenis === "Paket Keduanya") {
+          if (bData?.sppStatus !== "Lunas") {
+            sppTagihan += 100000;
+            hasUnpaid = true;
+          }
+        }
+        if (bulkJenis === "Transportasi" || bulkJenis === "Paket Keduanya") {
+          if (isTransportActive && bData?.transportStatus !== "Lunas") {
+            transportTagihan += transportTarif;
+            hasUnpaid = true;
+          }
+        }
+        if (hasUnpaid) {
+          unpaidMonths.push(bln);
+        }
+      });
+
+      const totalTagihan = sppTagihan + transportTagihan;
+      const isLunasSemuaBulan = totalTagihan === 0;
+      const isSaldoCukup = saldoTabungan >= totalTagihan;
+
+      return {
+        ...siswa,
+        rec,
+        isTransportActive,
+        transportTarif,
+        saldoTabungan,
+        sppTagihan,
+        transportTagihan,
+        totalTagihan,
+        unpaidMonths,
+        isLunasSemuaBulan,
+        isSaldoCukup,
+      };
+    });
+  }, [
+    siswaList,
+    bulkKelas,
+    bulkSearch,
+    bulkJenis,
+    bulkBulanList,
+    selectedTahunAjaran,
+    pesertaTransportList,
+    tabunganList,
+    getStudentSPPTransportRecord,
+  ]);
+
+  const bulkSelectedSummary = useMemo(() => {
+    const selected = bulkCandidateStudents.filter((s) => bulkSelectedSiswaIds.includes(s.id));
+    const totalAmount = selected.reduce((sum, s) => sum + s.totalTagihan, 0);
+    const countSiapBayar = selected.filter((s) => s.totalTagihan > 0).length;
+    const countSudahLunas = selected.filter((s) => s.totalTagihan === 0).length;
+    const countSaldoKurang =
+      bulkMetode === "Potong Tabungan Siswa"
+        ? selected.filter((s) => s.totalTagihan > 0 && !s.isSaldoCukup).length
+        : 0;
+
+    return {
+      totalSelected: selected.length,
+      countSiapBayar,
+      countSudahLunas,
+      countSaldoKurang,
+      totalAmount,
+    };
+  }, [bulkCandidateStudents, bulkSelectedSiswaIds, bulkMetode]);
+
+  const handleSelectAllBulk = () => {
+    setBulkSelectedSiswaIds(bulkCandidateStudents.map((s) => s.id));
+  };
+
+  const handleSelectUnpaidOnlyBulk = () => {
+    setBulkSelectedSiswaIds(
+      bulkCandidateStudents.filter((s) => s.totalTagihan > 0).map((s) => s.id)
+    );
+  };
+
+  const handleDeselectAllBulk = () => {
+    setBulkSelectedSiswaIds([]);
+  };
+
+  const handleToggleSiswaBulk = (siswaId: string) => {
+    setBulkSelectedSiswaIds((prev) =>
+      prev.includes(siswaId) ? prev.filter((id) => id !== siswaId) : [...prev, siswaId]
+    );
+  };
+
+  const handleToggleBulanBulk = (bulan: BulanSPP) => {
+    setBulkBulanList((prev) =>
+      prev.includes(bulan) ? prev.filter((b) => b !== bulan) : [...prev, bulan]
+    );
+  };
+
+  const handleSetBulkPresetMonths = (preset: "all" | "ganjil" | "genap" | "current") => {
+    if (preset === "all") {
+      setBulkBulanList(LIST_BULAN_SPP.map((b) => b.bulan));
+    } else if (preset === "ganjil") {
+      setBulkBulanList(LIST_BULAN_SPP.filter((b) => b.semester === "Ganjil").map((b) => b.bulan));
+    } else if (preset === "genap") {
+      setBulkBulanList(LIST_BULAN_SPP.filter((b) => b.semester === "Genap").map((b) => b.bulan));
+    } else {
+      setBulkBulanList(["Juli"]);
+    }
+  };
+
+  const handleExecuteBulkPayment = () => {
+    const targetCandidates = bulkCandidateStudents.filter(
+      (s) => bulkSelectedSiswaIds.includes(s.id) && s.totalTagihan > 0
+    );
+
+    if (targetCandidates.length === 0) {
+      alert("Silakan pilih minimal 1 siswa yang memiliki tagihan belum lunas pada bulan yang dipilih.");
+      return;
+    }
+
+    if (bulkBulanList.length === 0) {
+      alert("Silakan pilih minimal 1 bulan tagihan.");
+      return;
+    }
+
+    if (bulkMetode === "Potong Tabungan Siswa") {
+      const cannotPay = targetCandidates.filter((s) => !s.isSaldoCukup);
+      if (cannotPay.length > 0) {
+        const proceed = confirm(
+          `Perhatian: Terdapat ${cannotPay.length} siswa yang saldo tabungannya tidak mencukupi untuk autodebet.\n\nSiswa yang saldonya tidak cukup akan dilewati oleh sistem. Lanjutkan pemotongan tabungan untuk siswa yang siap bayar?`
+        );
+        if (!proceed) return;
+      }
+    } else {
+      const confirmMsg = `Konfirmasi Pembayaran Massal:\n\n• Jumlah Siswa: ${targetCandidates.length} siswa\n• Komponen: ${bulkJenis}\n• Bulan: ${bulkBulanList.join(", ")}\n• Metode: ${bulkMetode}\n• Total Nominal: ${formatRupiah(bulkSelectedSummary.totalAmount)}\n\nLanjutkan pemrosesan transaksi?`;
+      if (!confirm(confirmMsg)) return;
+    }
+
+    setIsBulkSubmitting(true);
+    try {
+      const items = targetCandidates.map((s) => ({
+        siswaId: s.id,
+        jenis: bulkJenis,
+        bulan: bulkBulanList,
+      }));
+
+      const res = bulkBayarSPPTransport({
+        items,
+        tahunAjaran: selectedTahunAjaran,
+        metodePembayaran: bulkMetode,
+        tanggalBayar: bulkTanggal,
+        petugas: bulkPetugas,
+        keterangan: bulkKeterangan,
+      });
+
+      setBulkResult(res);
+      if (res.success) {
+        setAutodebetAlert(
+          `⚡ Pembayaran massal berhasil! ${res.successCount} siswa terproses, total ${formatRupiah(res.totalAmount)}.`
+        );
+        setBulkSelectedSiswaIds([]);
+      }
+    } finally {
+      setIsBulkSubmitting(false);
+    }
+  };
+
   // Filtered transactions for Tab 4
   const filteredTransaksi = transaksiSPPTransportList.filter((t) => {
     const matchYear = t.tahunAjaran === selectedTahunAjaran;
@@ -507,18 +719,20 @@ export default function SPPTransportasiPage() {
 
   return (
     <div>
-      {/* Mobile Super App UI Kit View (Screen 6 Keuangan) */}
-      <div className="block lg:hidden -m-4 sm:-m-6">
-        <MobileKeuanganView
-          onPayNow={() => {
-            const firstUnpaidStudent = siswaList[0]?.id || "";
-            handleOpenOnlinePayment(firstUnpaidStudent);
-          }}
-        />
-      </div>
+      {/* Mobile Super App UI Kit View (Screen 6 Keuangan - Khusus Siswa & Wali Murid) */}
+      {(user?.role === "siswa" || user?.role === "ortu") && (
+        <div className="block lg:hidden -m-4 sm:-m-6">
+          <MobileKeuanganView
+            onPayNow={() => {
+              const firstUnpaidStudent = siswaList[0]?.id || "";
+              handleOpenPayment(firstUnpaidStudent);
+            }}
+          />
+        </div>
+      )}
 
-      {/* Desktop Administrative View */}
-      <div className="hidden lg:block space-y-6">
+      {/* Administrative View (Desktop & Mobile Responsive for Staff/Admin/Guru) */}
+      <div className={`space-y-6 ${(user?.role === "siswa" || user?.role === "ortu") ? "hidden lg:block" : "block"}`}>
         {/* Header Banner */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5 no-print">
         <div>
@@ -562,13 +776,13 @@ export default function SPPTransportasiPage() {
           </div>
 
           {canManage && (
-            <>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
               <button
                 onClick={() => setSelectedKelasForClassPrint(selectedKelas === "Semua" ? kelasList[0]?.nama || "Kelas 1" : selectedKelas)}
-                className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 transition-all flex items-center gap-1.5 shadow-sm"
+                className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Printer className="h-4 w-4 text-slate-500" />
-                <span>Cetak Rekap Rombel</span>
+                <span>Cetak Rekap</span>
               </button>
 
               <button
@@ -576,20 +790,32 @@ export default function SPPTransportasiPage() {
                   setBulkAutodebetFeedback(null);
                   setIsBulkAutodebetModalOpen(true);
                 }}
-                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-bold shadow-lg shadow-teal-600/20 transition-all flex items-center gap-1.5 transform hover:-translate-y-0.5"
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-bold shadow-md shadow-teal-600/20 transition-all flex items-center justify-center gap-1.5"
               >
                 <PiggyBank className="h-4 w-4 text-white" />
-                <span>⚡ Autodebet 1 Rombel</span>
+                <span>⚡ Autodebet</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("bulk")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md ${
+                  activeTab === "bulk"
+                    ? "bg-amber-500 text-white shadow-amber-500/25 ring-2 ring-amber-400"
+                    : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-500/20"
+                }`}
+              >
+                <Zap className="h-4 w-4 text-white fill-white" />
+                <span>⚡ Bulk Bayar Cepat</span>
               </button>
 
               <button
                 onClick={() => handleOpenPayment()}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 transform hover:-translate-y-0.5"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
               >
-                <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
-                <span>⚡ Bayar Cepat SPP & Transport</span>
+                <CreditCard className="h-4 w-4 text-white" />
+                <span>Bayar SPP</span>
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -723,10 +949,10 @@ export default function SPPTransportasiPage() {
       {/* Tabs Navigation & Search Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-3 no-print">
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl max-w-full">
           <button
             onClick={() => setActiveTab("kartu")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all flex items-center gap-2 ${
               activeTab === "kartu"
                 ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-sm"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -738,7 +964,7 @@ export default function SPPTransportasiPage() {
 
           <button
             onClick={() => setActiveTab("matriks")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all flex items-center gap-2 ${
               activeTab === "matriks"
                 ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-sm"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -750,8 +976,31 @@ export default function SPPTransportasiPage() {
 
           {canManage && (
             <button
+              onClick={() => setActiveTab("bulk")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-2 ${
+                activeTab === "bulk"
+                  ? "bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+              }`}
+            >
+              <Zap className="h-3.5 w-3.5 text-amber-300 fill-amber-300" />
+              <span>⚡ Bulk Bayar Cepat</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  activeTab === "bulk"
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                }`}
+              >
+                Massal
+              </span>
+            </button>
+          )}
+
+          {canManage && (
+            <button
               onClick={() => setActiveTab("transport")}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all flex items-center gap-2 ${
                 activeTab === "transport"
                   ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -767,7 +1016,7 @@ export default function SPPTransportasiPage() {
 
           <button
             onClick={() => setActiveTab("riwayat")}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold shrink-0 transition-all flex items-center gap-2 ${
               activeTab === "riwayat"
                 ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-sm"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -993,10 +1242,10 @@ export default function SPPTransportasiPage() {
                       </div>
 
                       {/* Right: Actions */}
-                      <div className="flex items-center gap-2 shrink-0 self-end lg:self-center flex-wrap">
+                      <div className="w-full lg:w-auto grid grid-cols-2 sm:flex sm:items-center gap-2 shrink-0 pt-3 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0">
                         <button
                           onClick={() => setExpandedSiswaId(isExpanded ? null : siswa.id)}
-                          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-1"
+                          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <span>{isExpanded ? "Tutup" : "12 Bulan"}</span>
                         </button>
@@ -1004,7 +1253,7 @@ export default function SPPTransportasiPage() {
                         <button
                           onClick={() => setSelectedRecordForPrint(rec)}
                           title="Cetak Kartu SPP & Transport 1 Tahun Ajaran"
-                          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-1"
+                          className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <Printer className="h-3.5 w-3.5 text-slate-500" />
                           <span>Kartu SPP</span>
@@ -1016,7 +1265,7 @@ export default function SPPTransportasiPage() {
                               <button
                                 onClick={() => handleOpenPayment(siswa.id, "Potong Tabungan Siswa")}
                                 title={`Potong langsung dari saldo tabungan ${siswa.nama} (Saldo: ${formatRupiah(studentSaldo)})`}
-                                className="px-3 py-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                                className="col-span-2 sm:col-span-1 px-3 py-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
                               >
                                 <PiggyBank className="h-3.5 w-3.5 text-teal-600" />
                                 <span>Potong Tabungan</span>
@@ -1025,22 +1274,11 @@ export default function SPPTransportasiPage() {
 
                             <button
                               onClick={() => handleOpenPayment(siswa.id)}
-                              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <CreditCard className="h-3.5 w-3.5" />
                               <span>Bayar</span>
                             </button>
-
-                            {totalTunggakanStudent > 0 && (
-                              <button
-                                onClick={() => handleOpenOnlinePayment(siswa.id)}
-                                title={`Bayar tagihan online via QRIS atau Virtual Account Midtrans`}
-                                className="px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
-                              >
-                                <QrCode className="h-3.5 w-3.5 text-emerald-600" />
-                                <span>Bayar Online</span>
-                              </button>
-                            )}
                           </>
                         )}
                       </div>
@@ -1326,6 +1564,535 @@ export default function SPPTransportasiPage() {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB KHUSUS: BULK PEMBAYARAN CEPAT SPP & TRANSPORTASI                      */}
+      {/* ========================================================================= */}
+      {activeTab === "bulk" && canManage && (
+        <div className="space-y-6">
+          {/* Header Banner Mode Bulk */}
+          <div className="p-5 rounded-3xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-indigo-500/15 border border-amber-200 dark:border-amber-900/60 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30 shrink-0">
+                <Zap className="h-6 w-6 text-white fill-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                    Bulk Pembayaran Cepat SPP & Transportasi
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                    Eksekusi Massal
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                  Bayar tagihan SPP dan Transportasi untuk seluruh siswa satu rombel sekaligus dalam 1 kali klik. Mendukung metode <strong>Tunai, Transfer Bank,</strong> hingga <strong>Autodebet Potong Saldo Tabungan Siswa</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleExecuteBulkPayment}
+                disabled={isBulkSubmitting || bulkSelectedSummary.countSiapBayar === 0}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+              >
+                <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
+                <span>
+                  {isBulkSubmitting
+                    ? "Memproses..."
+                    : `Bayar Massal (${formatRupiah(bulkSelectedSummary.totalAmount)})`}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback Hasil Eksekusi Bulk */}
+          {bulkResult && (
+            <div className="p-4 sm:p-5 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs shadow-sm space-y-2 no-print">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200 font-bold text-sm">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                  <span>{bulkResult.message}</span>
+                </div>
+                <button
+                  onClick={() => setBulkResult(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-200/60 dark:border-emerald-800/60">
+                <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Sukses Terproses</span>
+                  <span className="font-extrabold text-base text-emerald-700 dark:text-emerald-400">
+                    {bulkResult.successCount} Siswa
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Kas Terkumpul</span>
+                  <span className="font-extrabold text-base font-mono text-emerald-700 dark:text-emerald-400">
+                    {formatRupiah(bulkResult.totalAmount)}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">Dilewati / Gagal</span>
+                  <span className="font-bold text-base text-rose-600">
+                    {bulkResult.failedCount} Siswa
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/80 flex items-center justify-center">
+                  <button
+                    onClick={() => setActiveTab("riwayat")}
+                    className="text-indigo-600 dark:text-indigo-400 font-bold text-xs hover:underline flex items-center gap-1"
+                  >
+                    <span>Lihat di Riwayat Transaksi</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Panel Konfigurasi Parameter Pembayaran Massal */}
+          <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 no-print">
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-indigo-600" />
+              <span>Konfigurasi Tagihan & Metode Pembayaran</span>
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
+              {/* Filter Rombel */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Pilih Rombel / Kelas:
+                </label>
+                <select
+                  value={bulkKelas}
+                  onChange={(e) => {
+                    setBulkKelas(e.target.value);
+                    setBulkSelectedSiswaIds([]);
+                  }}
+                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="Semua">Semua Rombel ({siswaList.length} Siswa)</option>
+                  {kelasList.map((k) => (
+                    <option key={k.id} value={k.nama}>
+                      {k.nama} ({k.jumlahSiswa} Siswa)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Komponen Tagihan */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Komponen Pembayaran:
+                </label>
+                <select
+                  value={bulkJenis}
+                  onChange={(e) => setBulkJenis(e.target.value as any)}
+                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="SPP">SPP Saja (Rp 100.000 / bln)</option>
+                  <option value="Transportasi">Transportasi Saja</option>
+                  <option value="Paket Keduanya">Paket SPP & Transportasi</option>
+                </select>
+              </div>
+
+              {/* Metode Pembayaran */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Metode Pembayaran:
+                </label>
+                <select
+                  value={bulkMetode}
+                  onChange={(e) => setBulkMetode(e.target.value as MetodePembayaranTagihan)}
+                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="Tunai">💵 Tunai (Kasir / TU)</option>
+                  <option value="Transfer Bank">🏦 Transfer Bank</option>
+                  <option value="Potong Tabungan Siswa">🐷 Potong Saldo Tabungan (Autodebet)</option>
+                </select>
+              </div>
+
+              {/* Tanggal Bayar */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Tanggal Transaksi:
+                </label>
+                <input
+                  type="date"
+                  value={bulkTanggal}
+                  onChange={(e) => setBulkTanggal(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Pemilihan Bulan Tagihan */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Pilih Bulan Tagihan ({bulkBulanList.length} Bulan Terpilih):
+                </span>
+                {/* Preset Tombol Cepat */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleSetBulkPresetMonths("current")}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all"
+                  >
+                    Bulan Juli (Awal TA)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetBulkPresetMonths("ganjil")}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-all"
+                  >
+                    Semester 1 (Jul - Des)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetBulkPresetMonths("genap")}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-all"
+                  >
+                    Semester 2 (Jan - Jun)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetBulkPresetMonths("all")}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 hover:bg-amber-100 transition-all"
+                  >
+                    12 Bulan Penuh
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid 12 Bulan Checkboxes */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-1.5">
+                {LIST_BULAN_SPP.map((b) => {
+                  const isChecked = bulkBulanList.includes(b.bulan);
+                  return (
+                    <button
+                      type="button"
+                      key={b.bulan}
+                      onClick={() => handleToggleBulanBulk(b.bulan)}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all text-center flex flex-col items-center justify-center ${
+                        isChecked
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-xs scale-102 font-bold"
+                          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="font-bold text-[11px]">{b.bulan}</span>
+                      <span className={`text-[9px] ${isChecked ? "text-indigo-200" : "text-slate-400"}`}>
+                        Sem. {b.semester === "Ganjil" ? "1" : "2"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Panel Daftar Siswa & Checkbox Massal */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
+            {/* Toolbar Atas Tabel */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleSelectAllBulk}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs hover:bg-indigo-100 transition-all flex items-center gap-1.5"
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />
+                  <span>Pilih Semua ({bulkCandidateStudents.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSelectUnpaidOnlyBulk}
+                  className="px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold text-xs hover:bg-amber-100 transition-all flex items-center gap-1.5"
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Hanya Belum Lunas ({bulkCandidateStudents.filter((s) => s.totalTagihan > 0).length})</span>
+                </button>
+                {bulkSelectedSiswaIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleDeselectAllBulk}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold text-xs hover:bg-slate-200 transition-all flex items-center gap-1"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    <span>Batal Pilih</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Pencarian Siswa */}
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={bulkSearch}
+                  onChange={(e) => setBulkSearch(e.target.value)}
+                  placeholder="Cari siswa atau NISN..."
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="px-4 py-3.5 text-center w-12">Pilih</th>
+                    <th className="px-4 py-3.5">Data Siswa</th>
+                    <th className="px-3 py-3.5">Rombel</th>
+                    <th className="px-4 py-3.5">Status Transport</th>
+                    <th className="px-4 py-3.5 text-right">Saldo Tabungan</th>
+                    <th className="px-4 py-3.5">Bulan Belum Lunas</th>
+                    <th className="px-4 py-3.5 text-right">Nominal Tagihan</th>
+                    <th className="px-4 py-3.5 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {bulkCandidateStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-5 py-12 text-center text-slate-400">
+                        Tidak ada siswa yang cocok dengan kriteria filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    bulkCandidateStudents.map((s) => {
+                      const isSelected = bulkSelectedSiswaIds.includes(s.id);
+                      return (
+                        <tr
+                          key={s.id}
+                          onClick={() => handleToggleSiswaBulk(s.id)}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-indigo-50/50 dark:bg-indigo-950/20"
+                              : "hover:bg-slate-50/70 dark:hover:bg-slate-800/40"
+                          }`}
+                        >
+                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSiswaBulk(s.id)}
+                              className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                              <span>{s.nama}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">NISN: {s.nisn}</div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold text-[10px]">
+                              {s.kelas}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {s.isTransportActive ? (
+                              <span className="text-[11px] font-semibold text-blue-600 flex items-center gap-1">
+                                <Bus className="h-3 w-3" />
+                                <span>{formatRupiah(s.transportTarif)}/bln</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">Bukan Peserta</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs">
+                              {formatRupiah(s.saldoTabungan)}
+                            </span>
+                            {bulkMetode === "Potong Tabungan Siswa" && s.totalTagihan > 0 && !s.isSaldoCukup && (
+                              <span className="block text-[10px] text-rose-500 font-semibold">
+                                Kurang {formatRupiah(s.totalTagihan - s.saldoTabungan)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {s.unpaidMonths.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 max-w-xs">
+                                {s.unpaidMonths.map((m) => (
+                                  <span
+                                    key={m}
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                  >
+                                    {m}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1">
+                                <Check className="h-3.5 w-3.5" /> Lunas di {bulkBulanList.length} bln
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={`font-mono font-extrabold text-xs ${
+                                s.totalTagihan > 0
+                                  ? "text-emerald-700 dark:text-emerald-400"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {formatRupiah(s.totalTagihan)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {s.totalTagihan === 0 ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                Sudah Lunas
+                              </span>
+                            ) : bulkMetode === "Potong Tabungan Siswa" && !s.isSaldoCukup ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
+                                Saldo Kurang
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                                Siap Bayar
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View (md:hidden) */}
+            <div className="block md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {bulkCandidateStudents.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  Tidak ada siswa yang cocok dengan kriteria filter.
+                </div>
+              ) : (
+                bulkCandidateStudents.map((s) => {
+                  const isSelected = bulkSelectedSiswaIds.includes(s.id);
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => handleToggleSiswaBulk(s.id)}
+                      className={`p-4 space-y-2.5 transition-colors cursor-pointer ${
+                        isSelected
+                          ? "bg-indigo-50/50 dark:bg-indigo-950/20"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSiswaBulk(s.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-5 w-5 rounded text-indigo-600 focus:ring-indigo-500 shrink-0 cursor-pointer"
+                          />
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                              {s.nama}
+                            </h4>
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono mt-0.5">
+                              <span>{s.nisn}</span>
+                              <span>&bull;</span>
+                              <span className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold text-[10px]">
+                                {s.kelas}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-400 block font-medium">Tagihan</span>
+                          <span
+                            className={`font-mono font-black text-sm ${
+                              s.totalTagihan > 0
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {formatRupiah(s.totalTagihan)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                        <span className="text-slate-500">
+                          Saldo Tabungan: <strong className="font-mono text-slate-800 dark:text-slate-200">{formatRupiah(s.saldoTabungan)}</strong>
+                        </span>
+                        <div>
+                          {s.totalTagihan === 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                              Lunas
+                            </span>
+                          ) : bulkMetode === "Potong Tabungan Siswa" && !s.isSaldoCukup ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
+                              Saldo Kurang
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                              Siap Bayar
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Bottom Sticky Summary & Action Bar */}
+            <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-800/90 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs text-slate-500 block">Ringkasan Pembayaran Massal Terpilih:</span>
+                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">
+                    {bulkSelectedSummary.totalSelected} Siswa Dipilih
+                  </span>
+                  <span className="text-slate-300">&bull;</span>
+                  <span className="text-xs font-semibold text-emerald-600">
+                    {bulkSelectedSummary.countSiapBayar} Siap Bayar
+                  </span>
+                  <span className="text-slate-300">&bull;</span>
+                  <span className="text-sm font-extrabold font-mono text-emerald-700 dark:text-emerald-400">
+                    Total: {formatRupiah(bulkSelectedSummary.totalAmount)}
+                  </span>
+                </div>
+                {bulkMetode === "Potong Tabungan Siswa" && bulkSelectedSummary.countSaldoKurang > 0 && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-semibold">
+                    * {bulkSelectedSummary.countSaldoKurang} siswa memiliki saldo tabungan tidak cukup dan akan dilewati saat eksekusi.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExecuteBulkPayment}
+                  disabled={isBulkSubmitting || bulkSelectedSummary.countSiapBayar === 0}
+                  className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                >
+                  <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
+                  <span>
+                    {isBulkSubmitting
+                      ? "Memproses..."
+                      : `Eksekusi Pembayaran Massal (${formatRupiah(bulkSelectedSummary.totalAmount)})`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 3: KELOLA PESERTA TRANSPORTASI                                        */}
       {/* ========================================================================= */}
       {activeTab === "transport" && canManage && (
@@ -1445,7 +2212,8 @@ export default function SPPTransportasiPage() {
       {/* ========================================================================= */}
       {activeTab === "riwayat" && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden no-print">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
               <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
@@ -1532,6 +2300,83 @@ export default function SPPTransportasiPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (md:hidden) */}
+          <div className="block md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+            {filteredTransaksi.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                Belum ada transaksi pembayaran SPP / Transportasi untuk tahun ajaran {selectedTahunAjaran}.
+              </div>
+            ) : (
+              paginatedTransaksi.map((trx) => (
+                <div key={trx.id} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-xs text-slate-900 dark:text-white">
+                          {trx.siswaNama}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 font-mono text-slate-600 dark:text-slate-300">
+                          {trx.kelas}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            trx.jenis === "Paket Keduanya"
+                              ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                              : trx.jenis === "Transportasi"
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          }`}
+                        >
+                          {trx.jenis}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        No: {trx.noKuitansi} &bull; {formatDateIndo(trx.tanggalBayar)}
+                      </p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="font-mono font-extrabold text-sm text-emerald-700 dark:text-emerald-400 block">
+                        {formatRupiah(trx.totalNominal)}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">
+                        {trx.metodePembayaran}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                    <span className="text-slate-400">Bulan: </span>
+                    <span className="font-semibold">{trx.bulan.join(", ")}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                    <span className="text-[10px] text-slate-400">Petugas: {trx.petugas}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTrxForReceipt(trx)}
+                        className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Printer className="h-3 w-3 text-slate-500" />
+                        <span>Struk</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSendWhatsAppReceipt(trx)}
+                        disabled={waReceiptSendingTrxId === trx.id}
+                        className="px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <Send className="h-3 w-3" />
+                        <span>WA</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
           <Pagination
             currentPage={trxCurrentPage}
@@ -1885,10 +2730,9 @@ export default function SPPTransportasiPage() {
                       <p className="text-[11px] font-semibold text-slate-400 pt-1">
                         Atau Gunakan Kanal Pembayaran Lain:
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {[
                           { id: "Transfer Bank", label: "Transfer Bank", icon: Building2, desc: "BCA / Mandiri / BNI" },
-                          { id: "QRIS", label: "QRIS", icon: QrCode, desc: "GoPay / OVO / Dana" },
                           { id: "Tunai", label: "Tunai", icon: Wallet, desc: "Loket Tata Usaha" },
                         ].map((m) => (
                           <button

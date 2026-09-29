@@ -934,15 +934,34 @@ export const SupabaseSchoolService = {
   async upsertTabungan(tabungan: TabunganSiswa): Promise<boolean> {
     const client = getSupabaseBrowserClient();
     if (!client) return false;
-    const { error } = await client.from("tabungan_siswa").upsert({
-      id: tabungan.id,
-      siswa_id: tabungan.siswaId,
-      siswa_nama: tabungan.siswaNama,
-      nisn: tabungan.nisn || null,
-      kelas: tabungan.kelas,
-      saldo: tabungan.saldo,
-      terakhir_update: tabungan.terakhirUpdate,
-    });
+    const { error } = await client.from("tabungan_siswa").upsert(
+      {
+        id: tabungan.id || `tab-${tabungan.siswaId}`,
+        siswa_id: tabungan.siswaId,
+        siswa_nama: tabungan.siswaNama,
+        nisn: tabungan.nisn || null,
+        kelas: tabungan.kelas,
+        saldo: tabungan.saldo,
+        terakhir_update: tabungan.terakhirUpdate,
+      },
+      { onConflict: "siswa_id" }
+    );
+    return !error;
+  },
+
+  async bulkUpsertTabungan(items: TabunganSiswa[]): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client || items.length === 0) return false;
+    const payload = items.map((t) => ({
+      id: t.id || `tab-${t.siswaId}`,
+      siswa_id: t.siswaId,
+      siswa_nama: t.siswaNama,
+      nisn: t.nisn || null,
+      kelas: t.kelas,
+      saldo: t.saldo,
+      terakhir_update: t.terakhirUpdate,
+    }));
+    const { error } = await client.from("tabungan_siswa").upsert(payload, { onConflict: "siswa_id" });
     return !error;
   },
 
@@ -971,7 +990,7 @@ export const SupabaseSchoolService = {
   async insertTransaksiTabungan(trx: TransaksiTabungan): Promise<boolean> {
     const client = getSupabaseBrowserClient();
     if (!client) return false;
-    const { error } = await client.from("transaksi_tabungan").insert({
+    const { error } = await client.from("transaksi_tabungan").upsert({
       id: trx.id,
       tabungan_id: trx.tabunganId || null,
       siswa_id: trx.siswaId,
@@ -986,6 +1005,28 @@ export const SupabaseSchoolService = {
       petugas: trx.petugas || null,
       no_referensi: trx.noReferensi || null,
     });
+    return !error;
+  },
+
+  async bulkInsertTransaksiTabungan(items: TransaksiTabungan[]): Promise<boolean> {
+    const client = getSupabaseBrowserClient();
+    if (!client || items.length === 0) return false;
+    const payload = items.map((trx) => ({
+      id: trx.id,
+      tabungan_id: trx.tabunganId || null,
+      siswa_id: trx.siswaId,
+      siswa_nama: trx.siswaNama,
+      nisn: trx.nisn || null,
+      kelas: trx.kelas,
+      tipe: trx.tipe,
+      nominal: trx.nominal,
+      saldo_akhir: trx.saldoAkhir,
+      tanggal: trx.tanggal,
+      keterangan: trx.keterangan || null,
+      petugas: trx.petugas || null,
+      no_referensi: trx.noReferensi || null,
+    }));
+    const { error } = await client.from("transaksi_tabungan").upsert(payload);
     return !error;
   },
 
@@ -2017,11 +2058,11 @@ export const SupabaseSchoolService = {
       }
 
       // 12. Tabungan & Transaksi
-      for (const t of mockData.tabungan) {
-        await this.upsertTabungan(t);
+      if (mockData.tabungan.length > 0) {
+        await this.bulkUpsertTabungan(mockData.tabungan);
       }
-      for (const tt of mockData.transaksiTabungan) {
-        await this.insertTransaksiTabungan(tt);
+      if (mockData.transaksiTabungan.length > 0) {
+        await this.bulkInsertTransaksiTabungan(mockData.transaksiTabungan);
       }
 
       // 13. Transportasi & SPP Transport

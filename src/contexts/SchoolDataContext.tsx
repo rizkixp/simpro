@@ -234,7 +234,7 @@ interface SchoolDataContextType {
   transaksiTabunganList: TransaksiTabungan[];
   setorTabungan: (siswaId: string, nominal: number, keterangan?: string, petugas?: string, tanggal?: string) => void;
   tarikTabungan: (siswaId: string, nominal: number, keterangan?: string, petugas?: string, tanggal?: string) => { success: boolean; message?: string };
-  bulkSetorTabungan: (items: { siswaId: string; nominal: number; keterangan?: string }[], petugas?: string, tanggal?: string) => void;
+  bulkSetorTabungan: (items: { siswaId: string; nominal: number; keterangan?: string; tanggal?: string }[], petugas?: string, tanggal?: string) => void;
   clearAllTabungan: () => Promise<void>;
   pesertaTransportList: PesertaTransportasi[];
   sppTransportRecords: RecordSPPTransportTahunAjaran[];
@@ -262,6 +262,26 @@ interface SchoolDataContextType {
     insufficientCount: number;
     totalAmount: number;
     insufficientNames: string[];
+  };
+  bulkBayarSPPTransport: (params: {
+    items: {
+      siswaId: string;
+      jenis: "SPP" | "Transportasi" | "Paket Keduanya";
+      bulan: BulanSPP[];
+      customNominal?: number;
+    }[];
+    tahunAjaran: string;
+    metodePembayaran: MetodePembayaranTagihan;
+    tanggalBayar?: string;
+    petugas?: string;
+    keterangan?: string;
+  }) => {
+    success: boolean;
+    successCount: number;
+    failedCount: number;
+    totalAmount: number;
+    message: string;
+    newTransactions: TransaksiSPPTransport[];
   };
   getStudentSPPTransportRecord: (siswaId: string, tahunAjaran: string) => RecordSPPTransportTahunAjaran;
 
@@ -627,13 +647,24 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       } else {
         const deletedIds = getDeletedIds();
 
+        const safeParse = <T,>(raw: string | null, fallback: T): T => {
+          if (!raw || raw === "undefined" || raw === "null") return fallback;
+          try {
+            const res = JSON.parse(raw);
+            return res !== null && res !== undefined ? res : fallback;
+          } catch (e) {
+            console.warn("[SchoolDataContext] Safe parse error on localStorage key:", e);
+            return fallback;
+          }
+        };
+
         // 1. Profile
         const loadedProfile = load("profile", INITIAL_SCHOOL_PROFILE);
         setProfile(loadedProfile);
 
         // 2. Siswa
         const rawSiswa = localStorage.getItem("sim_data_siswa");
-        let baseSiswaList: Siswa[] = rawSiswa !== null ? (JSON.parse(rawSiswa) || []) : [];
+        let baseSiswaList: Siswa[] = safeParse(rawSiswa, []);
         baseSiswaList = baseSiswaList.filter((s) => !deletedIds.has(s.id));
         const waliCleanMigrationKey = "sim_data_siswa_wali_cleared_v1";
         const hasMigratedWali = typeof window !== "undefined" && localStorage.getItem(waliCleanMigrationKey) === "true";
@@ -673,7 +704,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 3. Guru
         const rawGuru = localStorage.getItem("sim_data_guru");
-        let baseGuruList: Guru[] = rawGuru !== null ? (JSON.parse(rawGuru) || []) : [];
+        let baseGuruList: Guru[] = safeParse(rawGuru, []);
         baseGuruList = baseGuruList.filter((g) => !deletedIds.has(g.id));
         const sanitizedGuru = baseGuruList.map((g: any) => ({
           ...g,
@@ -698,19 +729,19 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 4. Kelas (Otoritatif dari localStorage tanpa re-injeksi INITIAL_KELAS)
         const rawKelas = localStorage.getItem("sim_data_kelas");
-        let baseKelasList: Kelas[] = rawKelas !== null ? (JSON.parse(rawKelas) || []) : [];
+        let baseKelasList: Kelas[] = safeParse(rawKelas, []);
         baseKelasList = baseKelasList.filter((k) => !deletedIds.has(k.id));
         setKelasList(baseKelasList);
 
         // 5. Mapel (Otoritatif dari localStorage tanpa re-injeksi INITIAL_MAPEL)
         const rawMapel = localStorage.getItem("sim_data_mapel");
-        let baseMapelList: MataPelajaran[] = rawMapel !== null ? (JSON.parse(rawMapel) || []) : [];
+        let baseMapelList: MataPelajaran[] = safeParse(rawMapel, []);
         baseMapelList = baseMapelList.filter((m) => !deletedIds.has(m.id));
         setMapelList(baseMapelList);
 
         // 6. Jadwal (Otoritatif dari localStorage tanpa re-injeksi INITIAL_JADWAL)
         const rawJadwal = localStorage.getItem("sim_data_jadwal");
-        let baseJadwalList: JadwalPelajaran[] = rawJadwal !== null ? (JSON.parse(rawJadwal) || []) : [];
+        let baseJadwalList: JadwalPelajaran[] = safeParse(rawJadwal, []);
         baseJadwalList = baseJadwalList.filter((j) => !deletedIds.has(j.id));
         baseJadwalList = baseJadwalList.map((j) => {
           if (j.id === "jdw-01" && j.mapel === "Upacara & PAI") {
@@ -725,13 +756,13 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 7. Presensi
         const rawPresensi = localStorage.getItem("sim_data_presensi");
-        let basePresensiList: PresensiRecord[] = rawPresensi !== null ? (JSON.parse(rawPresensi) || []) : [];
+        let basePresensiList: PresensiRecord[] = safeParse(rawPresensi, []);
         basePresensiList = basePresensiList.filter((p) => !deletedIds.has(p.id));
         setPresensiList(basePresensiList);
 
         // 8. Nilai (Otoritatif dari localStorage tanpa re-injeksi INITIAL_NILAI)
         const rawNilai = localStorage.getItem("sim_data_nilai");
-        let mergedNilai: NilaiSiswa[] = rawNilai !== null ? (JSON.parse(rawNilai) || []) : [];
+        let mergedNilai: NilaiSiswa[] = safeParse(rawNilai, []);
         mergedNilai = mergedNilai.filter((n) => !deletedIds.has(n.id));
 
         // Migration: Kosongkan nilai default SAS (Ganjil & Genap) pada browser pengguna
@@ -776,7 +807,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 9. SPP & Jenis Tagihan
         const rawSpp = localStorage.getItem("sim_data_spp");
-        let loadedSpp: TagihanSiswa[] = (rawSpp !== null ? (JSON.parse(rawSpp) || []) : []).filter((s: any) => !deletedIds.has(s.id));
+        let loadedSpp: TagihanSiswa[] = safeParse<any[]>(rawSpp, []).filter((s: any) => !deletedIds.has(s.id));
         if (needsNilaiSppReset) {
           loadedSpp = [];
           localStorage.setItem("sim_data_spp", JSON.stringify([]));
@@ -785,27 +816,23 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         setSppList(loadedSpp);
 
         const rawJenisTagihan = localStorage.getItem("sim_data_jenis_tagihan");
-        const loadedJenisTagihan: JenisTagihan[] = (rawJenisTagihan !== null ? (JSON.parse(rawJenisTagihan) || []) : []).filter((j: any) => !deletedIds.has(j.id));
+        const loadedJenisTagihan: JenisTagihan[] = safeParse<any[]>(rawJenisTagihan, []).filter((j: any) => !deletedIds.has(j.id));
         setJenisTagihanList(loadedJenisTagihan);
 
         // 10. Pengumuman
         const rawPengumuman = localStorage.getItem("sim_data_pengumuman");
-        const loadedPengumuman: Pengumuman[] = (rawPengumuman !== null ? (JSON.parse(rawPengumuman) || []) : []).filter((p: any) => !deletedIds.has(p.id));
+        const loadedPengumuman: Pengumuman[] = safeParse<any[]>(rawPengumuman, []).filter((p: any) => !deletedIds.has(p.id));
         setPengumumanList(loadedPengumuman);
 
         // 11. Tabungan
-        const savedTab = localStorage.getItem("sim_data_tabungan");
-        let loadedTabungan: TabunganSiswa[] = [];
-        let loadedTransaksiTabungan: TransaksiTabungan[] = [];
-        if (savedTab && (savedTab.includes("tab-001") || savedTab.includes("Ahmad Rizky"))) {
-          localStorage.setItem("sim_data_tabungan", JSON.stringify([]));
-          localStorage.setItem("sim_data_transaksi_tabungan", JSON.stringify([]));
-          loadedTabungan = [];
-          loadedTransaksiTabungan = [];
-        } else {
-          loadedTabungan = load("tabungan", []);
-          loadedTransaksiTabungan = load("transaksi_tabungan", []);
-        }
+        const rawTabungan = localStorage.getItem("sim_data_tabungan");
+        const loadedTabungan: TabunganSiswa[] = safeParse<TabunganSiswa[]>(rawTabungan, []).filter(
+          (t: TabunganSiswa) => !deletedIds.has(t.id) && !deletedIds.has(t.siswaId)
+        );
+        const rawTrxTabungan = localStorage.getItem("sim_data_transaksi_tabungan");
+        const loadedTransaksiTabungan: TransaksiTabungan[] = safeParse<TransaksiTabungan[]>(rawTrxTabungan, []).filter(
+          (m: TransaksiTabungan) => !deletedIds.has(m.id) && !deletedIds.has(m.siswaId)
+        );
         setTabunganList(loadedTabungan);
         setTransaksiTabunganList(loadedTransaksiTabungan);
 
@@ -819,18 +846,18 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
 
         // 13. LMS Data (Otoritatif tanpa re-injeksi default yang telah dihapus)
         const rawMateri = localStorage.getItem("sim_data_lms_materi");
-        const baseMateri: LMSMateri[] = (rawMateri !== null ? (JSON.parse(rawMateri) || []) : []).filter((m: any) => !deletedIds.has(m.id));
+        const baseMateri: LMSMateri[] = safeParse<any[]>(rawMateri, []).filter((m: any) => !deletedIds.has(m.id));
         setLmsMateriList(baseMateri);
 
         const rawTugas = localStorage.getItem("sim_data_lms_tugas");
-        const baseTugas: LMSTugas[] = (rawTugas !== null ? (JSON.parse(rawTugas) || []) : []).filter((t: any) => !deletedIds.has(t.id));
+        const baseTugas: LMSTugas[] = safeParse<any[]>(rawTugas, []).filter((t: any) => !deletedIds.has(t.id));
         setLmsTugasList(baseTugas);
 
         const loadedSubmissions: LMSSubmission[] = load("lms_submissions", []);
         setLmsSubmissionList(loadedSubmissions);
 
         const rawKuis = localStorage.getItem("sim_data_lms_kuis");
-        const baseKuis: LMSKuis[] = (rawKuis !== null ? (JSON.parse(rawKuis) || []) : []).filter((k: any) => !deletedIds.has(k.id));
+        const baseKuis: LMSKuis[] = safeParse<any[]>(rawKuis, []).filter((k: any) => !deletedIds.has(k.id));
         setLmsKuisList(baseKuis);
 
         const loadedAttempts: LMSKuisAttempt[] = load("lms_attempts", []);
@@ -843,30 +870,20 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         setLmsMeetingList(loadedMeetings);
 
         const rawBank = localStorage.getItem("sim_data_lms_bank_soal");
-        let baseBank: LMSBankSoal[] = [];
-        if (rawBank !== null) {
-          try {
-            baseBank = JSON.parse(rawBank);
-          } catch {
-            baseBank = [];
-          }
-        } else {
-          baseBank = [];
-        }
-        baseBank = baseBank.filter((b: any) => !deletedIds.has(b.id));
+        let baseBank: LMSBankSoal[] = safeParse<any[]>(rawBank, []).filter((b: any) => !deletedIds.has(b.id));
         setLmsBankSoalList(baseBank);
 
         const rawJadwalMateri = localStorage.getItem("sim_data_lms_jadwal_materi");
-        const baseJadwalMateri: LMSJadwalMateri[] = (rawJadwalMateri !== null ? (JSON.parse(rawJadwalMateri) || []) : []).filter((j: any) => !deletedIds.has(j.id));
+        const baseJadwalMateri: LMSJadwalMateri[] = safeParse<any[]>(rawJadwalMateri, []).filter((j: any) => !deletedIds.has(j.id));
         setLmsJadwalMateriList(baseJadwalMateri);
 
         // 14. Islamic School Flagship (Tahfidz & Mutaba'ah)
         const rawTahfidz = localStorage.getItem("sim_data_tahfidz");
-        const baseTahfidz: TahfidzRecord[] = (rawTahfidz !== null ? (JSON.parse(rawTahfidz) || []) : []).filter((t: any) => !deletedIds.has(t.id));
+        const baseTahfidz: TahfidzRecord[] = safeParse<any[]>(rawTahfidz, []).filter((t: any) => !deletedIds.has(t.id));
         setTahfidzList(baseTahfidz);
 
         const rawMutabaah = localStorage.getItem("sim_data_mutabaah");
-        const baseMutabaah: MutabaahRecord[] = (rawMutabaah !== null ? (JSON.parse(rawMutabaah) || []) : []).filter((m: any) => !deletedIds.has(m.id));
+        const baseMutabaah: MutabaahRecord[] = safeParse<any[]>(rawMutabaah, []).filter((m: any) => !deletedIds.has(m.id));
         setMutabaahList(baseMutabaah);
 
         // Populate latestDataRef immediately for thread safety and sync alignment
@@ -1113,23 +1130,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         return;
       }
 
-      const hasCloudData = Boolean(
-        (data.siswa && data.siswa.length > 0) ||
-        (data.guru && data.guru.length > 0) ||
-        (data.kelas && data.kelas.length > 0) ||
-        data.profile
-      );
-
-      if (!hasCloudData) {
-        console.log("[Supabase] Database cloud masih kosong. Menjaga cloud tetap kosong (tidak auto-seeding data dummy).");
-        setIsSupabaseConnected(true);
-        setLastSyncTime(new Date());
-        lastSyncTimestampRef.current = Date.now();
-        setIsSyncing(false);
-        return;
-      }
-
-      // Hydrate all states with data from Supabase
+      // Selalu perbarui profil sekolah jika ada di Supabase Cloud
       if (data.profile) {
         const remoteProfile = data.profile;
         setProfile((prevProfile) => {
@@ -1152,120 +1153,308 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           return merged;
         });
       }
+
+      // Validasi master data: Hanya anggap cloud memiliki data operasional jika minimal ada siswa, guru, atau kelas
+      const hasCloudOperationalData = Boolean(
+        (data.siswa && data.siswa.length > 0) ||
+        (data.guru && data.guru.length > 0) ||
+        (data.kelas && data.kelas.length > 0)
+      );
+
+      if (!hasCloudOperationalData) {
+        console.log("[Supabase] Database cloud belum memiliki data master operasional (siswa/guru/kelas). Mempertahankan data lokal dan tidak menimpa dengan array kosong.");
+        setIsSupabaseConnected(true);
+        setLastSyncTime(new Date());
+        lastSyncTimestampRef.current = Date.now();
+        setIsSyncing(false);
+        return;
+      }
+
       const deletedIds = getDeletedIds();
 
+      // 1. Siswa: Lindungi data lokal agar tidak terhapus jika remote kosong
       if (Array.isArray(data.siswa)) {
         const stale = data.siswa.filter((s) => deletedIds.has(s.id)).map((s) => s.id);
         if (stale.length > 0) SupabaseSchoolService.bulkDeleteSiswa(stale).catch(() => {});
         const remoteSiswa = data.siswa.filter((s) => !deletedIds.has(s.id));
-        setSiswaList(remoteSiswa);
-        latestDataRef.current.siswaList = remoteSiswa;
-        saveState("siswa", remoteSiswa, true);
+        const localSiswa = (latestDataRef.current.siswaList || []).filter((s) => !deletedIds.has(s.id));
+        let finalSiswa: Siswa[];
+        if (remoteSiswa.length === 0 && localSiswa.length > 0) {
+          finalSiswa = localSiswa;
+        } else if (remoteSiswa.length > 0 && localSiswa.length > 0) {
+          const map = new Map(remoteSiswa.map((s) => [s.id, s]));
+          localSiswa.forEach((ls) => { if (!map.has(ls.id)) map.set(ls.id, ls); });
+          finalSiswa = Array.from(map.values());
+        } else {
+          finalSiswa = remoteSiswa;
+        }
+        setSiswaList(finalSiswa);
+        latestDataRef.current.siswaList = finalSiswa;
+        saveState("siswa", finalSiswa, true);
       }
+
+      // 2. Guru
       if (Array.isArray(data.guru)) {
         const stale = data.guru.filter((g) => deletedIds.has(g.id)).map((g) => g.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteGuru(id).catch(() => {}));
         }
         const remoteGuru = data.guru.filter((g) => !deletedIds.has(g.id));
-        setGuruList(remoteGuru);
-        latestDataRef.current.guruList = remoteGuru;
-        saveState("guru", remoteGuru, true);
+        const localGuru = (latestDataRef.current.guruList || []).filter((g) => !deletedIds.has(g.id));
+        let finalGuru: Guru[];
+        if (remoteGuru.length === 0 && localGuru.length > 0) {
+          finalGuru = localGuru;
+        } else if (remoteGuru.length > 0 && localGuru.length > 0) {
+          const map = new Map(remoteGuru.map((g) => [g.id, g]));
+          localGuru.forEach((lg) => { if (!map.has(lg.id)) map.set(lg.id, lg); });
+          finalGuru = Array.from(map.values());
+        } else {
+          finalGuru = remoteGuru;
+        }
+        setGuruList(finalGuru);
+        latestDataRef.current.guruList = finalGuru;
+        saveState("guru", finalGuru, true);
       }
+
+      // 3. Kelas
       if (Array.isArray(data.kelas)) {
         const stale = data.kelas.filter((k) => deletedIds.has(k.id)).map((k) => k.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteKelas(id).catch(() => {}));
         }
         const remoteKelas = data.kelas.filter((k) => !deletedIds.has(k.id));
-        setKelasList(remoteKelas);
-        latestDataRef.current.kelasList = remoteKelas;
-        saveState("kelas", remoteKelas, true);
+        const localKelas = (latestDataRef.current.kelasList || []).filter((k) => !deletedIds.has(k.id));
+        let finalKelas: Kelas[];
+        if (remoteKelas.length === 0 && localKelas.length > 0) {
+          finalKelas = localKelas;
+        } else if (remoteKelas.length > 0 && localKelas.length > 0) {
+          const map = new Map(remoteKelas.map((k) => [k.id, k]));
+          localKelas.forEach((lk) => { if (!map.has(lk.id)) map.set(lk.id, lk); });
+          finalKelas = Array.from(map.values());
+        } else {
+          finalKelas = remoteKelas;
+        }
+        setKelasList(finalKelas);
+        latestDataRef.current.kelasList = finalKelas;
+        saveState("kelas", finalKelas, true);
       }
+
+      // 4. Mapel
       if (Array.isArray(data.mapel)) {
         const stale = data.mapel.filter((m) => deletedIds.has(m.id)).map((m) => m.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteMapel(id).catch(() => {}));
         }
         const remoteMapel = data.mapel.filter((m) => !deletedIds.has(m.id));
-        setMapelList(remoteMapel);
-        latestDataRef.current.mapelList = remoteMapel;
-        saveState("mapel", remoteMapel, true);
+        const localMapel = (latestDataRef.current.mapelList || []).filter((m) => !deletedIds.has(m.id));
+        const finalMapel = (remoteMapel.length === 0 && localMapel.length > 0) ? localMapel : remoteMapel;
+        setMapelList(finalMapel);
+        latestDataRef.current.mapelList = finalMapel;
+        saveState("mapel", finalMapel, true);
       }
+
+      // 5. Jadwal
       if (Array.isArray(data.jadwal)) {
         const stale = data.jadwal.filter((j) => deletedIds.has(j.id)).map((j) => j.id);
         if (stale.length > 0) {
           SupabaseSchoolService.bulkDeleteJadwal(stale).catch(() => {});
         }
         const remoteJadwal = data.jadwal.filter((j) => !deletedIds.has(j.id));
-        setJadwalList(remoteJadwal);
-        latestDataRef.current.jadwalList = remoteJadwal;
-        saveState("jadwal", remoteJadwal, true);
+        const localJadwal = (latestDataRef.current.jadwalList || []).filter((j) => !deletedIds.has(j.id));
+        const finalJadwal = (remoteJadwal.length === 0 && localJadwal.length > 0) ? localJadwal : remoteJadwal;
+        setJadwalList(finalJadwal);
+        latestDataRef.current.jadwalList = finalJadwal;
+        saveState("jadwal", finalJadwal, true);
       }
+
+      // 6. Presensi
       if (Array.isArray(data.presensi)) {
         const remotePresensi = data.presensi.filter((p) => !deletedIds.has(p.id));
-        setPresensiList(remotePresensi);
-        latestDataRef.current.presensiList = remotePresensi;
-        saveState("presensi", remotePresensi, true);
+        const localPresensi = (latestDataRef.current.presensiList || []).filter((p) => !deletedIds.has(p.id));
+        const finalPresensi = (remotePresensi.length === 0 && localPresensi.length > 0) ? localPresensi : remotePresensi;
+        setPresensiList(finalPresensi);
+        latestDataRef.current.presensiList = finalPresensi;
+        saveState("presensi", finalPresensi, true);
       }
+
+      // 7. Nilai Siswa
       if (Array.isArray(data.nilai)) {
         const stale = data.nilai.filter((n) => deletedIds.has(n.id)).map((n) => n.id);
         if (stale.length > 0) {
           stale.forEach((id) => SupabaseSchoolService.deleteNilai(id).catch(() => {}));
         }
         const remoteNilai = data.nilai.filter((n) => !deletedIds.has(n.id));
-        setNilaiList(remoteNilai);
-        latestDataRef.current.nilaiList = remoteNilai;
-        saveState("nilai", remoteNilai, true);
+        const localNilai = (latestDataRef.current.nilaiList || []).filter((n) => !deletedIds.has(n.id));
+        let finalNilai: NilaiSiswa[];
+        if (remoteNilai.length === 0 && localNilai.length > 0) {
+          finalNilai = localNilai;
+        } else if (remoteNilai.length > 0 && localNilai.length > 0) {
+          const map = new Map(remoteNilai.map((n) => [n.id, n]));
+          localNilai.forEach((ln) => { if (!map.has(ln.id)) map.set(ln.id, ln); });
+          finalNilai = Array.from(map.values());
+        } else {
+          finalNilai = remoteNilai;
+        }
+        setNilaiList(finalNilai);
+        latestDataRef.current.nilaiList = finalNilai;
+        saveState("nilai", finalNilai, true);
       }
+
+      // 8. Tagihan SPP
       if (Array.isArray(data.tagihan)) {
         const stale = data.tagihan.filter((t) => deletedIds.has(t.id)).map((t) => t.id);
         if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteTagihan(id).catch(() => {}));
         const remoteTagihan = data.tagihan.filter((t) => !deletedIds.has(t.id));
-        setSppList(remoteTagihan);
-        latestDataRef.current.sppList = remoteTagihan;
-        saveState("spp", remoteTagihan, true);
+        const localTagihan = (latestDataRef.current.sppList || []).filter((t) => !deletedIds.has(t.id));
+        let finalTagihan: TagihanSPP[];
+        if (remoteTagihan.length === 0 && localTagihan.length > 0) {
+          finalTagihan = localTagihan;
+        } else if (remoteTagihan.length > 0 && localTagihan.length > 0) {
+          const map = new Map(remoteTagihan.map((t) => [t.id, t]));
+          localTagihan.forEach((lt) => { if (!map.has(lt.id)) map.set(lt.id, lt); });
+          finalTagihan = Array.from(map.values());
+        } else {
+          finalTagihan = remoteTagihan;
+        }
+        setSppList(finalTagihan);
+        latestDataRef.current.sppList = finalTagihan;
+        saveState("spp", finalTagihan, true);
       }
+
+      // 9. Jenis Tagihan
       if (Array.isArray(data.jenisTagihan)) {
         const stale = data.jenisTagihan.filter((t) => deletedIds.has(t.id)).map((t) => t.id);
         if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deleteJenisTagihan(id).catch(() => {}));
-        const filtered = data.jenisTagihan.filter((t) => !deletedIds.has(t.id));
-        setJenisTagihanList(filtered);
-        latestDataRef.current.jenisTagihanList = filtered;
-        saveState("jenis_tagihan", filtered, true);
+        const remoteJT = data.jenisTagihan.filter((t) => !deletedIds.has(t.id));
+        const localJT = (latestDataRef.current.jenisTagihanList || []).filter((t) => !deletedIds.has(t.id));
+        const finalJT = (remoteJT.length === 0 && localJT.length > 0) ? localJT : remoteJT;
+        setJenisTagihanList(finalJT);
+        latestDataRef.current.jenisTagihanList = finalJT;
+        saveState("jenis_tagihan", finalJT, true);
       }
+
+      // 10. Tabungan Siswa: MERGE AMAN (Cegah penimpaan kosong dari Supabase)
       if (Array.isArray(data.tabungan)) {
-        setTabunganList(data.tabungan);
-        latestDataRef.current.tabunganList = data.tabungan;
-        saveState("tabungan", data.tabungan, true);
+        const remoteTabungan = data.tabungan.filter(
+          (t) => !deletedIds.has(t.id) && !deletedIds.has(t.siswaId)
+        );
+        const localTabungan = (latestDataRef.current.tabunganList || []).filter(
+          (t) => !deletedIds.has(t.id) && !deletedIds.has(t.siswaId)
+        );
+
+        let finalTabungan: TabunganSiswa[];
+        if (remoteTabungan.length === 0 && localTabungan.length > 0) {
+          // Cloud kosong tapi lokal punya data saldo -> pertahankan data lokal!
+          finalTabungan = localTabungan;
+        } else if (remoteTabungan.length > 0 && localTabungan.length > 0) {
+          // Merge remote & local secara cerdas berdasarkan siswaId
+          const map = new Map<string, TabunganSiswa>();
+          remoteTabungan.forEach((t) => map.set(t.siswaId, t));
+          localTabungan.forEach((loc) => {
+            const rem = map.get(loc.siswaId);
+            if (!rem) {
+              map.set(loc.siswaId, loc);
+            } else {
+              // Jika data lokal memiliki pembaruan lebih baru atau saldo non-zero saat remote 0
+              const locDate = loc.terakhirUpdate || "";
+              const remDate = rem.terakhirUpdate || "";
+              if (locDate >= remDate) {
+                map.set(loc.siswaId, { ...rem, ...loc });
+              }
+            }
+          });
+          finalTabungan = Array.from(map.values());
+        } else {
+          finalTabungan = remoteTabungan;
+        }
+
+        setTabunganList(finalTabungan);
+        latestDataRef.current.tabunganList = finalTabungan;
+        saveState("tabungan", finalTabungan, true);
       }
+
+      // 11. Transaksi Tabungan (Mutasi): MERGE AMAN (Cegah riwayat mutasi hilang)
       if (Array.isArray(data.transaksiTabungan)) {
-        setTransaksiTabunganList(data.transaksiTabungan);
-        latestDataRef.current.transaksiTabunganList = data.transaksiTabungan;
-        saveState("transaksi_tabungan", data.transaksiTabungan, true);
+        const remoteTrx = data.transaksiTabungan.filter(
+          (m) => !deletedIds.has(m.id) && !deletedIds.has(m.siswaId)
+        );
+        const localTrx = (latestDataRef.current.transaksiTabunganList || []).filter(
+          (m) => !deletedIds.has(m.id) && !deletedIds.has(m.siswaId)
+        );
+
+        let finalTrx: TransaksiTabungan[];
+        if (remoteTrx.length === 0 && localTrx.length > 0) {
+          // Cloud kosong tapi lokal punya mutasi -> pertahankan mutasi lokal!
+          finalTrx = localTrx;
+        } else if (remoteTrx.length > 0 && localTrx.length > 0) {
+          // Gabungkan seluruh transaksi unik berdasarkan ID
+          const trxMap = new Map<string, TransaksiTabungan>();
+          remoteTrx.forEach((m) => trxMap.set(m.id, m));
+          localTrx.forEach((m) => {
+            if (!trxMap.has(m.id)) trxMap.set(m.id, m);
+          });
+          finalTrx = Array.from(trxMap.values()).sort(
+            (a, b) => (b.tanggal || "").localeCompare(a.tanggal || "")
+          );
+        } else {
+          finalTrx = remoteTrx;
+        }
+
+        setTransaksiTabunganList(finalTrx);
+        latestDataRef.current.transaksiTabunganList = finalTrx;
+        saveState("transaksi_tabungan", finalTrx, true);
       }
+
+      // 12. Peserta Transportasi
       if (Array.isArray(data.pesertaTransport)) {
-        setPesertaTransportList(data.pesertaTransport);
-        latestDataRef.current.pesertaTransportList = data.pesertaTransport;
-        saveState("peserta_transport", data.pesertaTransport, true);
+        const remoteTransport = data.pesertaTransport.filter((p) => !deletedIds.has(p.siswaId));
+        const localTransport = latestDataRef.current.pesertaTransportList || [];
+        const finalTransport = (remoteTransport.length === 0 && localTransport.length > 0) ? localTransport : remoteTransport;
+        setPesertaTransportList(finalTransport);
+        latestDataRef.current.pesertaTransportList = finalTransport;
+        saveState("peserta_transport", finalTransport, true);
       }
+
+      // 13. SPP Transport Records
       if (Array.isArray(data.sppTransportRecords)) {
-        setSppTransportRecords(data.sppTransportRecords);
-        latestDataRef.current.sppTransportRecords = data.sppTransportRecords;
-        saveState("spp_transport_records", data.sppTransportRecords, true);
+        const remoteRecords = data.sppTransportRecords.filter((r) => !deletedIds.has(r.id) && !deletedIds.has(r.siswaId));
+        const localRecords = latestDataRef.current.sppTransportRecords || [];
+        const finalRecords = (remoteRecords.length === 0 && localRecords.length > 0) ? localRecords : remoteRecords;
+        setSppTransportRecords(finalRecords);
+        latestDataRef.current.sppTransportRecords = finalRecords;
+        saveState("spp_transport_records", finalRecords, true);
       }
+
+      // 14. Transaksi SPP & Transport
       if (Array.isArray(data.transaksiSPPTransport)) {
-        setTransaksiSPPTransportList(data.transaksiSPPTransport);
-        latestDataRef.current.transaksiSPPTransportList = data.transaksiSPPTransport;
-        saveState("transaksi_spp_transport", data.transaksiSPPTransport, true);
+        const remoteTrxSPP = data.transaksiSPPTransport.filter((t) => !deletedIds.has(t.id) && !deletedIds.has(t.siswaId));
+        const localTrxSPP = latestDataRef.current.transaksiSPPTransportList || [];
+        let finalTrxSPP: TransaksiSPPTransport[];
+        if (remoteTrxSPP.length === 0 && localTrxSPP.length > 0) {
+          finalTrxSPP = localTrxSPP;
+        } else if (remoteTrxSPP.length > 0 && localTrxSPP.length > 0) {
+          const map = new Map<string, TransaksiSPPTransport>();
+          remoteTrxSPP.forEach((t) => map.set(t.id, t));
+          localTrxSPP.forEach((t) => { if (!map.has(t.id)) map.set(t.id, t); });
+          finalTrxSPP = Array.from(map.values()).sort((a, b) => (b.tanggalBayar || "").localeCompare(a.tanggalBayar || ""));
+        } else {
+          finalTrxSPP = remoteTrxSPP;
+        }
+        setTransaksiSPPTransportList(finalTrxSPP);
+        latestDataRef.current.transaksiSPPTransportList = finalTrxSPP;
+        saveState("transaksi_spp_transport", finalTrxSPP, true);
       }
+
+      // 15. Pengumuman
       if (Array.isArray(data.pengumuman)) {
         const stale = data.pengumuman.filter((p) => deletedIds.has(p.id)).map((p) => p.id);
         if (stale.length > 0) stale.forEach((id) => SupabaseSchoolService.deletePengumuman(id).catch(() => {}));
         const filtered = data.pengumuman.filter((p) => !deletedIds.has(p.id));
-        setPengumumanList(filtered);
-        latestDataRef.current.pengumumanList = filtered;
-        saveState("pengumuman", filtered, true);
+        const localPeng = latestDataRef.current.pengumumanList || [];
+        const finalPeng = (filtered.length === 0 && localPeng.length > 0) ? localPeng : filtered;
+        setPengumumanList(finalPeng);
+        latestDataRef.current.pengumumanList = finalPeng;
+        saveState("pengumuman", finalPeng, true);
       }
       if (Array.isArray(data.lmsMateri)) {
         const stale = data.lmsMateri.filter((m) => deletedIds.has(m.id)).map((m) => m.id);
@@ -2379,20 +2568,26 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   ) => {
     if (nominal <= 0) return;
     const today = tanggal || new Date().toISOString().split("T")[0];
-    const siswa = siswaList.find((s) => s.id === siswaId);
+    const siswa = (latestDataRef.current.siswaList || siswaList).find((s) => s.id === siswaId);
     if (!siswa) return;
 
-    let updatedTabungan: TabunganSiswa[];
-    const targetTabungan = tabunganList.find((t) => t.siswaId === siswaId);
-    let tabId = `tab-${Date.now()}`;
-    let newSaldo = nominal;
+    const currentTabs = [...(latestDataRef.current.tabunganList || tabunganList)];
+    const currentTrxList = [...(latestDataRef.current.transaksiTabunganList || transaksiTabunganList)];
 
-    if (targetTabungan) {
-      tabId = targetTabungan.id;
-      newSaldo = targetTabungan.saldo + nominal;
-      updatedTabungan = tabunganList.map((t) =>
-        t.siswaId === siswaId ? { ...t, saldo: newSaldo, terakhirUpdate: today } : t
-      );
+    const existingIndex = currentTabs.findIndex((t) => t.siswaId === siswaId);
+    let tabId = currentTabs[existingIndex]?.id || `tab-${siswa.id}`;
+    let newSaldo = nominal;
+    let updatedTabungan: TabunganSiswa[];
+
+    if (existingIndex >= 0) {
+      newSaldo = currentTabs[existingIndex].saldo + nominal;
+      tabId = currentTabs[existingIndex].id || `tab-${siswa.id}`;
+      currentTabs[existingIndex] = {
+        ...currentTabs[existingIndex],
+        saldo: newSaldo,
+        terakhirUpdate: today,
+      };
+      updatedTabungan = currentTabs;
     } else {
       const newTab: TabunganSiswa = {
         id: tabId,
@@ -2403,11 +2598,11 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         saldo: nominal,
         terakhirUpdate: today,
       };
-      updatedTabungan = [newTab, ...tabunganList];
+      updatedTabungan = [newTab, ...currentTabs];
     }
 
     const newTrx: TransaksiTabungan = {
-      id: `trx-${Date.now()}`,
+      id: `trx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       tabunganId: tabId,
       siswaId: siswa.id,
       siswaNama: siswa.nama,
@@ -2422,11 +2617,21 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       noReferensi: `TB-${today.replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`,
     };
 
-    const updatedTrx = [newTrx, ...transaksiTabunganList];
+    const updatedTrx = [newTrx, ...currentTrxList];
     setTabunganList(updatedTabungan);
     setTransaksiTabunganList(updatedTrx);
+    latestDataRef.current.tabunganList = updatedTabungan;
+    latestDataRef.current.transaksiTabunganList = updatedTrx;
     saveState("tabungan", updatedTabungan);
     saveState("transaksi_tabungan", updatedTrx);
+
+    if (SupabaseSchoolService.isConfigured()) {
+      persistSupabase(async () => {
+        const tab = updatedTabungan.find((t) => t.siswaId === siswa.id);
+        if (tab) await SupabaseSchoolService.upsertTabungan(tab);
+        await SupabaseSchoolService.insertTransaksiTabungan(newTrx);
+      });
+    }
   };
 
   const tarikTabungan = (
@@ -2438,7 +2643,11 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
   ) => {
     if (nominal <= 0)
       return { success: false, message: "Nominal penarikan harus lebih dari Rp 0" };
-    const targetTabungan = tabunganList.find((t) => t.siswaId === siswaId);
+
+    const currentTabs = [...(latestDataRef.current.tabunganList || tabunganList)];
+    const currentTrxList = [...(latestDataRef.current.transaksiTabunganList || transaksiTabunganList)];
+
+    const targetTabungan = currentTabs.find((t) => t.siswaId === siswaId);
     if (!targetTabungan || targetTabungan.saldo < nominal) {
       return {
         success: false,
@@ -2449,12 +2658,12 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const today = tanggal || new Date().toISOString().split("T")[0];
     const newSaldo = targetTabungan.saldo - nominal;
 
-    const updatedTabungan = tabunganList.map((t) =>
+    const updatedTabungan = currentTabs.map((t) =>
       t.siswaId === siswaId ? { ...t, saldo: newSaldo, terakhirUpdate: today } : t
     );
 
     const newTrx: TransaksiTabungan = {
-      id: `trx-${Date.now()}`,
+      id: `trx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       tabunganId: targetTabungan.id,
       siswaId: targetTabungan.siswaId,
       siswaNama: targetTabungan.siswaNama,
@@ -2469,17 +2678,27 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       noReferensi: `TR-${today.replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`,
     };
 
-    const updatedTrx = [newTrx, ...transaksiTabunganList];
+    const updatedTrx = [newTrx, ...currentTrxList];
     setTabunganList(updatedTabungan);
     setTransaksiTabunganList(updatedTrx);
+    latestDataRef.current.tabunganList = updatedTabungan;
+    latestDataRef.current.transaksiTabunganList = updatedTrx;
     saveState("tabungan", updatedTabungan);
     saveState("transaksi_tabungan", updatedTrx);
+
+    if (SupabaseSchoolService.isConfigured()) {
+      persistSupabase(async () => {
+        const tab = updatedTabungan.find((t) => t.siswaId === siswaId);
+        if (tab) await SupabaseSchoolService.upsertTabungan(tab);
+        await SupabaseSchoolService.insertTransaksiTabungan(newTrx);
+      });
+    }
 
     return { success: true };
   };
 
   const bulkSetorTabungan = (
-    items: { siswaId: string; nominal: number; keterangan?: string }[],
+    items: { siswaId: string; nominal: number; keterangan?: string; tanggal?: string }[],
     petugas?: string,
     tanggal?: string
   ) => {
@@ -2487,24 +2706,27 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
     const validItems = items.filter((item) => item.nominal > 0);
     if (validItems.length === 0) return;
 
-    let currentTabungan = [...tabunganList];
+    let currentTabungan = [...(latestDataRef.current.tabunganList || tabunganList)];
+    const currentTrxList = [...(latestDataRef.current.transaksiTabunganList || transaksiTabunganList)];
+    const allStudents = latestDataRef.current.siswaList || siswaList;
     const newTransactions: TransaksiTabungan[] = [];
 
     validItems.forEach((item, idx) => {
-      const siswa = siswaList.find((s) => s.id === item.siswaId);
+      const siswa = allStudents.find((s) => s.id === item.siswaId);
       if (!siswa) return;
 
+      const itemDate = item.tanggal || today;
       const existingIndex = currentTabungan.findIndex((t) => t.siswaId === item.siswaId);
       let newSaldo = item.nominal;
-      let tabId = `tab-${Date.now()}-${idx}`;
+      let tabId = currentTabungan[existingIndex]?.id || `tab-${item.siswaId}`;
 
       if (existingIndex >= 0) {
         newSaldo = currentTabungan[existingIndex].saldo + item.nominal;
-        tabId = currentTabungan[existingIndex].id;
+        tabId = currentTabungan[existingIndex].id || `tab-${item.siswaId}`;
         currentTabungan[existingIndex] = {
           ...currentTabungan[existingIndex],
           saldo: newSaldo,
-          terakhirUpdate: today,
+          terakhirUpdate: itemDate,
         };
       } else {
         const newTab: TabunganSiswa = {
@@ -2514,13 +2736,13 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
           nisn: siswa.nisn,
           kelas: siswa.kelas,
           saldo: item.nominal,
-          terakhirUpdate: today,
+          terakhirUpdate: itemDate,
         };
         currentTabungan = [newTab, ...currentTabungan];
       }
 
       newTransactions.push({
-        id: `trx-${Date.now()}-${idx}`,
+        id: `trx-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
         tabunganId: tabId,
         siswaId: siswa.id,
         siswaNama: siswa.nama,
@@ -2529,23 +2751,37 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
         tipe: "Setor",
         nominal: item.nominal,
         saldoAkhir: newSaldo,
-        tanggal: today,
+        tanggal: itemDate,
         keterangan: item.keterangan || "Setoran tabungan kelas (Bulk)",
         petugas: petugas || "Dewan Guru / Petugas",
-        noReferensi: `BK-${today.replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}-${idx + 1}`,
+        noReferensi: `BK-${itemDate.replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}-${idx + 1}`,
       });
     });
 
-    const updatedTrx = [...newTransactions, ...transaksiTabunganList];
+    const updatedTrx = [...newTransactions, ...currentTrxList];
     setTabunganList(currentTabungan);
     setTransaksiTabunganList(updatedTrx);
+    latestDataRef.current.tabunganList = currentTabungan;
+    latestDataRef.current.transaksiTabunganList = updatedTrx;
     saveState("tabungan", currentTabungan);
     saveState("transaksi_tabungan", updatedTrx);
+
+    if (SupabaseSchoolService.isConfigured()) {
+      persistSupabase(async () => {
+        const tabsToUpsert = currentTabungan.filter((t) =>
+          validItems.some((item) => item.siswaId === t.siswaId)
+        );
+        await SupabaseSchoolService.bulkUpsertTabungan(tabsToUpsert);
+        await SupabaseSchoolService.bulkInsertTransaksiTabungan(newTransactions);
+      });
+    }
   };
 
   const clearAllTabungan = async (): Promise<void> => {
     setTabunganList([]);
     setTransaksiTabunganList([]);
+    latestDataRef.current.tabunganList = [];
+    latestDataRef.current.transaksiTabunganList = [];
     saveState("tabungan", []);
     saveState("transaksi_tabungan", []);
     if (SupabaseSchoolService.isConfigured()) {
@@ -2838,6 +3074,219 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       insufficientCount,
       totalAmount,
       insufficientNames,
+    };
+  };
+
+  const bulkBayarSPPTransport = (params: {
+    items: {
+      siswaId: string;
+      jenis: "SPP" | "Transportasi" | "Paket Keduanya";
+      bulan: BulanSPP[];
+      customNominal?: number;
+    }[];
+    tahunAjaran: string;
+    metodePembayaran: MetodePembayaranTagihan;
+    tanggalBayar?: string;
+    petugas?: string;
+    keterangan?: string;
+  }): {
+    success: boolean;
+    successCount: number;
+    failedCount: number;
+    totalAmount: number;
+    message: string;
+    newTransactions: TransaksiSPPTransport[];
+  } => {
+    const today = params.tanggalBayar || new Date().toISOString().split("T")[0];
+    let currentRecords = [...latestDataRef.current.sppTransportRecords];
+    let currentTransactions = [...latestDataRef.current.transaksiSPPTransportList];
+    let currentTabungan = [...latestDataRef.current.tabunganList];
+    let currentTabunganTrx = [...latestDataRef.current.transaksiTabunganList];
+
+    let successCount = 0;
+    let failedCount = 0;
+    let totalAmount = 0;
+    const createdTransactions: TransaksiSPPTransport[] = [];
+
+    params.items.forEach((item, idx) => {
+      const targetSiswa = siswaList.find((s) => s.id === item.siswaId);
+      if (!targetSiswa) {
+        failedCount++;
+        return;
+      }
+
+      // Cari record siswa di tahun ajaran
+      let recIndex = currentRecords.findIndex(
+        (r) => r.siswaId === item.siswaId && r.tahunAjaran === params.tahunAjaran
+      );
+      let record: RecordSPPTransportTahunAjaran;
+      if (recIndex >= 0) {
+        record = { ...currentRecords[recIndex], bulan: { ...currentRecords[recIndex].bulan } };
+      } else {
+        record = getStudentSPPTransportRecord(item.siswaId, params.tahunAjaran);
+        record = { ...record, bulan: { ...record.bulan } };
+      }
+
+      // Hitung total tagihan siswa untuk bulan-bulan yang belum lunas
+      let studentItemAmount = 0;
+      const validMonths: BulanSPP[] = [];
+
+      item.bulan.forEach((b) => {
+        const cur = record.bulan[b];
+        if (!cur) return;
+
+        let monthCost = 0;
+        let shouldPaySPP = false;
+        let shouldPayTrans = false;
+
+        if (item.jenis === "SPP" || item.jenis === "Paket Keduanya") {
+          if (cur.sppStatus !== "Lunas") {
+            monthCost += cur.sppNominal;
+            shouldPaySPP = true;
+          }
+        }
+
+        if (item.jenis === "Transportasi" || item.jenis === "Paket Keduanya") {
+          if (cur.isTransport && cur.transportStatus !== "Lunas") {
+            monthCost += cur.transportNominal;
+            shouldPayTrans = true;
+          }
+        }
+
+        if (shouldPaySPP || shouldPayTrans) {
+          studentItemAmount += monthCost;
+          validMonths.push(b);
+        }
+      });
+
+      if (item.customNominal !== undefined && item.customNominal > 0) {
+        studentItemAmount = item.customNominal;
+      }
+
+      if (studentItemAmount <= 0 || validMonths.length === 0) {
+        failedCount++;
+        return;
+      }
+
+      // Jika Potong Tabungan Siswa, cek saldo dan potong
+      if (params.metodePembayaran === "Potong Tabungan Siswa") {
+        const tabIndex = currentTabungan.findIndex((t) => t.siswaId === item.siswaId);
+        const tab = tabIndex >= 0 ? currentTabungan[tabIndex] : null;
+        const saldo = tab ? tab.saldo : 0;
+
+        if (saldo < studentItemAmount) {
+          failedCount++;
+          return;
+        }
+
+        // Potong tabungan
+        const newSaldo = saldo - studentItemAmount;
+        currentTabungan[tabIndex] = {
+          ...tab!,
+          saldo: newSaldo,
+          terakhirUpdate: today,
+        };
+
+        const newTabTrx: TransaksiTabungan = {
+          id: `trx-${Date.now()}-${idx}`,
+          tabunganId: tab!.id,
+          siswaId: targetSiswa.id,
+          siswaNama: targetSiswa.nama,
+          nisn: targetSiswa.nisn,
+          kelas: targetSiswa.kelas,
+          tipe: "Tarik",
+          nominal: studentItemAmount,
+          saldoAkhir: newSaldo,
+          tanggal: today,
+          keterangan: `Pembayaran Cepat ${item.jenis} ${validMonths.join(", ")} (${params.tahunAjaran})`,
+          petugas: params.petugas || "Sistem Kasir Massal",
+          noReferensi: `TR-BULK-${today.replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}-${idx}`,
+        };
+        currentTabunganTrx = [newTabTrx, ...currentTabunganTrx];
+      }
+
+      // Update record bulan menjadi Lunas
+      const noKwt = `KW-${item.jenis === "SPP" ? "SPP" : item.jenis === "Transportasi" ? "TRN" : "BYR"}-${params.tahunAjaran.replace("/", "")}-${Date.now().toString().slice(-4)}${idx}`;
+
+      validMonths.forEach((b) => {
+        const cur = record.bulan[b];
+        if (!cur) return;
+        const newCur = { ...cur };
+
+        if (item.jenis === "SPP" || item.jenis === "Paket Keduanya") {
+          newCur.sppStatus = "Lunas";
+          newCur.sppTanggalBayar = today;
+          newCur.sppMetode = params.metodePembayaran;
+          newCur.sppNoKuitansi = noKwt;
+        }
+
+        if (item.jenis === "Transportasi" || item.jenis === "Paket Keduanya") {
+          if (cur.isTransport) {
+            newCur.transportStatus = "Lunas";
+            newCur.transportTanggalBayar = today;
+            newCur.transportMetode = params.metodePembayaran;
+            newCur.transportNoKuitansi = noKwt;
+          }
+        }
+
+        record.bulan[b] = newCur;
+      });
+
+      // Masukkan ke currentRecords
+      if (recIndex >= 0) {
+        currentRecords[recIndex] = record;
+      } else {
+        currentRecords.push(record);
+      }
+
+      // Buat TransaksiSPPTransport
+      const newTrx: TransaksiSPPTransport = {
+        id: `trx-spp-bulk-${Date.now()}-${idx}`,
+        noKuitansi: noKwt,
+        siswaId: targetSiswa.id,
+        siswaNama: targetSiswa.nama,
+        nisn: targetSiswa.nisn,
+        kelas: targetSiswa.kelas,
+        tahunAjaran: params.tahunAjaran,
+        jenis: item.jenis,
+        bulan: validMonths,
+        totalNominal: studentItemAmount,
+        metodePembayaran: params.metodePembayaran,
+        tanggalBayar: today,
+        petugas: params.petugas || "Petugas Keuangan",
+        keterangan: params.keterangan || `Pembayaran Massal ${item.jenis} ${validMonths.join(", ")}`,
+      };
+
+      currentTransactions.unshift(newTrx);
+      createdTransactions.push(newTrx);
+      successCount++;
+      totalAmount += studentItemAmount;
+    });
+
+    // Simpan semua state secara atomik
+    setSppTransportRecords(currentRecords);
+    setTransaksiSPPTransportList(currentTransactions);
+    latestDataRef.current.sppTransportRecords = currentRecords;
+    latestDataRef.current.transaksiSPPTransportList = currentTransactions;
+    saveState("spp_transport_records", currentRecords);
+    saveState("transaksi_spp_transport", currentTransactions);
+
+    if (params.metodePembayaran === "Potong Tabungan Siswa") {
+      setTabunganList(currentTabungan);
+      setTransaksiTabunganList(currentTabunganTrx);
+      latestDataRef.current.tabunganList = currentTabungan;
+      latestDataRef.current.transaksiTabunganList = currentTabunganTrx;
+      saveState("tabungan", currentTabungan);
+      saveState("transaksi_tabungan", currentTabunganTrx);
+    }
+
+    return {
+      success: successCount > 0,
+      successCount,
+      failedCount,
+      totalAmount,
+      message: `Berhasil memproses pembayaran massal untuk ${successCount} siswa (Total: Rp ${totalAmount.toLocaleString("id-ID")})`,
+      newTransactions: createdTransactions,
     };
   };
 
@@ -4018,6 +4467,7 @@ export function SchoolDataProvider({ children }: { children: React.ReactNode }) 
       updatePesertaTransport,
       bayarSPPTransport,
       bulkBayarSPPTransportDariTabungan,
+      bulkBayarSPPTransport,
       getStudentSPPTransportRecord,
 
       // LMS States & Actions

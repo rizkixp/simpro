@@ -36,10 +36,11 @@ export default function DashboardLayout({
 
       if (!pathname) return;
 
-      // 1. Proteksi Halaman Khusus Administrator (Pengguna & Pengaturan)
+      // 1. Proteksi Halaman Khusus Administrator (Pengguna, Pengaturan & Guru/Staf)
       const adminOnlyPaths = [
         "/dashboard/pengguna",
         "/dashboard/pengaturan",
+        "/dashboard/guru",
       ];
       const userRole = (user.role || "").toLowerCase();
       if (

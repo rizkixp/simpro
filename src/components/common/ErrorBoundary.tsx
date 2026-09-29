@@ -12,25 +12,39 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  isCleaning: boolean;
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
+    isCleaning: false,
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, isCleaning: false };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught component error:", error, errorInfo);
   }
 
-  private handleReload = () => {
+  private handleReload = async () => {
+    this.setState({ isCleaning: true });
     if (typeof window !== "undefined") {
-      window.location.reload();
+      try {
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+      } catch {}
+
+      window.location.replace(window.location.pathname + "?_r=" + Date.now());
     }
   };
 
@@ -58,7 +72,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </div>
 
             <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1.5">
-              {this.props.fallbackTitle || "Tampilan Sedang Memuat Ulang"}
+              {this.props.fallbackTitle || "Tampilan Sedang Diperbarui"}
             </h2>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
@@ -70,10 +84,11 @@ export default class ErrorBoundary extends Component<Props, State> {
               <button
                 type="button"
                 onClick={this.handleReload}
-                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-900/20 flex items-center justify-center gap-2 cursor-pointer"
+                disabled={this.state.isCleaning}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-900/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Muat Ulang Halaman</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${this.state.isCleaning ? "animate-spin" : ""}`} />
+                <span>{this.state.isCleaning ? "Membersihkan..." : "Muat Ulang Halaman"}</span>
               </button>
 
               <button

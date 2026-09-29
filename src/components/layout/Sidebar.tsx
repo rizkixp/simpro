@@ -51,6 +51,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       roles: ["admin", "guru", "siswa", "ortu"],
     },
     {
+      title: "Pengaturan Profil",
+      href: "/dashboard/pengaturan",
+      icon: Settings,
+      roles: ["admin"],
+    },
+    {
       title: "Data Siswa",
       href: "/dashboard/siswa",
       icon: Users,
@@ -66,7 +72,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: "Guru & Staf",
       href: "/dashboard/guru",
       icon: GraduationCap,
-      roles: ["admin", "guru", "siswa", "ortu"],
+      roles: ["admin"],
     },
     {
       title: "Jadwal Pelajaran",
@@ -132,12 +138,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       title: "Manajemen Pengguna",
       href: "/dashboard/pengguna",
       icon: ShieldCheck,
-      roles: ["admin"],
-    },
-    {
-      title: "Pengaturan Profil",
-      href: "/dashboard/pengaturan",
-      icon: Settings,
       roles: ["admin"],
     },
   ];

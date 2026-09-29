@@ -75,10 +75,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
 
-    // 2. Proteksi Halaman Khusus Administrator (Manajemen Pengguna & Konfigurasi Sistem)
+    // 2. Proteksi Halaman Khusus Administrator (Pengguna, Pengaturan & Direktori Guru/Staf)
     const adminOnlyPrefixes = [
       "/dashboard/pengguna",
       "/dashboard/pengaturan",
+      "/dashboard/guru",
     ];
 
     if (

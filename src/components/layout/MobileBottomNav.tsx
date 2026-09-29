@@ -9,6 +9,10 @@ import { Siswa } from "@/types/school";
 import MobileStudentProfileModal from "@/components/dashboard/MobileStudentProfileModal";
 import MobileBukuPesanDrawer from "@/components/dashboard/MobileBukuPesanDrawer";
 import {
+  Home,
+  Mail,
+  History,
+  User as UserIcon,
   LayoutDashboard,
   CalendarCheck2,
   BookOpen,
@@ -25,17 +29,12 @@ import {
   Bell,
   ShieldCheck,
   Settings,
-  Grid,
   X,
   LogOut,
-  Sparkles,
-  ChevronRight,
-  Shield,
   Search,
-  MessageSquare,
-  User as UserIcon,
-  QrCode,
-  Receipt,
+  ShoppingBag,
+  MoreHorizontal,
+  Sparkles,
 } from "lucide-react";
 
 export default function MobileBottomNav() {
@@ -51,7 +50,7 @@ export default function MobileBottomNav() {
   const currentRole = (user.role || "siswa").toLowerCase();
   const safePathname = pathname || "";
 
-  // Haptic feedback saat tab ditekan di smartphone Android
+  // Haptic feedback saat tab ditekan
   const triggerHaptic = () => {
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       try {
@@ -103,48 +102,55 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener("open-mobile-drawer", handleOpenDrawer);
   }, []);
 
-  // Navigasi Utama Bawah Mobile (5 Tab ala BRImo dengan Tombol QRIS Floating di Tengah)
-  // [Beranda, Mutasi, QRIS (Floating), Pesan, Akun]
-  const primaryNavItems = [
+  interface NavItem {
+    id: string;
+    label: string;
+    href?: string;
+    action?: string;
+    icon: any;
+    isActive: boolean;
+    hasNotification?: boolean;
+  }
+
+  // 4 Tab Navigasi Bawah Sesuai Gambar Referensi [Home, Brain Academy, Pembelian, Lainnya]
+  const navItems: NavItem[] = [
     {
-      label: "Beranda",
+      id: "home",
+      label: "Home",
       href: "/dashboard",
-      icon: LayoutDashboard,
+      icon: Home,
       isActive: safePathname === "/dashboard",
     },
     {
-      label: "Mutasi",
+      id: "brain-academy",
+      label: "Brain Acade...",
+      href: "/dashboard/lms",
+      icon: Sparkles,
+      isActive: safePathname === "/dashboard/lms" || safePathname.startsWith("/dashboard/lms"),
+    },
+    {
+      id: "pembelian",
+      label: "Pembelian",
       href: "/dashboard/spp-transportasi",
-      icon: Receipt,
+      icon: ShoppingBag,
       isActive: safePathname === "/dashboard/spp-transportasi" || safePathname === "/dashboard/keuangan",
     },
     {
-      label: "QRIS",
-      href: "/dashboard/presensi",
-      icon: QrCode,
-      isCenterFloating: true,
-      isActive: safePathname === "/dashboard/presensi",
-    },
-    {
-      label: "Pesan",
-      action: "pesan",
-      icon: MessageSquare,
-      isActive: false,
-    },
-    {
-      label: "Akun",
-      action: "profil",
-      icon: UserIcon,
-      isActive: safePathname === "/dashboard/pengaturan",
+      id: "lainnya",
+      label: "Lainnya",
+      action: "drawer",
+      icon: MoreHorizontal,
+      isActive: isDrawerOpen,
     },
   ];
 
   // Daftar Semua Modul Lengkap untuk Bottom Sheet Drawer
   const allModules = [
     { label: "Dashboard Utama", href: "/dashboard", icon: LayoutDashboard, roles: ["admin", "guru", "siswa", "ortu"] },
+    { label: "Pengaturan & Profil Lembaga", href: "/dashboard/pengaturan", icon: Settings, roles: ["admin"] },
     { label: "Data Siswa", href: "/dashboard/siswa", icon: Users, roles: ["admin", "guru"] },
     { label: "Data Rombel & Kelas", href: "/dashboard/kelas", icon: Building2, roles: ["admin", "guru"] },
-    { label: "Guru & Tenaga Pendidik", href: "/dashboard/guru", icon: GraduationCap, roles: ["admin", "guru", "siswa", "ortu"] },
+    { label: "Guru & Staf", href: "/dashboard/guru", icon: GraduationCap, roles: ["admin"] },
     { label: "Jadwal Pembelajaran", href: "/dashboard/jadwal", icon: CalendarDays, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Presensi & Kehadiran", href: "/dashboard/presensi", icon: CalendarCheck2, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "LMS & Tugas Digital", href: "/dashboard/lms", icon: BookOpenCheck, roles: ["admin", "guru", "siswa", "ortu"] },
@@ -156,41 +162,24 @@ export default function MobileBottomNav() {
     { label: "Tabungan Santri", href: "/dashboard/tabungan", icon: PiggyBank, roles: ["admin", "siswa", "ortu", "bendahara"] },
     { label: "Papan Pengumuman", href: "/dashboard/pengumuman", icon: Bell, roles: ["admin", "guru", "siswa", "ortu"] },
     { label: "Manajemen Pengguna", href: "/dashboard/pengguna", icon: ShieldCheck, roles: ["admin"] },
-    { label: "Pengaturan & Profil Lembaga", href: "/dashboard/pengaturan", icon: Settings, roles: ["admin"] },
   ];
 
   const filteredModules = allModules.filter((m) => m.roles.includes(currentRole));
 
   return (
     <>
-      {/* 1. NATIVE BOTTOM NAVIGATION BAR (5 Tab ala BRImo dengan Tombol QRIS Floating di Tengah) */}
+      {/* ========================================================================= */}
+      {/* 1. BOTTOM NAVIGATION BAR (4 Tabs: Home, Kotak Masuk, Riwayat, Profil)     */}
+      {/* ========================================================================= */}
       <nav
         aria-label="Navigasi Aplikasi Mobile"
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.08)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] no-print pb-[max(env(safe-area-inset-bottom),0.35rem)]"
       >
-        <div className="grid grid-cols-5 h-16 max-w-md mx-auto px-1">
-          {primaryNavItems.map((item, idx) => {
+        <div className="grid grid-cols-4 h-16 max-w-md mx-auto px-1">
+          {navItems.map((item, idx) => {
             const IconComponent = item.icon;
 
-            // Center Floating QRIS Button
-            if ((item as any).isCenterFloating) {
-              return (
-                <Link
-                  key={`nav-${idx}`}
-                  href={item.href!}
-                  onClick={triggerHaptic}
-                  className="flex flex-col items-center justify-center -mt-6 group active:scale-95 transition-transform"
-                >
-                  <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#00529C] to-[#0A6EC7] text-white shadow-lg shadow-blue-900/30 flex items-center justify-center ring-4 ring-[#F4F7FB] dark:ring-slate-900">
-                    <QrCode className="h-6 w-6 stroke-[2.5]" />
-                  </div>
-                  <span className="text-[10px] font-extrabold text-[#00529C] dark:text-blue-400 mt-1">
-                    QRIS
-                  </span>
-                </Link>
-              );
-            }
-
+            // Action Buttons (Kotak Masuk / Profil / Lainnya Drawer)
             if (item.action) {
               return (
                 <button
@@ -198,32 +187,33 @@ export default function MobileBottomNav() {
                   type="button"
                   onClick={() => {
                     triggerHaptic();
-                    if (item.action === "profil-siswa" || item.action === "profil") {
+                    if (item.action === "profil") {
                       setIsProfileOpen(true);
                     } else if (item.action === "pesan") {
                       setIsPesanOpen(true);
+                    } else if (item.action === "drawer") {
+                      setIsDrawerOpen(true);
                     }
                   }}
-                  className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform cursor-pointer ${
+                  className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform cursor-pointer relative ${
                     item.isActive
-                      ? "text-[#00529C] dark:text-blue-400 font-bold"
-                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      ? "text-[#00A5B5] font-bold"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                   }`}
                 >
-                  <div
-                    className={`p-1.5 px-2.5 rounded-full transition-all ${
-                      item.isActive
-                        ? "bg-blue-50 dark:bg-blue-950/70 text-[#00529C] dark:text-blue-400 font-bold shadow-xs"
-                        : ""
-                    }`}
-                  >
-                    <IconComponent className="h-5 w-5 stroke-[2]" />
+                  <div className="relative">
+                    {IconComponent && <IconComponent className="h-6 w-6 stroke-[1.9]" />}
+                    {/* Notification Badge */}
+                    {item.hasNotification && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#E53935] ring-2 ring-white dark:ring-slate-900" />
+                    )}
                   </div>
                   <span className="text-[10px] font-bold leading-none">{item.label}</span>
                 </button>
               );
             }
 
+            // Standard Link Tab (Home / Brain Academy / Pembelian)
             return (
               <Link
                 key={`nav-${idx}`}
@@ -231,18 +221,12 @@ export default function MobileBottomNav() {
                 onClick={triggerHaptic}
                 className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform ${
                   item.isActive
-                    ? "text-[#00529C] dark:text-blue-400 font-bold"
-                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    ? "text-[#00A5B5] font-bold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 }`}
               >
-                <div
-                  className={`p-1.5 px-2.5 rounded-full transition-all ${
-                    item.isActive
-                      ? "bg-blue-50 dark:bg-blue-950/70 text-[#00529C] dark:text-blue-400 font-bold shadow-xs"
-                      : ""
-                  }`}
-                >
-                  <IconComponent className="h-5 w-5 stroke-[2]" />
+                <div>
+                  {IconComponent && <IconComponent className="h-6 w-6 stroke-[1.9]" />}
                 </div>
                 <span className="text-[10px] font-bold leading-none truncate max-w-[64px]">{item.label}</span>
               </Link>
@@ -251,7 +235,9 @@ export default function MobileBottomNav() {
         </div>
       </nav>
 
-      {/* 2. BOTTOM SHEET DRAWER: "Lainnya / Semua Modul" */}
+      {/* ========================================================================= */}
+      {/* 2. BOTTOM SHEET DRAWER: "Menu Lainnya / Semua Modul"                       */}
+      {/* ========================================================================= */}
       {isDrawerOpen && (
         <div
           role="dialog"
@@ -276,18 +262,18 @@ export default function MobileBottomNav() {
                   alt={user.name}
                   loading="lazy"
                   decoding="async"
-                  className="h-10 w-10 rounded-2xl object-cover ring-2 ring-emerald-500/30"
+                  className="h-10 w-10 rounded-2xl object-cover ring-2 ring-[#00A5B5]/30"
                 />
                 <div className="min-w-0">
                   <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
                     {user.name}
                   </h4>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold uppercase tracking-wider">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-teal-50 text-[#00A5B5] dark:bg-teal-950 dark:text-teal-300 font-bold uppercase tracking-wider">
                       {user.role}
                     </span>
                     <span className="text-[10px] text-slate-400 truncate">
-                      {profile?.appName || "SIM SDI Smart"}
+                      {profile?.appName || "SIM SDI PRO"}
                     </span>
                   </div>
                 </div>
@@ -344,12 +330,12 @@ export default function MobileBottomNav() {
                         }}
                         className={`p-2.5 rounded-2xl flex flex-col items-center text-center gap-1.5 transition-all active:scale-90 ${
                           isModActive
-                            ? "bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-[#056839] dark:text-emerald-300 font-bold"
-                            : "bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:border-emerald-400"
+                            ? "bg-teal-50 dark:bg-teal-950/40 border border-teal-300 dark:border-teal-800 text-[#00A5B5] dark:text-teal-300 font-bold"
+                            : "bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:border-teal-400"
                         }`}
                       >
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 shadow-xs">
-                          <ModIcon className="w-4 h-4 text-[#056839] dark:text-emerald-400" />
+                          <ModIcon className="w-4 h-4 text-[#00A5B5] dark:text-teal-400" />
                         </div>
                         <span className="text-[10px] leading-tight line-clamp-2">
                           {item.label}
@@ -380,7 +366,9 @@ export default function MobileBottomNav() {
         </div>
       )}
 
-      {/* 3. MODALS TRIGGERED FROM BOTTOM NAV */}
+      {/* ========================================================================= */}
+      {/* 3. MODALS TRIGGERED FROM BOTTOM NAV                                       */}
+      {/* ========================================================================= */}
       <MobileStudentProfileModal
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSchoolData } from "@/contexts/SchoolDataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Guru } from "@/types/school";
@@ -27,8 +28,15 @@ import {
 } from "lucide-react";
 
 export default function GuruManagementPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { guruList, addGuru, updateGuru, deleteGuru, kelasList } = useSchoolData();
+
+  useEffect(() => {
+    if (user && user.role !== "admin") {
+      router.replace("/dashboard");
+    }
+  }, [user, router]);
 
   // Safe fallback to INITIAL_GURU if guruList is empty
   const allGuru = useMemo(() => {
@@ -176,26 +184,11 @@ export default function GuruManagementPage() {
     document.body.removeChild(link);
   };
 
-  if (user?.role === "guru") {
+  if (user?.role !== "admin") {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center p-6">
-        <div className="max-w-md w-full p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl text-center">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 mx-auto flex items-center justify-center mb-4 shadow-sm">
-            <GraduationCap className="h-8 w-8" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-            Akses Tidak Tersedia untuk Guru
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-            Menu direktori Guru & Staf tidak ditampilkan pada mode peran Guru. Anda dapat mengakses jadwal mengajar, presensi siswa, dan penilaian e-rapor kelas binaan Anda.
-          </p>
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition-all"
-          >
-            Kembali ke Dashboard Utama
-          </Link>
-        </div>
+      <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="h-8 w-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs text-slate-500">Mengarahkan ke Dashboard...</p>
       </div>
     );
   }

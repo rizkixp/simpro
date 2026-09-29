@@ -1,15 +1,21 @@
 // SIM Sekolah PRO - Progressive Web App Service Worker
-// Version: 2.0.0 (Full Offline Cache Engine)
+// Version: 2.1.0 (Safe Resilient Cache Engine)
 
-const CACHE_NAME = 'simpro-offline-v3';
+const CACHE_NAME = 'simpro-offline-v4';
 
-const isDevHost =
+const isDevHost = Boolean(
   self.location.hostname === 'localhost' ||
   self.location.hostname === '127.0.0.1' ||
-  self.location.hostname.endsWith('.local');
+  self.location.hostname.endsWith('.local') ||
+  self.location.port === '3000' ||
+  self.location.port === '3001' ||
+  self.location.hostname.startsWith('192.168.') ||
+  self.location.hostname.startsWith('10.') ||
+  self.location.hostname.startsWith('172.')
+);
 
 if (isDevHost) {
-  // In development: bypass Service Worker to avoid hot-reload and HMR conflict
+  // In development / local environment: completely bypass and self-destruct
   self.addEventListener('install', () => {
     self.skipWaiting();
   });
@@ -25,18 +31,18 @@ if (isDevHost) {
   });
 
   self.addEventListener('fetch', () => {
+    // Pass-through without caching in dev
     return;
   });
 } else {
-  // In Production: Full Offline-First Caching Engine (Only static assets precached)
+  // In Production: Only precache static, immutable assets (NEVER precache '/' or dynamic HTML)
   const PRECACHE_ASSETS = [
-    '/',
     '/offline.html',
     '/icons/icon.svg',
     '/manifest.webmanifest',
   ];
 
-  // 1. Install Event: Pre-cache core application shell
+  // 1. Install Event: Pre-cache static fallback assets
   self.addEventListener('install', (event) => {
     event.waitUntil(
       caches
@@ -69,7 +75,7 @@ if (isDevHost) {
     );
   });
 
-  // 3. Fetch Event: Strategic Offline Caching
+  // 3. Fetch Event: Safe Resilient Caching
   self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
@@ -77,54 +83,24 @@ if (isDevHost) {
     // Only intercept GET requests
     if (request.method !== 'GET') return;
 
-    // Bypass HMR, Chrome Extensions, and external cloud databases / mutations
+    // Bypass HMR, Chrome Extensions, external APIs, and Supabase cloud
     if (
       url.pathname.includes('webpack-hmr') ||
       url.pathname.includes('hot-update') ||
       url.protocol.startsWith('chrome-extension') ||
       url.hostname.includes('supabase.co') ||
-      url.pathname.startsWith('/api/')
+      url.pathname.startsWith('/api/') ||
+      url.searchParams.has('_rsc')
     ) {
       return;
     }
 
-    // STRATEGY A: Navigation requests (HTML page loads)
-    // Always bypass Service Worker caching for /login to ensure the login screen is always rendered directly
+    // STRATEGY A: Navigation requests (HTML page loads) - Always Network-First
     if (request.mode === 'navigate') {
-      if (url.pathname === '/login' || url.pathname.startsWith('/api/')) {
-        event.respondWith(fetch(request));
-        return;
-      }
-
       event.respondWith(
         fetch(request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseClone = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, responseClone);
-              });
-            }
-            return networkResponse;
-          })
           .catch(async () => {
-            // 1. Try exact cached page
-            const cachedPage = await caches.match(request);
-            if (cachedPage) return cachedPage;
-
-            // 2. If visiting /dashboard or any dashboard subroute, serve cached dashboard shell
-            if (url.pathname.startsWith('/dashboard')) {
-              const cachedDashboard = await caches.match('/dashboard');
-              if (cachedDashboard) return cachedDashboard;
-            }
-
-            // 3. Fallback to root if root was cached
-            if (url.pathname === '/' || url.pathname === '') {
-              const cachedRoot = await caches.match('/');
-              if (cachedRoot) return cachedRoot;
-            }
-
-            // 4. Fallback to dedicated Islamic Emerald offline.html
+            // Only when completely offline: serve dedicated offline fallback page
             const offlineFallback = await caches.match('/offline.html');
             if (offlineFallback) return offlineFallback;
 
@@ -137,12 +113,27 @@ if (isDevHost) {
       return;
     }
 
-    // STRATEGY B: Static Assets & RSC Payloads
-    // (/_next/static/*, fonts, icons, images, and Next.js RSC queries)
-    const isStaticAsset =
-      url.pathname.startsWith('/_next/static') ||
+    // STRATEGY B: Next.js Static JS Chunks - Network first to avoid ChunkLoadError
+    if (url.pathname.startsWith('/_next/static/chunks/')) {
+      event.respondWith(
+        fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, responseClone);
+              });
+            }
+            return networkResponse;
+          })
+          .catch(() => caches.match(request))
+      );
+      return;
+    }
+
+    // STRATEGY C: Images, Fonts, Icons (Stale-While-Revalidate)
+    const isMediaAsset =
       url.pathname.startsWith('/icons/') ||
-      url.searchParams.has('_rsc') ||
       url.pathname.endsWith('.svg') ||
       url.pathname.endsWith('.png') ||
       url.pathname.endsWith('.jpg') ||
@@ -150,10 +141,9 @@ if (isDevHost) {
       url.pathname.endsWith('.webp') ||
       url.pathname.endsWith('.woff2') ||
       url.pathname.endsWith('.woff') ||
-      url.pathname.endsWith('.css') ||
-      url.pathname.endsWith('.js');
+      url.pathname.endsWith('.css');
 
-    if (isStaticAsset) {
+    if (isMediaAsset) {
       event.respondWith(
         caches.match(request).then((cachedResponse) => {
           const fetchPromise = fetch(request)
@@ -175,3 +165,13 @@ if (isDevHost) {
     }
   });
 }
+
+// Support messaging for explicit cache purging
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CLEAR_CACHES') {
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+  }
+});

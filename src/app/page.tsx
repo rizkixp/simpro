@@ -29,6 +29,12 @@ export default function HomePage() {
   const { profile } = useSchoolData();
   const [isDemoLoading, setIsDemoLoading] = useState(false);
 
+  React.useEffect(() => {
+    if (user) {
+      router.replace("/dashboard");
+    }
+  }, [user, router]);
+
 
 
   const appName = profile?.appName || "SIM SD Islam Smart School";
@@ -112,6 +118,12 @@ export default function HomePage() {
                 <LayoutDashboard className="h-4 w-4" />
                 <span>Ke Dashboard</span>
               </Link>
+              <Link
+                href="/dashboard?view=mobile"
+                className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-red-950/40 flex items-center gap-1.5 border border-red-400/30"
+              >
+                <span>📱 Mode Mobile</span>
+              </Link>
               <button
                 onClick={() => logout()}
                 title="Keluar Akun"
@@ -121,13 +133,21 @@ export default function HomePage() {
               </button>
             </div>
           ) : (
-            <Link
-              href="/login"
-              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs sm:text-sm transition-all shadow-lg shadow-emerald-950/40 flex items-center gap-2 border border-emerald-400/30"
-            >
-              <LogIn className="h-4 w-4" />
-              <span>Masuk ke Sistem</span>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard?view=mobile"
+                className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-red-950/40 flex items-center gap-1.5 border border-red-400/30"
+              >
+                <span>📱 Mode Mobile</span>
+              </Link>
+              <Link
+                href="/login"
+                className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs sm:text-sm transition-all shadow-lg shadow-emerald-950/40 flex items-center gap-2 border border-emerald-400/30"
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Masuk ke Sistem</span>
+              </Link>
+            </div>
           )}
         </div>
       </header>

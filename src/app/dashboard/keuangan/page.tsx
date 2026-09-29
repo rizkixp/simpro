@@ -617,7 +617,7 @@ export default function KeuanganTagihanPage() {
                             <button
                               onClick={() => {
                                 setPayingItem(item);
-                                setSelectedMetode(canPayWithSavings ? "Potong Tabungan Siswa" : "Virtual Account");
+                                setSelectedMetode(canPayWithSavings ? "Potong Tabungan Siswa" : "Transfer Bank");
                               }}
                               className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors inline-flex items-center gap-1 shadow-sm"
                             >
@@ -950,8 +950,6 @@ export default function KeuanganTagihanPage() {
               <div className="space-y-2 mb-6">
                 <p className="text-[11px] font-semibold text-slate-400">Atau Pilih Kanal Lainnya:</p>
                 {[
-                  { id: "Virtual Account", icon: Building2, desc: "BCA / Mandiri / BNI / BRI VA" },
-                  { id: "QRIS", icon: QrCode, desc: "Scan instan via GoPay, OVO, Dana, QRIS" },
                   { id: "Transfer Bank", icon: CreditCard, desc: "Transfer manual ke Bendahara Sekolah" },
                   { id: "Tunai", icon: Wallet, desc: "Bayar tunai di loket tata usaha" },
                 ].map((m) => (

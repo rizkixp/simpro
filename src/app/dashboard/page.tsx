@@ -53,6 +53,44 @@ export default function DashboardOverviewPage() {
     nilaiList,
   } = useSchoolData();
 
+  const [forceMobileView, setForceMobileView] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const isMobileParam = params.get("view") === "mobile" || params.get("mobile") === "true";
+      const isStoredMobile = sessionStorage.getItem("sim_force_mobile") === "true";
+      if (isMobileParam || isStoredMobile) {
+        setForceMobileView(true);
+      }
+
+      const handleToggle = () => {
+        setForceMobileView((prev) => {
+          const next = !prev;
+          if (next) {
+            sessionStorage.setItem("sim_force_mobile", "true");
+          } else {
+            sessionStorage.removeItem("sim_force_mobile");
+          }
+          return next;
+        });
+      };
+      window.addEventListener("toggle-mobile-preview", handleToggle);
+      return () => window.removeEventListener("toggle-mobile-preview", handleToggle);
+    }
+  }, []);
+
+  const toggleMobileMode = (enable: boolean) => {
+    setForceMobileView(enable);
+    if (typeof window !== "undefined") {
+      if (enable) {
+        sessionStorage.setItem("sim_force_mobile", "true");
+      } else {
+        sessionStorage.removeItem("sim_force_mobile");
+      }
+    }
+  };
+
   // Statistics calculation scoped to teacher class if role is guru
   const scopedSiswaList = teacherScope.isTeacher
     ? teacherScope.filterByAssignedClass(siswaList)
@@ -176,13 +214,62 @@ export default function DashboardOverviewPage() {
   // RENDER KHUSUS: PORTAL WALI SANTRI (PARENT PORTAL) JIKA ROLE ADALAH ORTU
   // =========================================================================
   if (user?.role === "ortu" && currentSiswa) {
+    if (forceMobileView) {
+      return (
+        <div className="space-y-4">
+          <div className="max-w-md mx-auto flex items-center justify-between p-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-lg border border-white/20">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">📱</span>
+              <div>
+                <p className="font-extrabold text-xs">Pratinjau Mobile Ruangguru</p>
+                <p className="text-[10px] text-teal-100">Simulasi layar smartphone di desktop</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleMobileMode(false)}
+              className="px-3.5 py-1.5 rounded-xl bg-white text-[#00A5B5] font-extrabold text-xs hover:bg-teal-50 shadow-xs transition-all cursor-pointer active:scale-95"
+            >
+              ✕ Tutup Pratinjau
+            </button>
+          </div>
+          <MobileSuperAppDashboard forceShow={true} />
+        </div>
+      );
+    }
+
     return (
       <>
-        {/* Tampilan Mobile Super-App Bergaya BRImo Emerald (< 1024px) */}
+        {/* Tampilan Mobile Super-App Bergaya Ruangguru (< 1024px) */}
         <MobileSuperAppDashboard />
 
         {/* Tampilan Desktop Luas Portal Wali Santri (>= 1024px) */}
         <div className="hidden lg:block space-y-6">
+          {/* Quick Toggle Banner to Mobile Ruangguru View */}
+          <div className="flex items-center justify-between p-3.5 px-5 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-md border border-teal-400/30">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">📱</span>
+              <div>
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <span>Tampilan Mobile Ruangguru Aktif</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#00A5B5]">
+                    Aktif
+                  </span>
+                </h3>
+                <p className="text-xs text-teal-100 mt-0.5">
+                  Buka pratinjau tampilan HP langsung di layar ini, atau perkecil jendela browser Anda (&lt; 1024px).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleMobileMode(true)}
+              className="px-4 py-2 rounded-xl bg-white text-[#00A5B5] hover:bg-teal-50 font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer shrink-0"
+            >
+              📱 Buka Pratinjau Mobile
+            </button>
+          </div>
+
           {/* Banner Khusus Wali Santri */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#022c22] text-white p-6 sm:p-8 shadow-xl shadow-emerald-950/20 border border-emerald-600/30">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -612,6 +699,16 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Desktop Toggle for Quick Mobile Preview */}
+      <button
+        type="button"
+        onClick={() => toggleMobileMode(!forceMobileView)}
+        title="Klik untuk membuka simulasi tampilan mobile Ruangguru"
+        className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white font-extrabold text-xs shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-white/80 cursor-pointer"
+      >
+        <span>📱 {forceMobileView ? "Kembali ke Desktop" : "Pratinjau Mobile Ruangguru"}</span>
+      </button>
       </>
     );
   }
@@ -619,17 +716,66 @@ export default function DashboardOverviewPage() {
   // =========================================================================
   // RENDER STANDAR: DASHBOARD OVERVIEW UNTUK ADMIN, GURU, DAN SISWA
   // =========================================================================
+  if (forceMobileView) {
+    return (
+      <div className="space-y-4">
+        <div className="max-w-md mx-auto flex items-center justify-between p-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-lg border border-white/20">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">📱</span>
+            <div>
+              <p className="font-extrabold text-xs">Pratinjau Mobile Ruangguru</p>
+              <p className="text-[10px] text-teal-100">Simulasi layar smartphone di desktop</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleMobileMode(false)}
+            className="px-3.5 py-1.5 rounded-xl bg-white text-[#00A5B5] font-extrabold text-xs hover:bg-teal-50 shadow-xs transition-all cursor-pointer active:scale-95"
+          >
+            ✕ Tutup Pratinjau
+          </button>
+        </div>
+        <MobileSuperAppDashboard forceShow={true} />
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Tampilan Mobile Super-App Bergaya BRImo Emerald (< 1024px) */}
+      {/* Tampilan Mobile Super-App Bergaya Ruangguru (< 1024px) */}
       <MobileSuperAppDashboard />
 
       {/* Tampilan Desktop Luas Admin, Guru, dan Siswa (>= 1024px) */}
       <div className="hidden lg:block space-y-6">
+        {/* Quick Toggle Banner to Mobile Ruangguru View */}
+        <div className="flex items-center justify-between p-3.5 px-5 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-md border border-teal-400/30">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">📱</span>
+            <div>
+              <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                <span>Tampilan Mobile Ruangguru Aktif</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#00A5B5]">
+                  Aktif
+                </span>
+              </h3>
+              <p className="text-xs text-teal-100 mt-0.5">
+                Buka pratinjau tampilan HP langsung di layar ini, atau perkecil jendela browser Anda (&lt; 1024px).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleMobileMode(true)}
+            className="px-4 py-2 rounded-xl bg-white text-[#00A5B5] hover:bg-teal-50 font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            📱 Buka Pratinjau Mobile
+          </button>
+        </div>
+
         {/* Primary KPI Stats Grid */}
       <div
         className={`grid grid-cols-1 sm:grid-cols-2 ${
-          user?.role === "guru" ? "lg:grid-cols-3" : "lg:grid-cols-4"
+          user?.role === "admin" ? "lg:grid-cols-4" : "lg:grid-cols-3"
         } gap-4 sm:gap-5`}
       >
         {/* Stat 1: Siswa */}
@@ -674,8 +820,8 @@ export default function DashboardOverviewPage() {
           </div>
         )}
 
-        {/* Stat 2: Guru / Asatidz (Hanya tampil untuk Non-Guru / Admin) */}
-        {user?.role !== "guru" && (
+        {/* Stat 2: Guru / Asatidz (Khusus Administrator) */}
+        {user?.role === "admin" && (
           <Link
             href="/dashboard/guru"
             className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-teal-100/90 dark:border-teal-950 shadow-xs flex items-center justify-between hover:border-teal-400 hover:shadow-md transition-all group cursor-pointer"
@@ -998,6 +1144,16 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
     </div>
+
+    {/* Floating Desktop Toggle for Quick Mobile Preview */}
+    <button
+      type="button"
+      onClick={() => toggleMobileMode(!forceMobileView)}
+      title="Klik untuk membuka simulasi tampilan mobile Ruangguru"
+      className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white font-extrabold text-xs shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-white/80 cursor-pointer"
+    >
+      <span>📱 {forceMobileView ? "Kembali ke Desktop" : "Pratinjau Mobile Ruangguru"}</span>
+    </button>
     </>
   );
 }

@@ -91,6 +91,16 @@ export default function CommandPalette() {
         keywords: ["dashboard", "home", "beranda", "statistik", "utama"],
       },
       {
+        id: "mod-pengaturan",
+        title: "Pengaturan Profil & Cloud Sync",
+        description: "Identitas sekolah, WhatsApp Gateway & koneksi database",
+        icon: Settings,
+        path: "/dashboard/pengaturan",
+        category: "modul",
+        roles: ["admin"],
+        keywords: ["pengaturan", "setting", "profil", "sekolah", "whatsapp", "cloud", "sync"],
+      },
+      {
         id: "mod-siswa",
         title: "Data Siswa & Santri",
         description: "Direktori siswa, cetak kartu pelajar & impor data",
@@ -107,7 +117,7 @@ export default function CommandPalette() {
         icon: Users,
         path: "/dashboard/guru",
         category: "modul",
-        roles: ["admin", "guru", "siswa", "ortu"],
+        roles: ["admin"],
         keywords: ["guru", "ustadz", "ustadzah", "staf", "pegawai", "nip"],
       },
       {
@@ -153,12 +163,12 @@ export default function CommandPalette() {
       {
         id: "mod-spp",
         title: "SPP & Kasir Tagihan",
-        description: "Pembayaran SPP, bus antar-jemput, kuitansi & QRIS Midtrans",
+        description: "Pembayaran SPP, bus antar-jemput, kuitansi & kasir",
         icon: DollarSign,
         path: "/dashboard/spp-transportasi",
         category: "modul",
         roles: ["admin", "bendahara", "ortu", "siswa"],
-        keywords: ["spp", "bayar", "tagihan", "bus", "transportasi", "uang", "qris", "midtrans"],
+        keywords: ["spp", "bayar", "tagihan", "bus", "transportasi", "uang", "transfer", "tabungan"],
       },
       {
         id: "mod-keuangan",
@@ -229,16 +239,6 @@ export default function CommandPalette() {
         category: "modul",
         roles: ["admin"],
         keywords: ["pengguna", "user", "akun", "sandi", "password", "role", "admin"],
-      },
-      {
-        id: "mod-pengaturan",
-        title: "Pengaturan & Cloud Sync",
-        description: "Identitas sekolah, WhatsApp Gateway & koneksi database",
-        icon: Settings,
-        path: "/dashboard/pengaturan",
-        category: "modul",
-        roles: ["admin"],
-        keywords: ["pengaturan", "setting", "profil", "sekolah", "whatsapp", "cloud", "sync"],
       },
     ],
     []
@@ -365,7 +365,7 @@ export default function CommandPalette() {
   }, [siswaList, user, query]);
 
   const filteredGuru = useMemo(() => {
-    if (!user || user.role === "siswa") return [];
+    if (user?.role !== "admin") return [];
     if (!query.trim()) return (guruList || []).slice(0, 3);
     const q = query.toLowerCase().trim();
     return (guruList || [])
@@ -441,7 +441,9 @@ export default function CommandPalette() {
         setSelectedSiswaPreview(item.data);
       } else if (item.type === "guru") {
         setIsOpen(false);
-        router.push("/dashboard/guru");
+        if (user?.role === "admin") {
+          router.push("/dashboard/guru");
+        }
       }
     },
     [router]
@@ -552,7 +554,11 @@ export default function CommandPalette() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari siswa, guru, tagihan, atau aksi cepat... (Ketik nama/nisn)"
+            placeholder={
+              user?.role === "siswa" || user?.role === "ortu"
+                ? "Cari materi, jadwal, modul, atau tagihan... (Ketik judul/pelajaran)"
+                : "Cari siswa, guru, tagihan, atau aksi cepat... (Ketik nama/nisn)"
+            }
             className="w-full bg-transparent text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-sm sm:text-base outline-none font-medium"
           />
           {query ? (
@@ -579,7 +585,7 @@ export default function CommandPalette() {
           {[
             { id: "semua", label: "Semua Hasil" },
             { id: "siswa", label: "Siswa & Santri" },
-            { id: "guru", label: "Guru & Staf" },
+            ...(user?.role === "admin" ? [{ id: "guru", label: "Guru & Staf" }] : []),
             { id: "modul", label: "Modul Menu" },
             { id: "aksi", label: "Aksi Cepat" },
           ].map((cat) => {

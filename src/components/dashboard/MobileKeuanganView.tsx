@@ -157,7 +157,7 @@ export default function MobileKeuanganView({
       judul: "SPP Bulan Agustus 2026",
       tanggal: "10 Agu 2026",
       nominal: 250000,
-      metode: "QRIS / Transfer",
+      metode: "Transfer Bank",
       status: "Lunas",
     },
     {
@@ -296,7 +296,7 @@ export default function MobileKeuanganView({
                       if (onPayNow) {
                         onPayNow();
                       } else {
-                        alert("Membuka jalur pembayaran online QRIS / Virtual Account...");
+                        alert("Membuka jalur pembayaran...");
                       }
                     }}
                     className="px-5 py-2.5 rounded-full bg-[#056839] hover:bg-[#047857] text-white text-xs font-bold shadow-md shadow-emerald-900/20 flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
@@ -359,7 +359,7 @@ export default function MobileKeuanganView({
             <div className="p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 text-[11px] text-blue-800 dark:text-blue-300 flex items-start gap-2.5 leading-relaxed">
               <AlertCircle className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
               <span>
-                Pembayaran melalui QRIS, Bank Transfer, atau Autodebet Tabungan akan otomatis tercatat seketika tanpa perlu kirim struk fisik.
+                Pembayaran melalui Bank Transfer, Tunai, atau Autodebet Tabungan akan otomatis tercatat seketika tanpa perlu kirim struk fisik.
               </span>
             </div>
           </div>
@@ -391,7 +391,7 @@ export default function MobileKeuanganView({
               <div className="pt-2 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => alert("Silakan setor tabungan melalui kasir sekolah atau transfer virtual account.")}
+                  onClick={() => alert("Silakan setor tabungan melalui kasir tata usaha sekolah atau transfer rekening sekolah.")}
                   className="flex-1 py-2.5 rounded-xl bg-[#056839] hover:bg-[#047857] text-white text-xs font-bold text-center active:scale-95 transition-transform"
                 >
                   + Setor Tabungan

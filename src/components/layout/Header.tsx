@@ -137,7 +137,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-500 dark:text-slate-400 text-xs font-medium transition-all group shadow-2xs cursor-pointer ml-1"
         >
           <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
-          <span className="hidden lg:inline text-slate-600 dark:text-slate-300">Cari siswa, guru, modul...</span>
+          <span className="hidden lg:inline text-slate-600 dark:text-slate-300">
+            {user?.role === "siswa" || user?.role === "ortu" ? "Cari materi, jadwal, modul..." : "Cari siswa, guru, modul..."}
+          </span>
           <span className="inline lg:hidden text-slate-600 dark:text-slate-300">Cari...</span>
           <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-500 dark:text-slate-400 shadow-2xs">
             Ctrl K
@@ -212,6 +214,20 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             })}
           </div>
         )}
+
+        {/* Quick Mobile Ruangguru Mode Switcher (Desktop) */}
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("toggle-mobile-preview"));
+            }
+          }}
+          title="Buka / Tutup Pratinjau Tampilan Mobile Ruangguru"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00A5B5] to-[#7952B3] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all cursor-pointer active:scale-95"
+        >
+          <span>📱 Mode Mobile</span>
+        </button>
 
         {/* PWA Direct Install Button */}
         <InstallPwaButton />
