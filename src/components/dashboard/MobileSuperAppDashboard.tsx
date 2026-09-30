@@ -13,15 +13,9 @@ import MobileStreakDetailModal from "@/components/dashboard/MobileStreakDetailMo
 import MobileChildSwitcherModal, { ChildAccount, DEFAULT_CHILDREN } from "@/components/dashboard/MobileChildSwitcherModal";
 import MobileSkeletonDashboard from "@/components/dashboard/MobileSkeletonDashboard";
 import {
-  Search,
-  ChevronRight,
-  ChevronDown,
   ArrowDown,
   RefreshCw,
-  Sparkles,
   MessageCircle,
-  X,
-  Check,
   CalendarCheck2,
   BookOpenCheck,
   BookOpen,
@@ -31,17 +25,7 @@ import {
   PiggyBank,
   Award,
   CalendarDays,
-  Clock,
-  ShieldCheck,
-  Flame,
-  Star,
   CheckCircle2,
-  ArrowUpRight,
-  AlertCircle,
-  Bell,
-  Sun,
-  Moon,
-  Compass,
 } from "lucide-react";
 
 interface MobileSuperAppDashboardProps {
@@ -139,11 +123,8 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPesanOpen, setIsPesanOpen] = useState(false);
   const [isGaleriOpen, setIsGaleriOpen] = useState(false);
-  const [isTemanBelajarOpen, setIsTemanBelajarOpen] = useState(false);
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
   const [isChildSwitcherOpen, setIsChildSwitcherOpen] = useState(false);
-  const [activeMascot, setActiveMascot] = useState<"robo" | "dino" | "kucing" | "bintang">("robo");
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Active child for Multi-Child Switcher (persisted in sessionStorage)
   const [activeChild, setActiveChild] = useState<ChildAccount>(() => {
@@ -161,34 +142,6 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
       sessionStorage.setItem("sim_active_child_id", child.id);
     }
   };
-
-
-  // Time-aware greeting & context
-  const [timeContext, setTimeContext] = useState<"pagi" | "siang" | "sore" | "malam">("pagi");
-  const [currentTimeStr, setCurrentTimeStr] = useState("");
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const hour = now.getHours();
-      const minutes = now.getMinutes().toString().padStart(2, "0");
-      setCurrentTimeStr(`${hour.toString().padStart(2, "0")}:${minutes} WIB`);
-
-      if (hour >= 4 && hour < 11) {
-        setTimeContext("pagi");
-      } else if (hour >= 11 && hour < 15) {
-        setTimeContext("siang");
-      } else if (hour >= 15 && hour < 18) {
-        setTimeContext("sore");
-      } else {
-        setTimeContext("malam");
-      }
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Current active student mapped to activeChild
   const currentSiswa = useMemo(() => {
@@ -231,12 +184,6 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
     }
   };
 
-  const handleSearchTrigger = () => {
-    triggerHaptic();
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
-    }
-  };
 
 
   return (
@@ -247,7 +194,7 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
       className={`${
         forceShow
           ? "block max-w-md mx-auto my-4 shadow-2xl rounded-[40px] overflow-hidden border-[8px] border-slate-900 ring-1 ring-slate-800"
-          : "lg:hidden -mx-4 -mt-4 sm:-mx-6 sm:-mt-6"
+          : "lg:hidden -mx-4 sm:-mx-6 pt-1"
       } pb-28 min-h-screen bg-[#F8FAFC] dark:bg-slate-950 text-slate-800 dark:text-slate-100 select-none relative font-sans`}
     >
       {/* Simulated Phone Top Speaker (Desktop Preview Mode) */}
@@ -292,246 +239,8 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
           <span>✓ Data SDI Smart berhasil disinkronkan</span>
         </div>
       )}
-
       {/* ========================================================================= */}
-      {/* 1. TOP HEADER: ISLAMIC MODERN ROYAL GRADIENT (EMERALD & TEAL)             */}
-      {/* ========================================================================= */}
-      <div className="bg-gradient-to-r from-[#064e3b] via-[#047857] to-[#0f766e] text-white px-4 pt-3.5 pb-8 rounded-b-[32px] shadow-sm relative overflow-hidden">
-        {/* Subtle Islamic arabesque radial dots */}
-        <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.09)_1px,transparent_0)] bg-[size:18px_18px] pointer-events-none" />
-
-        {/* Profile & Gamification Companion Bar */}
-        <div className="relative z-10 bg-white/10 backdrop-blur-md rounded-2xl p-2.5 flex items-center justify-between border border-white/20 shadow-xs">
-          {/* Left: Avatar, Name, Class & Level */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* Circular Avatar with Gold & Emerald Ring */}
-            <div
-              onClick={() => {
-                triggerHaptic();
-                setIsProfileOpen(true);
-              }}
-              title="Buka profil santri"
-              className="relative shrink-0 cursor-pointer active:scale-95 transition-transform"
-            >
-              <div className="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-emerald-300 to-white shadow-xs">
-                <img
-                  src={
-                    currentSiswa.avatar ||
-                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentSiswa.nama}`
-                  }
-                  alt={currentSiswa.nama}
-                  className="w-full h-full rounded-full object-cover bg-white"
-                />
-              </div>
-              <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-emerald-950" />
-            </div>
-
-            {/* Student Name (Clickable Multi-Child Switcher) & Badges */}
-            <div className="flex flex-col min-w-0">
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic();
-                  setIsChildSwitcherOpen(true);
-                }}
-                title="Beralih akun santri"
-                className="flex items-center gap-1 text-left cursor-pointer group active:scale-95 transition-transform"
-              >
-                <span className="text-xs font-black tracking-tight text-white truncate max-w-[115px] drop-shadow-xs group-hover:text-amber-200">
-                  {currentSiswa.nama}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-white/80 group-hover:text-amber-200 shrink-0" />
-                <span className="px-1.5 py-0.2 rounded-full bg-amber-400/25 border border-amber-300/40 text-amber-200 text-[8.5px] font-bold shrink-0">
-                  {currentSiswa.kelas?.replace(/kelas/i, "").trim() || "3 Al-Farabi"}
-                </span>
-              </button>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {/* Streak Pill - Clickable to open Habit Modal */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic();
-                    setIsStreakModalOpen(true);
-                  }}
-                  title="Lihat rincian habit istiqomah santri"
-                  className="inline-flex items-center gap-0.5 px-2 py-0.2 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-[9.5px] font-black shadow-xs cursor-pointer active:scale-95 transition-all"
-                >
-                  <Flame className="w-2.5 h-2.5 fill-current" />
-                  <span>{activeChild.streak} Hari</span>
-                </button>
-                {/* XP Pill */}
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-500/80 text-white text-[9.5px] font-bold">
-                  <span>⭐ 4.2k</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Thin Vertical Divider Line */}
-          <div className="w-px h-8 bg-white/20 mx-1 shrink-0" />
-
-          {/* Right: Companion Mascot Button */}
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic();
-              setIsTemanBelajarOpen(true);
-            }}
-            className="flex items-center gap-1.5 text-left active:scale-95 transition-transform cursor-pointer pl-1 shrink-0"
-          >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-400 to-emerald-400 p-0.5 flex items-center justify-center shadow-xs shrink-0 ring-2 ring-white/30 text-base">
-              {activeMascot === "robo" && "🐣"}
-              {activeMascot === "dino" && "🦖"}
-              {activeMascot === "kucing" && "🐱"}
-              {activeMascot === "bintang" && "⭐"}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-emerald-100 leading-tight">
-                Teman Belajar
-              </span>
-              <span className="text-[9px] font-medium text-white/80 leading-tight">
-                {activeMascot === "robo"
-                  ? "Robo Dira"
-                  : activeMascot === "dino"
-                  ? "Dino Rex"
-                  : activeMascot === "kucing"
-                  ? "Mimi Cat"
-                  : "Starry"}
-              </span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 2. PROMINENT SEARCH BAR (CTRL+K SPOTLIGHT SEARCH)                         */}
-      {/* ========================================================================= */}
-      <div className="px-4 -mt-4 relative z-20">
-        <button
-          type="button"
-          onClick={handleSearchTrigger}
-          className="w-full bg-white dark:bg-slate-900 rounded-full py-3 px-4 shadow-[0_4px_20px_rgba(0,0,0,0.06)] border border-slate-200/90 dark:border-slate-800 flex items-center justify-between text-left active:scale-[0.98] transition-transform cursor-pointer"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.4] shrink-0 ml-0.5" />
-            <span className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 truncate">
-              Cari jadwal, materi LMS, hafalan Qur'an...
-            </span>
-          </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">
-            Ctrl+K
-          </span>
-        </button>
-      </div>
-
-
-      {/* ========================================================================= */}
-      {/* 4. TIME-AWARE SMART HERO CARD (DINAMIS PAGI/SIANG/SORE/MALAM)              */}
-      {/* ========================================================================= */}
-      <div className="px-4 mt-3.5">
-        <div className="bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900 rounded-3xl p-4 text-white shadow-md relative overflow-hidden">
-          {/* Subtle Arabesque pattern */}
-          <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_0)] bg-[size:16px_16px] pointer-events-none" />
-
-          {/* Header Row: Time Greeting & Live Clock */}
-          <div className="relative z-10 flex items-center justify-between pb-2.5 border-b border-white/15">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-amber-300">
-                {timeContext === "pagi" && <Sun className="w-4 h-4" />}
-                {timeContext === "siang" && <Sun className="w-4 h-4 text-amber-400" />}
-                {timeContext === "sore" && <Compass className="w-4 h-4 text-orange-400" />}
-                {timeContext === "malam" && <Moon className="w-4 h-4 text-cyan-300" />}
-              </div>
-              <div>
-                <span className="text-xs font-black tracking-tight text-white">
-                  {timeContext === "pagi" && "Pagi Barakah, Ananda!"}
-                  {timeContext === "siang" && "Semangat Siang, Ananda!"}
-                  {timeContext === "sore" && "Waktu Kepulangan Santri"}
-                  {timeContext === "malam" && "Malam Tenang & Murojaah"}
-                </span>
-                <span className="text-[10px] text-emerald-200 block -mt-0.5">
-                  Tahun Ajaran 1447 H / 2026 M
-                </span>
-              </div>
-            </div>
-
-            <span className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold tracking-tight text-emerald-100">
-              {currentTimeStr}
-            </span>
-          </div>
-
-          {/* Time Context Specific Content */}
-          <div className="relative z-10 pt-3 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              {timeContext === "pagi" && (
-                <>
-                  <p className="text-xs font-bold text-white leading-snug">
-                    {todayPresensi?.status === "Hadir"
-                      ? "✓ Presensi Masuk Tuntas (Tepat Waktu)"
-                      : "Presensi Pagi & Sholat Dhuha"}
-                  </p>
-                  <p className="text-[11px] text-emerald-200 mt-0.5 line-clamp-1">
-                    {todayPresensi?.status === "Hadir"
-                      ? `Tercatat pada ${todayPresensi.waktuMasuk || "07:05 WIB"} • Selamat belajar!`
-                      : "Bel masuk 07:15 WIB • Awali dengan Sholat Dhuha 4 rakaat"}
-                  </p>
-                </>
-              )}
-
-              {timeContext === "siang" && (
-                <>
-                  <p className="text-xs font-bold text-white leading-snug">
-                    Sholat Dzuhur Berjamaah & Istirahat
-                  </p>
-                  <p className="text-[11px] text-emerald-200 mt-0.5 line-clamp-1">
-                    Masjid Al-Ikhlas • Menu Catering Sehat telah disajikan di Dining Hall
-                  </p>
-                </>
-              )}
-
-              {timeContext === "sore" && (
-                <>
-                  <p className="text-xs font-bold text-white leading-snug">
-                    Penjemputan & Armada Bus Sekolah
-                  </p>
-                  <p className="text-[11px] text-emerald-200 mt-0.5 line-clamp-1">
-                    Jam pulang 15:30 WIB • Bus Rute A siap di lobby penjemputan
-                  </p>
-                </>
-              )}
-
-              {timeContext === "malam" && (
-                <>
-                  <p className="text-xs font-bold text-white leading-snug">
-                    Mutaba'ah Maghrib-Isya & Murojaah
-                  </p>
-                  <p className="text-[11px] text-emerald-200 mt-0.5 line-clamp-1">
-                    Persiapkan hafalan Surat An-Naba & cek tugas di LMS Cendekia
-                  </p>
-                </>
-              )}
-            </div>
-
-            <Link
-              href={
-                timeContext === "pagi"
-                  ? "/dashboard/presensi"
-                  : timeContext === "malam"
-                  ? "/dashboard/mutabaah"
-                  : "/dashboard/jadwal"
-              }
-              onClick={triggerHaptic}
-              className="px-3 py-1.5 rounded-xl bg-white text-emerald-900 font-extrabold text-xs shadow-sm hover:bg-emerald-50 active:scale-95 transition-all shrink-0 flex items-center gap-1"
-            >
-              <span>Buka</span>
-              <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 5. MODERN BENTO GRID: FITUR UTAMA & AKADEMIK                              */}
+      {/* MODERN BENTO GRID: FITUR UTAMA & AKADEMIK                                 */}
       {/* ========================================================================= */}
       <div className="px-4 mt-4 space-y-3">
         <div className="flex items-center justify-between px-1">
@@ -953,75 +662,7 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
         </button>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 9. MODAL TEMAN BELAJAR PICKER                                             */}
-      {/* ========================================================================= */}
-      {isTemanBelajarOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fadeIn"
-          onClick={() => setIsTemanBelajarOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-2xl border border-slate-100 dark:border-slate-800 animate-scaleUp"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                Pilih Teman Belajar
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsTemanBelajarOpen(false)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              Pilih karakter pendamping belajar yang siap menyemangati ananda setiap hari:
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              {[
-                { id: "robo", name: "Robo Dira", desc: "Sahabat Cerdas", color: "from-emerald-500 to-teal-500" },
-                { id: "dino", name: "Dino Rex", desc: "Petualang Sains", color: "from-blue-500 to-indigo-500" },
-                { id: "kucing", name: "Mimi Cat", desc: "Penyayang & Ceria", color: "from-amber-400 to-orange-500" },
-                { id: "bintang", name: "Starry", desc: "Bintang Juara", color: "from-purple-500 to-pink-500" },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveMascot(m.id as any);
-                    setIsTemanBelajarOpen(false);
-                  }}
-                  className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                    activeMascot === m.id
-                      ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20"
-                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <div className={`w-12 h-12 rounded-full bg-gradient-to-tr ${m.color} text-white flex items-center justify-center text-xl shadow-xs`}>
-                    {m.id === "robo" && "🐣"}
-                    {m.id === "dino" && "🦖"}
-                    {m.id === "kucing" && "🐱"}
-                    {m.id === "bintang" && "⭐"}
-                  </div>
-                  <span className="text-xs font-bold text-slate-800 dark:text-white">
-                    {m.name}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    {m.desc}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
 
 

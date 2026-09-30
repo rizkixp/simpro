@@ -30,7 +30,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const teacherUsers = (userList || []).filter((u) => u?.role === "guru");
 
   return (
-    <header className={`sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 px-4 sm:px-8 items-center justify-between shadow-xs no-print ${isHomeDashboard ? "hidden lg:flex" : "flex"}`}>
+    <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-emerald-900/10 dark:border-emerald-900/30 px-4 sm:px-8 flex items-center justify-between shadow-xs no-print">
       {/* Left section: Hamburger, Title & Hijri Date */}
       <div className="flex items-center gap-2.5 sm:gap-5 min-w-0">
         <button
