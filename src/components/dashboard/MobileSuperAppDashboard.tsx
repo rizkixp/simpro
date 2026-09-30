@@ -9,7 +9,6 @@ import { Siswa } from "@/types/school";
 import MobileStudentProfileModal from "@/components/dashboard/MobileStudentProfileModal";
 import MobileBukuPesanDrawer from "@/components/dashboard/MobileBukuPesanDrawer";
 import MobileGaleriModal from "@/components/dashboard/MobileGaleriModal";
-import MobileSchoolStoriesModal, { DEFAULT_STORIES, SchoolStory } from "@/components/dashboard/MobileSchoolStoriesModal";
 import MobileStreakDetailModal from "@/components/dashboard/MobileStreakDetailModal";
 import MobileChildSwitcherModal, { ChildAccount, DEFAULT_CHILDREN } from "@/components/dashboard/MobileChildSwitcherModal";
 import MobileSkeletonDashboard from "@/components/dashboard/MobileSkeletonDashboard";
@@ -163,9 +162,6 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
     }
   };
 
-  // Stories state
-  const [isStoryOpen, setIsStoryOpen] = useState(false);
-  const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
 
   // Time-aware greeting & context
   const [timeContext, setTimeContext] = useState<"pagi" | "siang" | "sore" | "malam">("pagi");
@@ -242,11 +238,6 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
     }
   };
 
-  const handleOpenStory = (index: number) => {
-    triggerHaptic();
-    setSelectedStoryIndex(index);
-    setIsStoryOpen(true);
-  };
 
   return (
     <div
@@ -433,53 +424,6 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
         </button>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 3. SCHOOL STORIES TRAY (CERITA & DOKUMENTASI SEKOLAH KELAS DUNIA)          */}
-      {/* ========================================================================= */}
-      <div className="mt-4 px-4">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-              Kilas Info Sekolah
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleOpenStory(0)}
-            className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
-          >
-            Buka Cerita
-          </button>
-        </div>
-
-        {/* Horizontal Story Circles Tray */}
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 pt-0.5">
-          {DEFAULT_STORIES.map((story, idx) => (
-            <button
-              key={story.id}
-              type="button"
-              onClick={() => handleOpenStory(idx)}
-              className="flex flex-col items-center gap-1 shrink-0 active:scale-90 transition-transform cursor-pointer"
-            >
-              {/* Story Ring with Gradient Border */}
-              <div className="w-14 h-14 rounded-full p-[2.2px] bg-gradient-to-tr from-amber-400 via-emerald-500 to-teal-400 shadow-sm flex items-center justify-center">
-                <div className={`w-full h-full rounded-full bg-gradient-to-br ${story.bgGradient} flex items-center justify-center text-white font-bold text-lg p-1 text-center`}>
-                  {idx === 0 && "🌱"}
-                  {idx === 1 && "🕌"}
-                  {idx === 2 && "🏆"}
-                  {idx === 3 && "🍱"}
-                  {idx === 4 && "🚌"}
-                  {idx === 5 && "📝"}
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 text-center truncate max-w-[58px] leading-tight">
-                {story.category}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* 4. TIME-AWARE SMART HERO CARD (DINAMIS PAGI/SIANG/SORE/MALAM)              */}
@@ -1079,14 +1023,7 @@ export default function MobileSuperAppDashboard({ forceShow = false }: MobileSup
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 10. MODAL SCHOOL STORIES VIEWER                                           */}
-      {/* ========================================================================= */}
-      <MobileSchoolStoriesModal
-        isOpen={isStoryOpen}
-        initialIndex={selectedStoryIndex}
-        onClose={() => setIsStoryOpen(false)}
-      />
+
 
       {/* ========================================================================= */}
       {/* 11. MODALS (PROFILE, PESAN, GALERI) PRESERVED                             */}

@@ -28,21 +28,6 @@ export default function MobileSkeletonDashboard() {
         <div className="w-full h-11 bg-white dark:bg-slate-900 rounded-full shadow-sm border border-slate-200/80 dark:border-slate-800 animate-shimmer" />
       </div>
 
-      {/* 3. Stories Tray Skeleton */}
-      <div className="mt-4 px-4 space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="w-28 h-3 bg-slate-200 dark:bg-slate-800 rounded-md animate-shimmer" />
-          <div className="w-14 h-3 bg-slate-200 dark:bg-slate-800 rounded-md animate-shimmer" />
-        </div>
-        <div className="flex items-center gap-3 overflow-hidden pt-1">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="flex flex-col items-center gap-1.5 shrink-0">
-              <div className="w-14 h-14 rounded-full bg-slate-200 dark:bg-slate-800 animate-shimmer" />
-              <div className="w-10 h-2 bg-slate-200 dark:bg-slate-800 rounded-md animate-shimmer" />
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* 4. Time-Aware Card Skeleton */}
       <div className="px-4 mt-4">
