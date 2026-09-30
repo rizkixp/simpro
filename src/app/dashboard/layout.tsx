@@ -9,6 +9,7 @@ import IdleSessionTimeout from "@/components/common/IdleSessionTimeout";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import CommandPalette from "@/components/common/CommandPalette";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
+import MobileSkeletonDashboard from "@/components/dashboard/MobileSkeletonDashboard";
 
 export default function DashboardLayout({
   children,
@@ -94,12 +95,20 @@ export default function DashboardLayout({
 
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen bg-[#f8faf9] dark:bg-slate-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-            {isLoading ? "Memuat SIM SD Islam Smart School..." : "Mengalihkan ke halaman login..."}
-          </p>
+      <div className="min-h-screen bg-[#f8faf9] dark:bg-slate-950">
+        {/* Mobile Shimmer Skeleton View (< 1024px) */}
+        <div className="lg:hidden">
+          <MobileSkeletonDashboard />
+        </div>
+
+        {/* Desktop Loading View (>= 1024px) */}
+        <div className="hidden lg:flex min-h-screen items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-10 w-10 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+              {isLoading ? "Memuat SIM SD Islam Smart School..." : "Mengalihkan ke halaman login..."}
+            </p>
+          </div>
         </div>
       </div>
     );

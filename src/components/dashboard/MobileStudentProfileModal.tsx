@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   ChevronLeft,
   Settings,
@@ -33,7 +33,35 @@ export default function MobileStudentProfileModal({
 }: MobileStudentProfileModalProps) {
   const [activeTab, setActiveTab] = useState<"profil" | "data" | "prestasi">("profil");
 
+  // Drag-to-Dismiss state
+  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartYRef = useRef(0);
+
   if (!isOpen) return null;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    dragStartYRef.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const delta = e.touches[0].clientY - dragStartYRef.current;
+    if (delta > 0) {
+      setDragY(delta);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    if (dragY > 100) {
+      if (typeof window !== "undefined" && "vibrate" in navigator) {
+        try { navigator.vibrate(10); } catch {}
+      }
+      onClose();
+    }
+    setDragY(0);
+  };
 
   const displayName = siswa?.nama || "Ahmad Fauzan";
   const displayKelas = siswa?.kelas
@@ -54,9 +82,31 @@ export default function MobileStudentProfileModal({
       aria-modal="true"
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
     >
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-[32px] sm:rounded-[32px] max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800">
-        {/* 1. Header Bar */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+      <div
+        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-[32px] sm:rounded-[32px] max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-slideUp"
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: isDragging ? "none" : "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Handle bar on top */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="pt-3 pb-1 cursor-grab active:cursor-grabbing select-none"
+        >
+          <div className="w-12 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto" />
+        </div>
+
+        {/* 1. Header Bar with Touch Gestures */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-slate-800 cursor-grab select-none"
+        >
           <button
             type="button"
             onClick={onClose}

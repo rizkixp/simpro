@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +44,34 @@ export default function MobileBottomNav() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPesanOpen, setIsPesanOpen] = useState(false);
+
+  // Gesture Drag-to-Dismiss state untuk Drawer Semua Modul
+  const [drawerDragY, setDrawerDragY] = useState(0);
+  const [isDraggingDrawer, setIsDraggingDrawer] = useState(false);
+  const dragStartYRef = useRef(0);
+
+  const handleDrawerTouchStart = (e: React.TouchEvent) => {
+    dragStartYRef.current = e.touches[0].clientY;
+    setIsDraggingDrawer(true);
+  };
+
+  const handleDrawerTouchMove = (e: React.TouchEvent) => {
+    const delta = e.touches[0].clientY - dragStartYRef.current;
+    if (delta > 0) {
+      setDrawerDragY(delta);
+    }
+  };
+
+  const handleDrawerTouchEnd = () => {
+    setIsDraggingDrawer(false);
+    if (drawerDragY > 110) {
+      if (typeof window !== "undefined" && "vibrate" in navigator) {
+        try { navigator.vibrate(10); } catch {}
+      }
+      setIsDrawerOpen(false);
+    }
+    setDrawerDragY(0);
+  };
 
   if (!user) return null;
 
@@ -112,7 +140,7 @@ export default function MobileBottomNav() {
     hasNotification?: boolean;
   }
 
-  // 4 Tab Navigasi Bawah Sesuai Gambar Referensi [Home, Brain Academy, Pembelian, Lainnya]
+  // 4 Tab Navigasi Bawah SDI Smart [Home, Akademi LMS, SPP & Bus, Lainnya]
   const navItems: NavItem[] = [
     {
       id: "home",
@@ -122,17 +150,17 @@ export default function MobileBottomNav() {
       isActive: safePathname === "/dashboard",
     },
     {
-      id: "brain-academy",
-      label: "Brain Acade...",
+      id: "lms",
+      label: "Akademi",
       href: "/dashboard/lms",
-      icon: Sparkles,
+      icon: BookOpenCheck,
       isActive: safePathname === "/dashboard/lms" || safePathname.startsWith("/dashboard/lms"),
     },
     {
-      id: "pembelian",
-      label: "Pembelian",
+      id: "keuangan",
+      label: "SPP & Bus",
       href: "/dashboard/spp-transportasi",
-      icon: ShoppingBag,
+      icon: Wallet,
       isActive: safePathname === "/dashboard/spp-transportasi" || safePathname === "/dashboard/keuangan",
     },
     {
@@ -197,7 +225,7 @@ export default function MobileBottomNav() {
                   }}
                   className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform cursor-pointer relative ${
                     item.isActive
-                      ? "text-[#00A5B5] font-bold"
+                      ? "text-emerald-700 dark:text-emerald-400 font-bold"
                       : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                   }`}
                 >
@@ -213,7 +241,7 @@ export default function MobileBottomNav() {
               );
             }
 
-            // Standard Link Tab (Home / Brain Academy / Pembelian)
+            // Standard Link Tab (Home / Akademi / SPP & Bus)
             return (
               <Link
                 key={`nav-${idx}`}
@@ -221,7 +249,7 @@ export default function MobileBottomNav() {
                 onClick={triggerHaptic}
                 className={`flex flex-col items-center justify-center gap-1 active:scale-90 transition-transform ${
                   item.isActive
-                    ? "text-[#00A5B5] font-bold"
+                    ? "text-emerald-700 dark:text-emerald-400 font-bold"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 }`}
               >
@@ -247,29 +275,43 @@ export default function MobileBottomNav() {
         >
           <div
             className="w-full bg-white dark:bg-slate-900 rounded-t-[32px] max-h-[85vh] flex flex-col shadow-2xl border-t border-slate-200 dark:border-slate-800 overflow-hidden animate-slideUp"
+            style={{
+              transform: `translateY(${drawerDragY}px)`,
+              transition: isDraggingDrawer ? "none" : "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Sheet Drag Handle */}
-            <div className="pt-3 pb-1 flex justify-center">
+            {/* Sheet Drag Handle with Touch Listeners */}
+            <div
+              onTouchStart={handleDrawerTouchStart}
+              onTouchMove={handleDrawerTouchMove}
+              onTouchEnd={handleDrawerTouchEnd}
+              className="pt-3 pb-2 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing select-none"
+            >
               <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
             </div>
 
             {/* Sheet Header: User Card & Close Button */}
-            <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+            <div
+              onTouchStart={handleDrawerTouchStart}
+              onTouchMove={handleDrawerTouchMove}
+              onTouchEnd={handleDrawerTouchEnd}
+              className="px-5 py-3 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between cursor-grab select-none"
+            >
               <div className="flex items-center gap-3">
                 <img
                   src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`}
                   alt={user.name}
                   loading="lazy"
                   decoding="async"
-                  className="h-10 w-10 rounded-2xl object-cover ring-2 ring-[#00A5B5]/30"
+                  className="h-10 w-10 rounded-2xl object-cover ring-2 ring-emerald-500/30"
                 />
                 <div className="min-w-0">
                   <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
                     {user.name}
                   </h4>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-teal-50 text-[#00A5B5] dark:bg-teal-950 dark:text-teal-300 font-bold uppercase tracking-wider">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-bold uppercase tracking-wider">
                       {user.role}
                     </span>
                     <span className="text-[10px] text-slate-400 truncate">

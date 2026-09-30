@@ -217,18 +217,18 @@ export default function DashboardOverviewPage() {
     if (forceMobileView) {
       return (
         <div className="space-y-4">
-          <div className="max-w-md mx-auto flex items-center justify-between p-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-lg border border-white/20">
+          <div className="max-w-md mx-auto flex items-center justify-between p-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-900 text-white shadow-lg border border-white/20">
             <div className="flex items-center gap-2.5">
               <span className="text-xl">📱</span>
               <div>
-                <p className="font-extrabold text-xs">Pratinjau Mobile Ruangguru</p>
-                <p className="text-[10px] text-teal-100">Simulasi layar smartphone di desktop</p>
+                <p className="font-extrabold text-xs">Pratinjau Mobile SDI Smart</p>
+                <p className="text-[10px] text-emerald-100">Simulasi layar smartphone di desktop</p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => toggleMobileMode(false)}
-              className="px-3.5 py-1.5 rounded-xl bg-white text-[#00A5B5] font-extrabold text-xs hover:bg-teal-50 shadow-xs transition-all cursor-pointer active:scale-95"
+              className="px-3.5 py-1.5 rounded-xl bg-white text-emerald-900 font-extrabold text-xs hover:bg-emerald-50 shadow-xs transition-all cursor-pointer active:scale-95"
             >
               ✕ Tutup Pratinjau
             </button>
@@ -240,23 +240,23 @@ export default function DashboardOverviewPage() {
 
     return (
       <>
-        {/* Tampilan Mobile Super-App Bergaya Ruangguru (< 1024px) */}
+        {/* Tampilan Mobile Super-App SDI Smart (< 1024px) */}
         <MobileSuperAppDashboard />
 
         {/* Tampilan Desktop Luas Portal Wali Santri (>= 1024px) */}
         <div className="hidden lg:block space-y-6">
-          {/* Quick Toggle Banner to Mobile Ruangguru View */}
-          <div className="flex items-center justify-between p-3.5 px-5 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-md border border-teal-400/30">
+          {/* Quick Toggle Banner to Mobile Super-App View */}
+          <div className="flex items-center justify-between p-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-900 text-white shadow-md border border-emerald-400/30">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📱</span>
               <div>
                 <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
-                  <span>Tampilan Mobile Ruangguru Aktif</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#00A5B5]">
+                  <span>Tampilan Mobile SDI Smart Aktif</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-emerald-900">
                     Aktif
                   </span>
                 </h3>
-                <p className="text-xs text-teal-100 mt-0.5">
+                <p className="text-xs text-emerald-100 mt-0.5">
                   Buka pratinjau tampilan HP langsung di layar ini, atau perkecil jendela browser Anda (&lt; 1024px).
                 </p>
               </div>
@@ -704,10 +704,10 @@ export default function DashboardOverviewPage() {
       <button
         type="button"
         onClick={() => toggleMobileMode(!forceMobileView)}
-        title="Klik untuk membuka simulasi tampilan mobile Ruangguru"
-        className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white font-extrabold text-xs shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-white/80 cursor-pointer"
+        title="Klik untuk membuka simulasi tampilan mobile SDI Smart"
+        className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-800 text-white font-extrabold text-xs shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-white/80 cursor-pointer"
       >
-        <span>📱 {forceMobileView ? "Kembali ke Desktop" : "Pratinjau Mobile Ruangguru"}</span>
+        <span>📱 {forceMobileView ? "Kembali ke Desktop" : "Pratinjau Mobile SDI Smart"}</span>
       </button>
       </>
     );
@@ -719,18 +719,18 @@ export default function DashboardOverviewPage() {
   if (forceMobileView) {
     return (
       <div className="space-y-4">
-        <div className="max-w-md mx-auto flex items-center justify-between p-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-lg border border-white/20">
+        <div className="max-w-md mx-auto flex items-center justify-between p-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-900 text-white shadow-lg border border-white/20">
           <div className="flex items-center gap-2.5">
             <span className="text-xl">📱</span>
             <div>
-              <p className="font-extrabold text-xs">Pratinjau Mobile Ruangguru</p>
-              <p className="text-[10px] text-teal-100">Simulasi layar smartphone di desktop</p>
+              <p className="font-extrabold text-xs">Pratinjau Mobile SDI Smart</p>
+              <p className="text-[10px] text-emerald-100">Simulasi layar smartphone di desktop</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => toggleMobileMode(false)}
-            className="px-3.5 py-1.5 rounded-xl bg-white text-[#00A5B5] font-extrabold text-xs hover:bg-teal-50 shadow-xs transition-all cursor-pointer active:scale-95"
+            className="px-3.5 py-1.5 rounded-xl bg-white text-emerald-900 font-extrabold text-xs hover:bg-emerald-50 shadow-xs transition-all cursor-pointer active:scale-95"
           >
             ✕ Tutup Pratinjau
           </button>
@@ -742,23 +742,23 @@ export default function DashboardOverviewPage() {
 
   return (
     <>
-      {/* Tampilan Mobile Super-App Bergaya Ruangguru (< 1024px) */}
+      {/* Tampilan Mobile Super-App SDI Smart (< 1024px) */}
       <MobileSuperAppDashboard />
 
       {/* Tampilan Desktop Luas Admin, Guru, dan Siswa (>= 1024px) */}
       <div className="hidden lg:block space-y-6">
-        {/* Quick Toggle Banner to Mobile Ruangguru View */}
-        <div className="flex items-center justify-between p-3.5 px-5 rounded-2xl bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white shadow-md border border-teal-400/30">
+        {/* Quick Toggle Banner to Mobile Super-App View */}
+        <div className="flex items-center justify-between p-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-900 text-white shadow-md border border-emerald-400/30">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📱</span>
             <div>
               <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
-                <span>Tampilan Mobile Ruangguru Aktif</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#00A5B5]">
+                <span>Tampilan Mobile SDI Smart Aktif</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-emerald-900">
                   Aktif
                 </span>
               </h3>
-              <p className="text-xs text-teal-100 mt-0.5">
+              <p className="text-xs text-emerald-100 mt-0.5">
                 Buka pratinjau tampilan HP langsung di layar ini, atau perkecil jendela browser Anda (&lt; 1024px).
               </p>
             </div>
@@ -1149,10 +1149,10 @@ export default function DashboardOverviewPage() {
     <button
       type="button"
       onClick={() => toggleMobileMode(!forceMobileView)}
-      title="Klik untuk membuka simulasi tampilan mobile Ruangguru"
-      className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-[#00A5B5] via-[#2F80ED] to-[#7952B3] text-white font-extrabold text-xs shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-white/80 cursor-pointer"
+      title="Klik untuk membuka simulasi tampilan mobile SDI Smart"
+      className="hidden lg:flex fixed bottom-6 right-6 z-50 items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-800 text-white font-extrabold text-xs shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all border-2 border-white/80 cursor-pointer"
     >
-      <span>📱 {forceMobileView ? "Kembali ke Desktop" : "Pratinjau Mobile Ruangguru"}</span>
+      <span>📱 {forceMobileView ? "Kembali ke Desktop" : "Pratinjau Mobile SDI Smart"}</span>
     </button>
     </>
   );

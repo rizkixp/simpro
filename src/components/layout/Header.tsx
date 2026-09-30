@@ -215,7 +215,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           </div>
         )}
 
-        {/* Quick Mobile Ruangguru Mode Switcher (Desktop) */}
+        {/* Quick Mobile Super-App Mode Switcher (Desktop) */}
         <button
           type="button"
           onClick={() => {
@@ -223,8 +223,8 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
               window.dispatchEvent(new CustomEvent("toggle-mobile-preview"));
             }
           }}
-          title="Buka / Tutup Pratinjau Tampilan Mobile Ruangguru"
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#00A5B5] to-[#7952B3] text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all cursor-pointer active:scale-95"
+          title="Buka / Tutup Pratinjau Tampilan Mobile SDI Smart"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white text-xs font-bold shadow-xs hover:opacity-95 transition-all cursor-pointer active:scale-95"
         >
           <span>📱 Mode Mobile</span>
         </button>
